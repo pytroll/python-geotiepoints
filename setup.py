@@ -32,7 +32,7 @@ setup(name='pyresample',
       author_email='martin.raspaud@smhi.se',
       package_dir = {'geo_interpolator': 'geo_interpolator'},
       packages = ['geo_interpolator'],      
-      install_requires=['numpy', 'scipy'],
+      install_requires=['numpy', 'scipy', 'pyresample'],
       zip_safe = False
       )
 

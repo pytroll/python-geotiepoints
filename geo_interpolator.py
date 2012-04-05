@@ -1,64 +1,399 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright (c) 2010-2011.
-
-# SMHI,
-# Folkborgsvägen 1,
-# Norrköping, 
-# Sweden
+# Copyright (c) 2010-2012.
 
 # Author(s):
  
 #   Adam Dybbroe <adam.dybbroe@smhise>
 #   Martin Raspaud <martin.raspaud@smhi.se>
 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 from numpy import (meshgrid, mgrid, ceil,
                    arccos, sign, rad2deg, sqrt, fabs,
                    cos, sin, tan, arcsin, arctan)
 
+import numpy as np
+from pyresample import geometry
+from scipy.interpolate import RectBivariateSpline
+
 EARTH_RADIUS = 6371000.0
 
 
-class SatelliteInterpolator(object):
+# TODO: extrapolate on a sphere ?
+def _linear_extrapolate(pos, data, xev):
     """
-    Handles interpolation of satellite geolocation data from a grid of tie points.
-    It is preferable to have tie-points out till the edges if the satellite swath.
-    The interpolation, is strictly an interpolation, so if the satellite swath goes beyond 
-    the tie point grid this area outside the tie point grid will not be 
-    interpolated/extrapolated.
-
-    Uses numpy, Scipy, and pyresample
 
     >>> import numpy as np
-    >>> coldim, rowdim = 2030, 1354
-    >>> tiepoints = np.arange(0, coldim, 5), np.arange(0, rowdim, 5)
-    >>> geodata = SatelliteInterpolator(tiepoints)
-    # Get some longitudes and latitudes, e.g. from a HDF MODIS file...
-    >>> geodata.lon_tiepoint = longitudes
-    >>> geodata.lat_tiepoint = latitudes
-    >>> geodata.interpolate()
-
+    >>> pos = np.array([1, 2])
+    >>> data = np.arange(10).reshape((2, 5), order="F")
+    >>> xev = 5
+    >>> _linear_extrapolate(pos, data, xev)
+    array([  4.,   6.,   8.,  10.,  12.])
+    >>> xev = 0
+    >>> _linear_extrapolate(pos, data, xev)
+    array([-1.,  1.,  3.,  5.,  7.])
     """
+    if len(data) != 2 or len(pos) != 2:
+        raise ValueError("len(pos) and the number of lines of data"
+                         " must be 2.")
 
-    def __init__(self, tiepoint_grid):
+    return data[1] + ((xev - pos[1]) / (1.0 * (pos[0] - pos[1])) *
+                      (data[0] - data[1]))
+
+
+def modis5kmto1km(lons5km, lats5km):
+    cols5km = np.arange(2, 1354, 5)
+    cols1km = np.arange(1354)
+    lines = lons5km.shape[0] * 5
+    rows5km = np.arange(2, lines, 5)
+    rows1km = np.arange(lines)
+    
+    satint = SatelliteInterpolator((lons5km, lats5km),
+                                   (cols5km, rows5km),
+                                   (cols1km, rows1km), 10)
+    satint.fill_borders("y", "x")
+    lons1km, lats1km = satint.interpolate_martin()
+
+    return lons1km, lats1km
+
+class SatelliteInterpolator(object):
+    # """
+    # Handles interpolation of satellite geolocation data from a grid of tie points.
+    # It is preferable to have tie-points out till the edges if the satellite swath.
+    # The interpolation, is strictly an interpolation, so if the satellite swath goes beyond 
+    # the tie point grid this area outside the tie point grid will not be 
+    # interpolated/extrapolated.
+
+    # Uses numpy, Scipy, and pyresample
+
+    # >>> import numpy as np
+    # >>> coldim, rowdim = 2030, 1354
+    # >>> tiepoints = np.arange(0, coldim, 5), np.arange(0, rowdim, 5)
+    # >>> geodata = SatelliteInterpolator(tiepoints)
+    # # Get some longitudes and latitudes, e.g. from a HDF MODIS file...
+    # >>> geodata.lon_tiepoint = longitudes
+    # >>> geodata.lat_tiepoint = latitudes
+    # >>> geodata.interpolate()
+
+    # """
+
+    def __init__(self, lon_lat_data, tiepoint_grid, final_grid, chunk_size=0):
         self.row_indices = tiepoint_grid[0]
         self.col_indices = tiepoint_grid[1]
+        self.hrow_indices = final_grid[0]
+        self.hcol_indices = final_grid[1]
+        self.chunk_size = chunk_size
         self.lon_tiepoint = None
         self.lat_tiepoint = None
+        self.set_tiepoints(lon_lat_data[0], lon_lat_data[0])
         self.longitude = None
         self.latitude = None
-
+        swath = geometry.BaseDefinition(self.lon_tiepoint,
+                                        self.lat_tiepoint)
+        xyz = swath.get_cartesian_coords()
+        self.x = xyz[:, :, 0]
+        self.y = xyz[:, :, 1]
+        self.z = xyz[:, :, 2]
+        
     def set_tiepoints(self, lon, lat):
         """Defines the lon,lat tie points"""
         self.lon_tiepoint = lon
         self.lat_tiepoint = lat
 
+    def fill_borders(self, *args):
+        """Extrapolate tiepoint lons and lats to fill in the border of the
+        chunks.
+
+        >>> import numpy as np
+        >>> lons = np.arange(20).reshape((4, 5), order="F")
+        >>> lats = np.arange(20).reshape((4, 5), order="C")
+        >>> lines = np.array([2, 7, 12, 17])
+        >>> cols = np.array([2, 7, 12, 17, 22])
+        >>> hlines = np.arange(20)
+        >>> hcols = np.arange(24)
+        >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols), 10)
+        >>> satint.fill_borders('x', 'y')
+        >>> satint.x
+        array([[ 6381701.09954534,  6371773.20784676,  6346953.47860033,
+                 6260599.62429718,  6114392.42448528,  5911177.63600072,
+                 5870534.67830381],
+               [ 6383397.42097033,  6370997.        ,  6339995.94757417,
+                 6247596.19051897,  6095596.18500232,  5886954.43823415,
+                 5845226.08888052],
+               [ 6387638.22453282,  6369056.48038309,  6322602.12000876,
+                 6215087.60607344,  6048605.58629493,  5826396.44381773,
+                 5781954.61532229],
+               [ 6389334.54595781,  6368280.27253632,  6315644.5889826 ,
+                 6202084.17229522,  6029809.34681197,  5802173.24605116,
+                 5756646.02589899],
+               [ 6389402.6093161 ,  6367113.59769412,  6311391.06863915,
+                 6194826.59638572,  6019688.97579612,  5789387.06143903,
+                 5743326.67856761],
+               [ 6387977.71409278,  6363237.28575659,  6301386.21491614,
+                 6178887.93397458,  5998126.73263072,  5762620.9220559 ,
+                 5715519.75994094],
+               [ 6384415.47603447,  6353546.50591279,  6276374.0806086 ,
+                 6139041.27794672,  5944221.12471722,  5695705.57359808,
+                 5646002.46337425],
+               [ 6382990.58081115,  6349670.19397527,  6266369.22688558,
+                 6123102.61553557,  5922658.88155182,  5668939.43421495,
+                 5618195.54474758]])
+        >>> satint.row_indices
+        array([ 0,  2,  7,  9, 10, 12, 17, 19])
+        >>> satint.col_indices
+        array([ 0,  2,  7, 12, 17, 22, 23])
+        """
+        to_run = []
+        cases = {"y": self._fill_row_borders,
+                 "x": self._fill_col_borders}
+        for dim in args:
+            try:
+                to_run.append(cases[dim])
+            except KeyError:
+                raise NameError("Unrecognized dimension: "+str(dim))
+
+        for fun in to_run:
+            fun()
+
+
+    def _extrapolate_cols(self, data):
+        """Extrapolate the column of data, to get the first and last together
+        with the data.
+
+        >>> import numpy as np
+        >>> lons = np.arange(10).reshape((2, 5), order="F")
+        >>> lats = np.arange(10).reshape((2, 5), order="C")
+        >>> lines = np.array([2, 7])
+        >>> cols = np.array([2, 7, 12, 17, 22])
+        >>> hlines = np.arange(10)
+        >>> hcols = np.arange(24)
+        >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols))
+        >>> satint._extrapolate_cols(satint.x)
+        array([[ 6374100.88569736,  6370997.        ,  6363237.28575659,
+                 6339995.94757417,  6301386.21491614,  6247596.19051897,
+                 6236838.18563954],
+               [ 6375260.47017121,  6369056.48038309,  6353546.50591279,
+                 6322602.12000876,  6276374.0806086 ,  6215087.60607344,
+                 6202830.31116641]])
+        """
+
+        pos = self.col_indices[:2]
+        first_column = _linear_extrapolate(pos,
+                                           (data[:, 0], data[:, 1]),
+                                           self.hcol_indices[0])
+        pos = self.col_indices[-2:]
+        last_column = _linear_extrapolate(pos,
+                                          (data[:, -2], data[:, -1]),
+                                          self.hcol_indices[-1])
+
+        return np.hstack((np.expand_dims(first_column, 1),
+                          data,
+                          np.expand_dims(last_column, 1))) 
+
+    def _fill_col_borders(self):
+        """Add the first and last column to the data by extrapolation.
+
+        >>> import numpy as np
+        >>> lons = np.arange(10).reshape((2, 5), order="F")
+        >>> lats = np.arange(10).reshape((2, 5), order="C")
+        >>> lines = np.array([2, 7])
+        >>> cols = np.array([2, 7, 12, 17, 22])
+        >>> hlines = np.arange(10)
+        >>> hcols = np.arange(24)
+        >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols))
+        >>> satint._fill_col_borders()
+        >>> satint.x
+        array([[ 6374100.88569736,  6370997.        ,  6363237.28575659,
+                 6339995.94757417,  6301386.21491614,  6247596.19051897,
+                 6236838.18563954],
+               [ 6375260.47017121,  6369056.48038309,  6353546.50591279,
+                 6322602.12000876,  6276374.0806086 ,  6215087.60607344,
+                 6202830.31116641]])
+        >>> satint.col_indices
+        array([ 0,  2,  7, 12, 17, 22, 23])
+        """
+
+        self.x = self._extrapolate_cols(self.x)
+        self.y = self._extrapolate_cols(self.y)
+        self.z = self._extrapolate_cols(self.z)
+  
+        self.col_indices = np.concatenate((np.array([self.hcol_indices[0]]),
+                                           self.col_indices,
+                                           np.array([self.hcol_indices[-1]])))
+
+    def _extrapolate_rows(self, data):
+        """Extrapolate the rows of data, to get the first and last together
+        with the data.
+
+        >>> import numpy as np
+        >>> lons = np.arange(10).reshape((2, 5), order="F")
+        >>> lats = np.arange(10).reshape((2, 5), order="C")
+        >>> lines = np.array([2, 7])
+        >>> cols = np.array([2, 7, 12, 17, 22])
+        >>> hlines = np.arange(10)
+        >>> hcols = np.arange(24)
+        >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols))
+        >>> satint._extrapolate_rows(satint.x)
+        array([[ 6371773.20784676,  6367113.59769412,  6346953.47860033,
+                 6311391.06863915,  6260599.62429718],
+               [ 6370997.        ,  6363237.28575659,  6339995.94757417,
+                 6301386.21491614,  6247596.19051897],
+               [ 6369056.48038309,  6353546.50591279,  6322602.12000876,
+                 6276374.0806086 ,  6215087.60607344],
+               [ 6368280.27253632,  6349670.19397527,  6315644.5889826 ,
+                 6266369.22688558,  6202084.17229522]])
+
+        """
+
+        pos = self.row_indices[:2]
+        first_row = _linear_extrapolate(pos,
+                                        (data[0, :], data[1, :]),
+                                        self.hrow_indices[0])
+        pos = self.row_indices[-2:]
+        last_row = _linear_extrapolate(pos,
+                                       (data[-2, :], data[-1, :]),
+                                       self.hrow_indices[-1])
+
+        return np.vstack((np.expand_dims(first_row, 0),
+                          data,
+                          np.expand_dims(last_row, 0))) 
+
+    def _fill_row_borders(self):
+        """Add the first and last rows to the data by extrapolation.
+
+        >>> import numpy as np
+        >>> lons = np.arange(20).reshape((4, 5), order="F")
+        >>> lats = np.arange(20).reshape((4, 5), order="C")
+        >>> lines = np.array([2, 7, 12, 17])
+        >>> cols = np.array([2, 7, 12, 17, 22])
+        >>> hlines = np.arange(20)
+        >>> hcols = np.arange(24)
+        >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols))
+        >>> satint._fill_row_borders()
+        >>> satint.x
+        array([[ 6371773.20784676,  6346953.47860033,  6260599.62429718,
+                 6114392.42448528,  5911177.63600072],
+               [ 6370997.        ,  6339995.94757417,  6247596.19051897,
+                 6095596.18500232,  5886954.43823415],
+               [ 6369056.48038309,  6322602.12000876,  6215087.60607344,
+                 6048605.58629493,  5826396.44381773],
+               [ 6363237.28575659,  6301386.21491614,  6178887.93397458,
+                 5998126.73263072,  5762620.9220559 ],
+               [ 6353546.50591279,  6276374.0806086 ,  6139041.27794672,
+                 5944221.12471722,  5695705.57359808],
+               [ 6349670.19397527,  6266369.22688558,  6123102.61553557,
+                 5922658.88155182,  5668939.43421495]])
+        >>> satint.row_indices
+        array([ 0,  2,  7, 12, 17, 19])
+        >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols), 10)
+        >>> satint._fill_row_borders()
+        >>> satint.x
+        array([[ 6371773.20784676,  6346953.47860033,  6260599.62429718,
+                 6114392.42448528,  5911177.63600072],
+               [ 6370997.        ,  6339995.94757417,  6247596.19051897,
+                 6095596.18500232,  5886954.43823415],
+               [ 6369056.48038309,  6322602.12000876,  6215087.60607344,
+                 6048605.58629493,  5826396.44381773],
+               [ 6368280.27253632,  6315644.5889826 ,  6202084.17229522,
+                 6029809.34681197,  5802173.24605116],
+               [ 6367113.59769412,  6311391.06863915,  6194826.59638572,
+                 6019688.97579612,  5789387.06143903],
+               [ 6363237.28575659,  6301386.21491614,  6178887.93397458,
+                 5998126.73263072,  5762620.9220559 ],
+               [ 6353546.50591279,  6276374.0806086 ,  6139041.27794672,
+                 5944221.12471722,  5695705.57359808],
+               [ 6349670.19397527,  6266369.22688558,  6123102.61553557,
+                 5922658.88155182,  5668939.43421495]])
+         >>> satint.row_indices
+         array([ 0,  2,  7,  9, 10, 12, 17, 19])
+        """
+        lines = len(self.hrow_indices)
+        chunk_size = self.chunk_size or lines
+
+        x, y, z = [], [], []
+        row_indices = []
+        for index in range(0, lines, chunk_size):
+            ties = np.argwhere(np.logical_and(self.row_indices >= index,
+                                              self.row_indices < index + chunk_size)).squeeze()
+            tiepos = self.row_indices[np.logical_and(self.row_indices >= index,
+                                                     self.row_indices < index + chunk_size)].squeeze()
+            x.append(self._extrapolate_rows(self.x[ties, :]))
+            y.append(self._extrapolate_rows(self.y[ties, :]))
+            z.append(self._extrapolate_rows(self.z[ties, :]))
+            row_indices.append(np.array([self.hrow_indices[index]]))
+            row_indices.append(tiepos)
+            row_indices.append(np.array([self.hrow_indices[index + chunk_size - 1]]))
+        self.x = np.vstack(x)
+        self.y = np.vstack(y)
+        self.z = np.vstack(z)
+
+        self.row_indices = np.concatenate(row_indices)
+    
+    def _interp(self):
+        xpoints, ypoints = np.meshgrid(self.hrow_indices,
+                                       self.hcol_indices)
+        print xpoints, ypoints
+        spl = RectBivariateSpline(self.row_indices,
+                                  self.col_indices,
+                                  self.x,
+                                  s=0,
+                                  kx=3,
+                                  ky=1)
+
+        self.newx = spl.ev(xpoints.ravel(), ypoints.ravel())
+        self.newx = self.newx.reshape(xpoints.shape)
+
+        spl = RectBivariateSpline(self.row_indices,
+                                  self.col_indices,
+                                  self.y,
+                                  s=0,
+                                  kx=3,
+                                  ky=1)
+
+        self.newy = spl.ev(xpoints.ravel(), ypoints.ravel())
+        self.newy = self.newy.reshape(xpoints.shape)
+
+        spl = RectBivariateSpline(self.row_indices,
+                                  self.col_indices,
+                                  self.z,
+                                  s=0,
+                                  kx=3,
+                                  ky=1)
+
+        self.newz = spl.ev(xpoints.ravel(), ypoints.ravel())
+        self.newz = self.newz.reshape(xpoints.shape)
+
+    def interpolate_martin(self):
+        self._interp()
+
+        self.longitude = get_lons_from_cartesian(self.newx, self.newy)
+        self.longitude = self.longitude.reshape(len(self.hcol_indices),
+                                                len(self.hrow_indices)).T
+
+        self.latitude = get_lats_from_cartesian(self.newx, self.newy, self.newz)
+        self.latitude = self.latitude.reshape(len(self.hcol_indices),
+                                              len(self.hrow_indices)).T
+        return self.longitude, self.latitude
+        
     def interpolate(self, method="linear"):
         """
         Upsample the tiepoint lonlat data to full resolution lonlat.
-        Uses pyresample and Scipy to go from lon,lat space to x,y,z (cartesian) space,
-        the interpolate in the 3D cartesian space, and then go back again to
-        polar coordinates (lon,lat)
+
+        Uses pyresample and Scipy to go from lon,lat space to x,y,z (cartesian)
+        space, the interpolate in the 3D cartesian space, and then go back
+        again to polar coordinates (lon,lat)
 
         """
 
@@ -124,7 +459,6 @@ class SatelliteInterpolator(object):
         again to polar coordinates (lon,lat)
         """
 
-        from pyresample import geometry
         from scipy.interpolate import SmoothBivariateSpline
 
         if self.lon_tiepoint is None or self.lat_tiepoint is None:
