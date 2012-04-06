@@ -61,11 +61,10 @@ def modis5kmto1km(lons5km, lats5km):
     rows1km = np.arange(lines)
     
     satint = SatelliteInterpolator((lons5km, lats5km),
-                                   (cols5km, rows5km),
-                                   (cols1km, rows1km), 10)
+                                   (rows5km, cols5km),
+                                   (rows1km, cols1km), 10)
     satint.fill_borders("y", "x")
     lons1km, lats1km = satint.interpolate_martin()
-
     return lons1km, lats1km
 
 class SatelliteInterpolator(object):
@@ -97,7 +96,7 @@ class SatelliteInterpolator(object):
         self.chunk_size = chunk_size
         self.lon_tiepoint = None
         self.lat_tiepoint = None
-        self.set_tiepoints(lon_lat_data[0], lon_lat_data[0])
+        self.set_tiepoints(lon_lat_data[0], lon_lat_data[1])
         self.longitude = None
         self.latitude = None
         swath = geometry.BaseDefinition(self.lon_tiepoint,
@@ -344,7 +343,6 @@ class SatelliteInterpolator(object):
     def _interp(self):
         xpoints, ypoints = np.meshgrid(self.hrow_indices,
                                        self.hcol_indices)
-        print xpoints, ypoints
         spl = RectBivariateSpline(self.row_indices,
                                   self.col_indices,
                                   self.x,

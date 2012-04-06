@@ -25,12 +25,11 @@
 
 from setuptools import setup
 
-setup(name='pyresample',
+setup(name='geo_interpolator',
       version="v0.1",
       description='Interpolation geographic tiepoints in Python',
       author='Martin Raspaud',
       author_email='martin.raspaud@smhi.se',
-      package_dir = {'geo_interpolator': 'geo_interpolator'},
       packages = ['geo_interpolator'],      
       install_requires=['numpy', 'scipy', 'pyresample'],
       zip_safe = False
