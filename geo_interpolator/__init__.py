@@ -56,7 +56,7 @@ def modis5kmto1km(lons5km, lats5km):
     return lons1km, lats1km
 
 def modis1kmto500m(lons1km, lats1km):
-    """Getting 1km geolocation for modis from 5km tiepoints.
+    """Getting 500m geolocation for modis from 1km tiepoints.
     """
     cols1km = np.arange(0, 2708, 2)
     cols500m = np.arange(2708)
@@ -78,7 +78,7 @@ def modis1kmto500m(lons1km, lats1km):
     return lons500m, lats500m
 
 def modis1kmto250m(lons1km, lats1km):
-    """Getting 1km geolocation for modis from 5km tiepoints.
+    """Getting 250m geolocation for modis from 1km tiepoints.
     """
     cols1km = np.arange(0, 5416, 4)
     cols250m = np.arange(5416)
