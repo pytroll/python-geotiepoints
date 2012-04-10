@@ -24,8 +24,6 @@
 """Interpolation of geographical tiepoints.
 """
 
-# TODO: Add the possibility to change interpolation orders (hardcoded right now)
-
 import numpy as np
 from numpy import arccos, sign, rad2deg, sqrt, arcsin
 from pyresample import geometry
