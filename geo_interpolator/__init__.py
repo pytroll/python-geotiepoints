@@ -129,6 +129,14 @@ class SatelliteInterpolator(object):
     of the grid.
 
     Uses numpy, scipy, and pyresample
+
+    The constructor takes in the tiepointed lon/lat data as *lon_lat_data*, the
+    *tiepoint_grid* and the desired *final_grid*. As optional arguments, one
+    can provide *kx* and *ky* as interpolation orders (in x and y directions
+    respectively), and the *chunksize* if the data has to be handled by pieces
+    along the y axis (this affects how the extrapolator behaves). If
+    *chunksize* is set, don't forget to adjust the interpolation orders
+    accordingly: the interpolation is indeed done globaly (not chunkwise).
     """
 
     def __init__(self, lon_lat_data, tiepoint_grid, final_grid,
@@ -173,7 +181,7 @@ class SatelliteInterpolator(object):
         >>> cols = np.array([2, 7, 12, 17, 22])
         >>> hlines = np.arange(20)
         >>> hcols = np.arange(24)
-        >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols), 10)
+        >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols), chunk_size=10)
         >>> satint.fill_borders('x', 'y')
         >>> satint.x__
         array([[ 6384905.78040055,  6381081.08333225,  6371519.34066148,
@@ -346,7 +354,7 @@ class SatelliteInterpolator(object):
                  5784478.09790441,  5622309.91344102]])
         >>> satint.row_indices
         array([ 0,  2,  7, 12, 17, 19])
-        >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols), 10)
+        >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols), chunk_size=10)
         >>> satint._fill_row_borders()
         >>> satint.x__
         array([[ 6381081.08333225,  6371519.34066148,  6328950.00792935,
