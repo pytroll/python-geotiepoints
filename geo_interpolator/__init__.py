@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
 # Copyright (c) 2010-2012.
 
 # Author(s):
@@ -20,13 +21,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from numpy import (meshgrid, mgrid, ceil,
-                   arccos, sign, rad2deg, sqrt, fabs,
-                   cos, sin, tan, arcsin, arctan)
+"""Interpolation of geographical tiepoints.
+"""
+
+# TODO: Add the possibility to change interpolation orders (hardcoded right now)
 
 import numpy as np
+from numpy import arccos, sign, rad2deg, sqrt, arcsin
 from pyresample import geometry
 from scipy.interpolate import RectBivariateSpline
+
 
 EARTH_RADIUS = 6371000.0
 
@@ -54,6 +58,8 @@ def _linear_extrapolate(pos, data, xev):
 
 
 def modis5kmto1km(lons5km, lats5km):
+    """Getting 1km geolocation for modis from 5km tiepoints.
+    """
     cols5km = np.arange(2, 1354, 5)
     cols1km = np.arange(1354)
     lines = lons5km.shape[0] * 5
@@ -64,18 +70,18 @@ def modis5kmto1km(lons5km, lats5km):
                                    (rows5km, cols5km),
                                    (rows1km, cols1km), 10)
     satint.fill_borders("y", "x")
-    lons1km, lats1km = satint.interpolate_martin()
+    lons1km, lats1km = satint.interpolate()
     return lons1km, lats1km
 
 class SatelliteInterpolator(object):
-    # """
-    # Handles interpolation of satellite geolocation data from a grid of tie points.
-    # It is preferable to have tie-points out till the edges if the satellite swath.
-    # The interpolation, is strictly an interpolation, so if the satellite swath goes beyond 
-    # the tie point grid this area outside the tie point grid will not be 
-    # interpolated/extrapolated.
+    """
+    Handles interpolation of geolocation data from a grid of tie points.  It is
+    preferable to have tie-points out till the edges if the tiepoint grid, but
+    a method is provided to extrapolate linearly the tiepoints to the borders
+    of the grid.
 
-    # Uses numpy, Scipy, and pyresample
+    Uses numpy, Scipy, and pyresample
+    """
 
     # >>> import numpy as np
     # >>> coldim, rowdim = 2030, 1354
@@ -86,7 +92,6 @@ class SatelliteInterpolator(object):
     # >>> geodata.lat_tiepoint = latitudes
     # >>> geodata.interpolate()
 
-    # """
 
     def __init__(self, lon_lat_data, tiepoint_grid, final_grid, chunk_size=0):
         self.row_indices = tiepoint_grid[0]
@@ -102,12 +107,17 @@ class SatelliteInterpolator(object):
         swath = geometry.BaseDefinition(self.lon_tiepoint,
                                         self.lat_tiepoint)
         xyz = swath.get_cartesian_coords()
-        self.x = xyz[:, :, 0]
-        self.y = xyz[:, :, 1]
-        self.z = xyz[:, :, 2]
+        self.x__ = xyz[:, :, 0]
+        self.y__ = xyz[:, :, 1]
+        self.z__ = xyz[:, :, 2]
+
+        self.newx = None
+        self.newy = None
+        self.newz = None
         
     def set_tiepoints(self, lon, lat):
-        """Defines the lon,lat tie points"""
+        """Defines the lon,lat tie points.
+        """
         self.lon_tiepoint = lon
         self.lat_tiepoint = lat
 
@@ -124,7 +134,7 @@ class SatelliteInterpolator(object):
         >>> hcols = np.arange(24)
         >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols), 10)
         >>> satint.fill_borders('x', 'y')
-        >>> satint.x
+        >>> satint.x__
         array([[ 6381701.09954534,  6371773.20784676,  6346953.47860033,
                  6260599.62429718,  6114392.42448528,  5911177.63600072,
                  5870534.67830381],
@@ -179,7 +189,7 @@ class SatelliteInterpolator(object):
         >>> hlines = np.arange(10)
         >>> hcols = np.arange(24)
         >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols))
-        >>> satint._extrapolate_cols(satint.x)
+        >>> satint._extrapolate_cols(satint.x__)
         array([[ 6374100.88569736,  6370997.        ,  6363237.28575659,
                  6339995.94757417,  6301386.21491614,  6247596.19051897,
                  6236838.18563954],
@@ -213,7 +223,7 @@ class SatelliteInterpolator(object):
         >>> hcols = np.arange(24)
         >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols))
         >>> satint._fill_col_borders()
-        >>> satint.x
+        >>> satint.x__
         array([[ 6374100.88569736,  6370997.        ,  6363237.28575659,
                  6339995.94757417,  6301386.21491614,  6247596.19051897,
                  6236838.18563954],
@@ -224,9 +234,9 @@ class SatelliteInterpolator(object):
         array([ 0,  2,  7, 12, 17, 22, 23])
         """
 
-        self.x = self._extrapolate_cols(self.x)
-        self.y = self._extrapolate_cols(self.y)
-        self.z = self._extrapolate_cols(self.z)
+        self.x__ = self._extrapolate_cols(self.x__)
+        self.y__ = self._extrapolate_cols(self.y__)
+        self.z__ = self._extrapolate_cols(self.z__)
   
         self.col_indices = np.concatenate((np.array([self.hcol_indices[0]]),
                                            self.col_indices,
@@ -281,7 +291,7 @@ class SatelliteInterpolator(object):
         >>> hcols = np.arange(24)
         >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols))
         >>> satint._fill_row_borders()
-        >>> satint.x
+        >>> satint.x__
         array([[ 6371773.20784676,  6346953.47860033,  6260599.62429718,
                  6114392.42448528,  5911177.63600072],
                [ 6370997.        ,  6339995.94757417,  6247596.19051897,
@@ -298,7 +308,7 @@ class SatelliteInterpolator(object):
         array([ 0,  2,  7, 12, 17, 19])
         >>> satint = SatelliteInterpolator((lons, lats), (lines, cols), (hlines, hcols), 10)
         >>> satint._fill_row_borders()
-        >>> satint.x
+        >>> satint.x__
         array([[ 6371773.20784676,  6346953.47860033,  6260599.62429718,
                  6114392.42448528,  5911177.63600072],
                [ 6370997.        ,  6339995.94757417,  6247596.19051897,
@@ -325,27 +335,32 @@ class SatelliteInterpolator(object):
         row_indices = []
         for index in range(0, lines, chunk_size):
             ties = np.argwhere(np.logical_and(self.row_indices >= index,
-                                              self.row_indices < index + chunk_size)).squeeze()
+                                              self.row_indices < index
+                                              + chunk_size)).squeeze()
             tiepos = self.row_indices[np.logical_and(self.row_indices >= index,
-                                                     self.row_indices < index + chunk_size)].squeeze()
-            x.append(self._extrapolate_rows(self.x[ties, :]))
-            y.append(self._extrapolate_rows(self.y[ties, :]))
-            z.append(self._extrapolate_rows(self.z[ties, :]))
+                                                     self.row_indices < index
+                                                     + chunk_size)].squeeze()
+            x.append(self._extrapolate_rows(self.x__[ties, :]))
+            y.append(self._extrapolate_rows(self.y__[ties, :]))
+            z.append(self._extrapolate_rows(self.z__[ties, :]))
             row_indices.append(np.array([self.hrow_indices[index]]))
             row_indices.append(tiepos)
-            row_indices.append(np.array([self.hrow_indices[index + chunk_size - 1]]))
-        self.x = np.vstack(x)
-        self.y = np.vstack(y)
-        self.z = np.vstack(z)
+            row_indices.append(np.array([self.hrow_indices[index
+                                                           + chunk_size - 1]]))
+        self.x__ = np.vstack(x)
+        self.y__ = np.vstack(y)
+        self.z__ = np.vstack(z)
 
         self.row_indices = np.concatenate(row_indices)
     
     def _interp(self):
+        """Interpolate the cartesian coordinates.
+        """
         xpoints, ypoints = np.meshgrid(self.hrow_indices,
                                        self.hcol_indices)
         spl = RectBivariateSpline(self.row_indices,
                                   self.col_indices,
-                                  self.x,
+                                  self.x__,
                                   s=0,
                                   kx=3,
                                   ky=1)
@@ -355,7 +370,7 @@ class SatelliteInterpolator(object):
 
         spl = RectBivariateSpline(self.row_indices,
                                   self.col_indices,
-                                  self.y,
+                                  self.y__,
                                   s=0,
                                   kx=3,
                                   ky=1)
@@ -365,7 +380,7 @@ class SatelliteInterpolator(object):
 
         spl = RectBivariateSpline(self.row_indices,
                                   self.col_indices,
-                                  self.z,
+                                  self.z__,
                                   s=0,
                                   kx=3,
                                   ky=1)
@@ -373,7 +388,9 @@ class SatelliteInterpolator(object):
         self.newz = spl.ev(xpoints.ravel(), ypoints.ravel())
         self.newz = self.newz.reshape(xpoints.shape)
 
-    def interpolate_martin(self):
+    def interpolate(self):
+        """Do the interpolation, and return resulting longitudes and latitudes.
+        """
         self._interp()
 
         self.longitude = get_lons_from_cartesian(self.newx, self.newy)
@@ -384,158 +401,27 @@ class SatelliteInterpolator(object):
         self.latitude = self.latitude.reshape(len(self.hcol_indices),
                                               len(self.hrow_indices)).T
         return self.longitude, self.latitude
-        
-    def interpolate(self, method="linear"):
-        """
-        Upsample the tiepoint lonlat data to full resolution lonlat.
-
-        Uses pyresample and Scipy to go from lon,lat space to x,y,z (cartesian)
-        space, the interpolate in the 3D cartesian space, and then go back
-        again to polar coordinates (lon,lat)
-
-        """
-
-        from pyresample import geometry
-        from scipy.interpolate import griddata
-
-        if self.lon_tiepoint is None or self.lat_tiepoint is None:
-            raise ValueError('lon/lat values are not defined')
-
-        swath = geometry.BaseDefinition(self.lon_tiepoint,
-                                        self.lat_tiepoint)
-
-        # Convert to cartesian coordinates
-        
-        xyz = swath.get_cartesian_coords()
-        col_indices, row_indices = meshgrid(self.col_indices, self.row_indices)
-        col_indices = col_indices.reshape(-1)
-        row_indices = row_indices.reshape(-1)
-        
-        hcol_indices, hrow_indices = mgrid[ceil(self.col_indices[0]):
-                                               self.col_indices[-1] + 1,
-                                           ceil(self.row_indices[0]):
-                                               self.row_indices[-1] + 1]
-        orig_col_size = hcol_indices.shape[0]
-        orig_row_size = hcol_indices.shape[1]
-
-        hcol_indices = hcol_indices.reshape(-1)
-        hrow_indices = hrow_indices.reshape(-1)
-
-        # Interpolate x, y, and z        
-        x_new = griddata((col_indices, row_indices),
-                         xyz[:, :, 0].reshape(-1),
-                         (hcol_indices, hrow_indices),
-                         method=method)
-
-        y_new = griddata((col_indices, row_indices),
-                         xyz[:, :, 1].reshape(-1),
-                         (hcol_indices, hrow_indices),
-                         method=method)
-
-        z_new = griddata((col_indices, row_indices),
-                         xyz[:, :, 2].reshape(-1),
-                         (hcol_indices, hrow_indices),
-                         method=method)
-        #orig_col_size = self.col_indices[-1] + 1
-        #orig_row_size = self.row_indices[-1] + 1
-
-        # Back to lon and lat
-        self.longitude = get_lons_from_cartesian(x_new, y_new)
-        self.longitude = self.longitude.reshape(orig_col_size, orig_row_size).transpose()
-        #self.latitude = get_lats_from_cartesian(z_new)
-        self.latitude = get_lats_from_cartesian(x_new, y_new, z_new)
-        self.latitude = self.latitude.reshape(orig_col_size, orig_row_size).transpose()
-
-
-
-
-    def interpolate_bivariate(self, output_grid=None):
-        """
-        Upsample the tiepoint lonlat data to full resolution lonlat.  Uses
-        pyresample and Scipy to go from lon,lat space to x,y,z (cartesian)
-        space, the interpolate in the 3D cartesian space, and then go back
-        again to polar coordinates (lon,lat)
-        """
-
-        from scipy.interpolate import SmoothBivariateSpline
-
-        if self.lon_tiepoint is None or self.lat_tiepoint is None:
-            raise ValueError('lon/lat values are not defined')
-
-        swath = geometry.BaseDefinition(self.lon_tiepoint,
-                                        self.lat_tiepoint)
-
-        # Convert to cartesian coordinates
-        xyz = swath.get_cartesian_coords()
-        col_indices, row_indices = meshgrid(self.col_indices, self.row_indices)
-        col_indices = col_indices.ravel()
-        row_indices = row_indices.ravel()
-        
-        try:
-            hcol_indices, hrow_indices = output_grid
-        except TypeError:
-            hcol_indices, hrow_indices = mgrid[ceil(self.col_indices[0]):
-                                                   self.col_indices[-1] + 1,
-                                               ceil(self.row_indices[0]):
-                                                   self.row_indices[-1] + 1]
-
-        orig_col_size = hcol_indices.shape[0]
-        orig_row_size = hcol_indices.shape[1]
-
-        hcol_indices = hcol_indices.ravel()
-        hrow_indices = hrow_indices.ravel()
-
-        # Interpolate x, y, and z 
-        spl = SmoothBivariateSpline(col_indices, row_indices,
-                                    xyz[:, :, 0].ravel(),
-                                    kx=2, ky=1)
-        x_new = spl.ev(hcol_indices, hrow_indices)
-
-        spl = SmoothBivariateSpline(col_indices, row_indices,
-                                    xyz[:, :, 1].ravel(),
-                                    kx=2, ky=1)
-        y_new = spl.ev(hcol_indices, hrow_indices)
-
-        spl = SmoothBivariateSpline(col_indices, row_indices,
-                                    xyz[:, :, 2].ravel(),
-                                    kx=2, ky=1)
-        z_new = spl.ev(hcol_indices, hrow_indices)
-
-
-
-        # Back to lon and lat
-        self.longitude = get_lons_from_cartesian(x_new, y_new)
-        self.longitude = self.longitude.reshape(orig_col_size, orig_row_size).transpose()
-        #self.latitude = get_lats_from_cartesian(z_new)
-        self.latitude = get_lats_from_cartesian(x_new, y_new, z_new)
-        self.latitude = self.latitude.reshape(orig_col_size, orig_row_size).transpose()
-
-
 
 def get_lons_from_cartesian(x__, y__):
-    """Get longitudes from cartesian coordinates"""
-    #import geographic_tools
-    #return geographic_tools.get_lons_from_cartesian(x__, y__)
+    """Get longitudes from cartesian coordinates.
+    """
     return rad2deg(arccos(x__/sqrt(x__**2 + y__**2)))*sign(y__)
     
 def get_lats_from_cartesian(x__, y__, z__, thr=0.8):
-    """Get latitudes from cartesian coordinates"""
+    """Get latitudes from cartesian coordinates.
+    """
     # if we are at low latitudes - small z, then get the
     # latitudes only from z. If we are at high latitudes (close to the poles)
     # then derive the latitude using x and y:
 
-    #import geographic_tools
-    #return geographic_tools.get_lats_from_cartesian(x__, y__, z__, thr)
-    import numpy as np
     lats = np.where(np.logical_and(np.less(z__, thr * EARTH_RADIUS), 
                                    np.greater(z__, -1. * thr * EARTH_RADIUS)),
                     90 - rad2deg(arccos(z__/EARTH_RADIUS)),
-                    sign(z__) * (90 - rad2deg(arcsin(sqrt(x__**2 + y__**2)/EARTH_RADIUS))))
+                    sign(z__) *
+                    (90 - rad2deg(arcsin(sqrt(x__**2 + y__**2)
+                                         / EARTH_RADIUS))))
     return lats
-    #return sign(z__) * (90 - rad2deg(arcsin(sqrt(x__**2 + y__**2)/EARTH_RADIUS)))
 
-#def get_lats_from_cartesian(z__):
-#    """Get latitudes from cartesian coordinates"""
-#    return 90 - rad2deg(arccos(z__/EARTH_RADIUS))
+
 
 

@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2012 SMHI
+# Copyright (c) 2012 Adam Dybbroe, Martin Raspaud
 
 # Author(s):
 
+#   Adam Dybbroe <adam.dybbroe@smhi.se>
 #   Martin Raspaud <martin.raspaud@smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
@@ -27,8 +28,8 @@ from setuptools import setup
 
 setup(name='geo_interpolator',
       version="v0.1",
-      description='Interpolation geographic tiepoints in Python',
-      author='Martin Raspaud',
+      description='Interpolation of geographic tiepoints in Python',
+      author='Adam Dybbroe, Martin Raspaud',
       author_email='martin.raspaud@smhi.se',
       packages = ['geo_interpolator'],      
       install_requires=['numpy', 'scipy', 'pyresample'],
