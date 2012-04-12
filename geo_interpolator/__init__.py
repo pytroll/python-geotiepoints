@@ -27,11 +27,30 @@
 import numpy as np
 from numpy import arccos, sign, rad2deg, sqrt, arcsin
 from pyresample import geometry
-from scipy.interpolate import RectBivariateSpline
+from scipy.interpolate import RectBivariateSpline, splrep, splev
 
 
 EARTH_RADIUS = 6371000.0
 
+
+def metop20kmto1km(lons20km, lats20km):
+    """Getting 1km geolocation for metop avhrr from 20km tiepoints.
+    """
+    cols20km = np.array([0] + range(4, 2048, 20) + [2047])
+    cols1km = np.arange(2048)
+    lines = lons20km.shape[0]
+    rows20km = np.arange(lines)
+    rows1km = np.arange(lines)
+
+    along_track_order = 1
+    cross_track_order = 3
+
+    satint = SatelliteInterpolator((lons20km, lats20km),
+                                   (rows20km, cols20km),
+                                   (rows1km, cols1km),
+                                   along_track_order,
+                                   cross_track_order)
+    return satint.interpolate()
 
 def modis5kmto1km(lons5km, lats5km):
     """Getting 1km geolocation for modis from 5km tiepoints.
@@ -44,13 +63,13 @@ def modis5kmto1km(lons5km, lats5km):
 
     along_track_order = 1
     cross_track_order = 3
-    
+
     satint = SatelliteInterpolator((lons5km, lats5km),
                                    (rows5km, cols5km),
                                    (rows1km, cols1km),
                                    along_track_order,
                                    cross_track_order,
-                                   10)
+                                   chunk_size=10)
     satint.fill_borders("y", "x")
     lons1km, lats1km = satint.interpolate()
     return lons1km, lats1km
@@ -72,7 +91,7 @@ def modis1kmto500m(lons1km, lats1km):
                                    (rows500m, cols500m),
                                    along_track_order,
                                    cross_track_order,
-                                   20)
+                                   chunk_size=20)
     satint.fill_borders("y", "x")
     lons500m, lats500m = satint.interpolate()
     return lons500m, lats500m
@@ -94,7 +113,7 @@ def modis1kmto250m(lons1km, lats1km):
                                    (rows250m, cols250m),
                                    along_track_order,
                                    cross_track_order,
-                                   40)
+                                   chunk_size=40)
     satint.fill_borders("y", "x")
     lons250m, lats250m = satint.interpolate()
     return lons250m, lats250m
@@ -404,6 +423,9 @@ class SatelliteInterpolator(object):
     def _interp(self):
         """Interpolate the cartesian coordinates.
         """
+        if np.all(self.hrow_indices == self.row_indices):
+            return self._interp1d()
+        
         xpoints, ypoints = np.meshgrid(self.hrow_indices,
                                        self.hcol_indices)
         spl = RectBivariateSpline(self.row_indices,
@@ -414,7 +436,7 @@ class SatelliteInterpolator(object):
                                   ky=self.ky)
 
         self.newx = spl.ev(xpoints.ravel(), ypoints.ravel())
-        self.newx = self.newx.reshape(xpoints.shape)
+        self.newx = self.newx.reshape(xpoints.shape).T
 
         spl = RectBivariateSpline(self.row_indices,
                                   self.col_indices,
@@ -424,7 +446,7 @@ class SatelliteInterpolator(object):
                                   ky=self.ky)
 
         self.newy = spl.ev(xpoints.ravel(), ypoints.ravel())
-        self.newy = self.newy.reshape(xpoints.shape)
+        self.newy = self.newy.reshape(xpoints.shape).T
 
         spl = RectBivariateSpline(self.row_indices,
                                   self.col_indices,
@@ -434,7 +456,35 @@ class SatelliteInterpolator(object):
                                   ky=self.ky)
 
         self.newz = spl.ev(xpoints.ravel(), ypoints.ravel())
-        self.newz = self.newz.reshape(xpoints.shape)
+        self.newz = self.newz.reshape(xpoints.shape).T
+
+    def _interp1d(self):
+
+        lines = len(self.hrow_indices)
+
+        self.newx = np.empty((len(self.hrow_indices),
+                              len(self.hcol_indices)),
+                             self.x__.dtype)
+
+        self.newy = np.empty((len(self.hrow_indices),
+                              len(self.hcol_indices)),
+                             self.y__.dtype)
+
+        self.newz = np.empty((len(self.hrow_indices),
+                              len(self.hcol_indices)),
+                             self.z__.dtype)
+
+
+        for cnt in range(lines):
+            tck = splrep(self.col_indices, self.x__[cnt, :], s=0)
+            self.newx[cnt, :] = splev(self.hcol_indices, tck, der=0)
+
+            tck = splrep(self.col_indices, self.y__[cnt, :], s=0)
+            self.newy[cnt, :] = splev(self.hcol_indices, tck, der=0)
+
+            tck = splrep(self.col_indices, self.z__[cnt, :], s=0)
+            self.newz[cnt, :] = splev(self.hcol_indices, tck, der=0)
+
 
     def interpolate(self):
         """Do the interpolation, and return resulting longitudes and latitudes.
@@ -442,12 +492,9 @@ class SatelliteInterpolator(object):
         self._interp()
 
         self.longitude = get_lons_from_cartesian(self.newx, self.newy)
-        self.longitude = self.longitude.reshape(len(self.hcol_indices),
-                                                len(self.hrow_indices)).T
 
         self.latitude = get_lats_from_cartesian(self.newx, self.newy, self.newz)
-        self.latitude = self.latitude.reshape(len(self.hcol_indices),
-                                              len(self.hrow_indices)).T
+
         return self.longitude, self.latitude
 
 def get_lons_from_cartesian(x__, y__):
