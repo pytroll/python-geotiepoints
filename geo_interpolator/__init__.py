@@ -119,7 +119,7 @@ def modis1kmto250m(lons1km, lats1km):
     return lons250m, lats250m
 
 
-# TODO: extrapolate on a sphere ?
+# NOTE: extrapolate on a sphere ?
 def _linear_extrapolate(pos, data, xev):
     """
 
@@ -151,7 +151,7 @@ class SatelliteInterpolator(object):
 
     The constructor takes in the tiepointed lon/lat data as *lon_lat_data*, the
     *tiepoint_grid* and the desired *final_grid*. As optional arguments, one
-    can provide *kx* and *ky* as interpolation orders (in x and y directions
+    can provide *kx_* and *ky_* as interpolation orders (in x and y directions
     respectively), and the *chunksize* if the data has to be handled by pieces
     along the y axis (this affects how the extrapolator behaves). If
     *chunksize* is set, don't forget to adjust the interpolation orders
@@ -159,7 +159,7 @@ class SatelliteInterpolator(object):
     """
 
     def __init__(self, lon_lat_data, tiepoint_grid, final_grid,
-                 kx=1, ky=1, chunk_size=0):
+                 kx_=1, ky_=1, chunk_size=0):
         self.row_indices = tiepoint_grid[0]
         self.col_indices = tiepoint_grid[1]
         self.hrow_indices = final_grid[0]
@@ -181,7 +181,7 @@ class SatelliteInterpolator(object):
         self.newy = None
         self.newz = None
 
-        self.kx, self.ky = kx, ky
+        self.kx_, self.ky_ = kx_, ky_
         
     def set_tiepoints(self, lon, lat):
         """Defines the lon,lat tie points.
@@ -432,8 +432,8 @@ class SatelliteInterpolator(object):
                                   self.col_indices,
                                   self.x__,
                                   s=0,
-                                  kx=self.kx,
-                                  ky=self.ky)
+                                  kx=self.kx_,
+                                  ky=self.ky_)
 
         self.newx = spl.ev(xpoints.ravel(), ypoints.ravel())
         self.newx = self.newx.reshape(xpoints.shape).T
@@ -442,8 +442,8 @@ class SatelliteInterpolator(object):
                                   self.col_indices,
                                   self.y__,
                                   s=0,
-                                  kx=self.kx,
-                                  ky=self.ky)
+                                  kx=self.kx_,
+                                  ky=self.ky_)
 
         self.newy = spl.ev(xpoints.ravel(), ypoints.ravel())
         self.newy = self.newy.reshape(xpoints.shape).T
@@ -452,14 +452,15 @@ class SatelliteInterpolator(object):
                                   self.col_indices,
                                   self.z__,
                                   s=0,
-                                  kx=self.kx,
-                                  ky=self.ky)
+                                  kx=self.kx_,
+                                  ky=self.ky_)
 
         self.newz = spl.ev(xpoints.ravel(), ypoints.ravel())
         self.newz = self.newz.reshape(xpoints.shape).T
 
     def _interp1d(self):
-
+        """Interpolate in one dimension.
+        """
         lines = len(self.hrow_indices)
 
         self.newx = np.empty((len(self.hrow_indices),
@@ -476,13 +477,13 @@ class SatelliteInterpolator(object):
 
 
         for cnt in range(lines):
-            tck = splrep(self.col_indices, self.x__[cnt, :], s=0)
+            tck = splrep(self.col_indices, self.x__[cnt, :], k=self.ky_, s=0)
             self.newx[cnt, :] = splev(self.hcol_indices, tck, der=0)
 
-            tck = splrep(self.col_indices, self.y__[cnt, :], s=0)
+            tck = splrep(self.col_indices, self.y__[cnt, :], k=self.ky_, s=0)
             self.newy[cnt, :] = splev(self.hcol_indices, tck, der=0)
 
-            tck = splrep(self.col_indices, self.z__[cnt, :], s=0)
+            tck = splrep(self.col_indices, self.z__[cnt, :], k=self.ky_, s=0)
             self.newz[cnt, :] = splev(self.hcol_indices, tck, der=0)
 
 
@@ -518,5 +519,42 @@ def get_lats_from_cartesian(x__, y__, z__, thr=0.8):
     return lats
 
 
+import unittest
+
+class TestMODIS(unittest.TestCase):
+    """Class for system testing the MODIS interpolation.
+    """
+
+    def test_5_to_1(self):
+        """test the 5km to 1km interpolation facility
+        """
+        gfilename = "/san1/test/data/modis/MOD03_A12097_174256_2012097175435.hdf"
+        filename = "/san1/test/data/modis/MOD021km_A12097_174256_2012097175435.hdf"
+        from pyhdf.SD import SD
+        from pyhdf.error import HDF4Error
+        
+        try:
+            gdata = SD(gfilename)
+            data = SD(filename)
+        except HDF4Error:
+            return
+        
+        glats = gdata.select("Latitude")[:]
+        glons = gdata.select("Longitude")[:]
+    
+        lats = data.select("Latitude")[:]
+        lons = data.select("Longitude")[:]
+        
+        import geo_interpolator
+        tlons, tlats = geo_interpolator.modis5kmto1km(lons, lats)
+
+        import numpy as np
+        self.assert_(np.allclose(tlons, glons, atol=0.05))
+        self.assert_(np.allclose(tlats, glats, atol=0.05))
 
 
+
+if __name__ == "__main__":
+    unittest.main()
+
+    
