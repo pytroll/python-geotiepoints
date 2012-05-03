@@ -26,11 +26,10 @@
 
 import numpy as np
 from numpy import arccos, sign, rad2deg, sqrt, arcsin
-from pyresample import geometry
 from scipy.interpolate import RectBivariateSpline, splrep, splev
 
 
-EARTH_RADIUS = 6371000.0
+EARTH_RADIUS = 6370997.0
 
 
 def metop20kmto1km(lons20km, lats20km):
@@ -167,15 +166,24 @@ class SatelliteInterpolator(object):
         self.chunk_size = chunk_size
         self.lon_tiepoint = None
         self.lat_tiepoint = None
-        self.set_tiepoints(lon_lat_data[0], lon_lat_data[1])
         self.longitude = None
         self.latitude = None
-        swath = geometry.BaseDefinition(self.lon_tiepoint,
-                                        self.lat_tiepoint)
-        xyz = swath.get_cartesian_coords()
-        self.x__ = xyz[:, :, 0]
-        self.y__ = xyz[:, :, 1]
-        self.z__ = xyz[:, :, 2]
+
+        try:
+            # Maybe it's a pyresample object ?
+            self.set_tiepoints(lon_lat_data.lons, lon_lat_data.lats)
+            xyz = lon_lat_data.get_cartesian_coords()
+            self.x__ = xyz[:, :, 0]
+            self.y__ = xyz[:, :, 1]
+            self.z__ = xyz[:, :, 2]
+
+        except AttributeError:
+            self.set_tiepoints(lon_lat_data[0], lon_lat_data[1])
+            lons_rad = np.radians(self.lon_tiepoint)
+            lats_rad = np.radians(self.lat_tiepoint)
+            self.x__ = EARTH_RADIUS * np.cos(lats_rad) * np.cos(lons_rad)
+            self.y__ = EARTH_RADIUS * np.cos(lats_rad) * np.sin(lons_rad)
+            self.z__ = EARTH_RADIUS * np.sin(lats_rad)
 
         self.newx = None
         self.newy = None
@@ -398,7 +406,7 @@ class SatelliteInterpolator(object):
         lines = len(self.hrow_indices)
         chunk_size = self.chunk_size or lines
 
-        x, y, z = [], [], []
+        x__, y__, z__ = [], [], []
         row_indices = []
         for index in range(0, lines, chunk_size):
             ties = np.argwhere(np.logical_and(self.row_indices >= index,
@@ -407,16 +415,16 @@ class SatelliteInterpolator(object):
             tiepos = self.row_indices[np.logical_and(self.row_indices >= index,
                                                      self.row_indices < index
                                                      + chunk_size)].squeeze()
-            x.append(self._extrapolate_rows(self.x__[ties, :]))
-            y.append(self._extrapolate_rows(self.y__[ties, :]))
-            z.append(self._extrapolate_rows(self.z__[ties, :]))
+            x__.append(self._extrapolate_rows(self.x__[ties, :]))
+            y__.append(self._extrapolate_rows(self.y__[ties, :]))
+            z__.append(self._extrapolate_rows(self.z__[ties, :]))
             row_indices.append(np.array([self.hrow_indices[index]]))
             row_indices.append(tiepos)
             row_indices.append(np.array([self.hrow_indices[index
                                                            + chunk_size - 1]]))
-        self.x__ = np.vstack(x)
-        self.y__ = np.vstack(y)
-        self.z__ = np.vstack(z)
+        self.x__ = np.vstack(x__)
+        self.y__ = np.vstack(y__)
+        self.z__ = np.vstack(z__)
 
         self.row_indices = np.concatenate(row_indices)
     
@@ -528,8 +536,10 @@ class TestMODIS(unittest.TestCase):
     def test_5_to_1(self):
         """test the 5km to 1km interpolation facility
         """
-        gfilename = "/san1/test/data/modis/MOD03_A12097_174256_2012097175435.hdf"
-        filename = "/san1/test/data/modis/MOD021km_A12097_174256_2012097175435.hdf"
+        gfilename = \
+              "/san1/test/data/modis/MOD03_A12097_174256_2012097175435.hdf"
+        filename = \
+              "/san1/test/data/modis/MOD021km_A12097_174256_2012097175435.hdf"
         from pyhdf.SD import SD
         from pyhdf.error import HDF4Error
         
@@ -545,10 +555,8 @@ class TestMODIS(unittest.TestCase):
         lats = data.select("Latitude")[:]
         lons = data.select("Longitude")[:]
         
-        import geo_interpolator
-        tlons, tlats = geo_interpolator.modis5kmto1km(lons, lats)
+        tlons, tlats = modis5kmto1km(lons, lats)
 
-        import numpy as np
         self.assert_(np.allclose(tlons, glons, atol=0.05))
         self.assert_(np.allclose(tlats, glats, atol=0.05))
 
