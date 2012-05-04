@@ -26,13 +26,13 @@
 
 from setuptools import setup
 
-setup(name='geo_interpolator',
+setup(name='python-geotiepoints',
       version="v0.1",
       description='Interpolation of geographic tiepoints in Python',
       author='Adam Dybbroe, Martin Raspaud',
       author_email='martin.raspaud@smhi.se',
-      packages = ['geo_interpolator'],      
-      install_requires=['numpy', 'scipy', 'pyresample'],
+      packages = ['geotiepoints'],      
+      install_requires=['numpy', 'scipy'],
       zip_safe = False
       )
 
