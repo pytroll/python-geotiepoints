@@ -27,10 +27,19 @@
 from setuptools import setup
 
 setup(name='python-geotiepoints',
-      version="v0.1",
+      version="v0.1.0",
       description='Interpolation of geographic tiepoints in Python',
       author='Adam Dybbroe, Martin Raspaud',
       author_email='martin.raspaud@smhi.se',
+      classifiers=["Development Status :: 4 - Beta",
+                   "Intended Audience :: Science/Research",
+                   "License :: OSI Approved :: GNU General Public License v3 " +
+                   "or later (GPLv3+)",
+                   "Operating System :: OS Independent",
+                   "Programming Language :: Python",
+                   "Topic :: Scientific/Engineering"],
+      url="https://github.com/mraspaud/python-geotiepoints",
+      download_url="https://github.com/mraspaud/pyorbital/tarball/v0.1.0#egg=python-geotiepoints-v0.1.0",
       packages = ['geotiepoints'],      
       install_requires=['numpy', 'scipy'],
       zip_safe = False
