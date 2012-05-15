@@ -1,0 +1,225 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Python-geotiepoints &mdash; python-geotiepoints v0.1.0 documentation</title>
+    <link rel="stylesheet" href="static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="static/jquery.js"></script>
+    <script type="text/javascript" src="static/underscore.js"></script>
+    <script type="text/javascript" src="static/doctools.js"></script>
+    <link rel="top" title="python-geotiepoints v0.1.0 documentation" href="#" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li><a href="#">python-geotiepoints v0.1.0 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="#">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Python-geotiepoints</a><ul>
+<li><a class="reference internal" href="#installation">Installation</a></li>
+<li><a class="reference internal" href="#usage">Usage</a></li>
+<li><a class="reference internal" href="#predefined-functions-for-satellite-data">Predefined functions for satellite data</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+</ul>
+
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="sources/index.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="python-geotiepoints">
+<h1><a class="toc-backref" href="#id1">Python-geotiepoints</a><a class="headerlink" href="#python-geotiepoints" title="Permalink to this headline">¶</a></h1>
+<p>Python-geotiepoints is a python modules that interpolates (and extrapolates if
+needed) geographical tiepoints into a larger geographical grid. This is usefull
+when the full resolution lon/lat grid is needed while only a lower resolution
+grid of tiepoints was provided.</p>
+<p>Some helper functions are provided to accomodate for satellite data, but the
+package should be generic enough to be used for any kind of data.</p>
+<p>The source code of the module can be found on the <a class="reference external" href="http://github.com/adybbroe/python-geotiepoints">github</a> page.</p>
+<div class="contents topic" id="contents">
+<p class="topic-title first">Contents</p>
+<ul class="simple">
+<li><a class="reference internal" href="#python-geotiepoints" id="id1">Python-geotiepoints</a><ul>
+<li><a class="reference internal" href="#installation" id="id2">Installation</a></li>
+<li><a class="reference internal" href="#usage" id="id3">Usage</a></li>
+<li><a class="reference internal" href="#predefined-functions-for-satellite-data" id="id4">Predefined functions for satellite data</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#indices-and-tables" id="id5">Indices and tables</a></li>
+</ul>
+</div>
+<div class="section" id="installation">
+<h2><a class="toc-backref" href="#id2">Installation</a><a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
+<p>You can install the latest version of python-geotiepoints with easy_install:</p>
+<div class="highlight-python"><pre>$&gt; easy_install python-geotiepoints</pre>
+</div>
+<p>or pip:</p>
+<div class="highlight-python"><pre>$&gt; pip install python-geotiepoints</pre>
+</div>
+<p>Alternatively, you can download the source code from <a class="reference external" href="http://github.com/adybbroe/python-geotiepoints">github</a>:</p>
+<div class="highlight-python"><pre>$&gt; git clone git://github.com/adybbroe/python-geotiepoints.git</pre>
+</div>
+<p>and then run:</p>
+<div class="highlight-python"><pre>$&gt; python setup.py install</pre>
+</div>
+<p>or, if you want to hack the package:</p>
+<div class="highlight-python"><pre>$&gt; python setup.py develop</pre>
+</div>
+</div>
+<div class="section" id="usage">
+<h2><a class="toc-backref" href="#id3">Usage</a><a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
+<p>A typical usage of the package.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">geotiepoints</span> <span class="kn">import</span> <span class="n">SatelliteInterpolator</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tie_cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tie_rows</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fine_cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">11</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fine_rows</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tie_lons</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">3</span><span class="o">*</span><span class="mi">3</span><span class="p">)</span> <span class="o">+</span> <span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tie_lats</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">3</span><span class="o">*</span><span class="mi">3</span><span class="p">)</span> <span class="o">-</span> <span class="mf">4.5</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">interpolator</span> <span class="o">=</span> <span class="n">SatelliteInterpolator</span><span class="p">((</span><span class="n">tie_lons</span><span class="p">,</span> <span class="n">tie_lats</span><span class="p">),</span>
+<span class="gp">... </span>                                     <span class="p">(</span><span class="n">tie_rows</span><span class="p">,</span> <span class="n">tie_cols</span><span class="p">),</span>
+<span class="gp">... </span>                                     <span class="p">(</span><span class="n">fine_rows</span><span class="p">,</span> <span class="n">fine_cols</span><span class="p">),</span>
+<span class="gp">... </span>                                     <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">interpolator</span><span class="o">.</span><span class="n">interpolate</span><span class="p">()</span>
+<span class="go">(array([[ 30.        ,  30.20005856,  30.40007805,  30.60006827,</span>
+<span class="go">         30.800039  ,  31.        ,  31.19996102,  31.39993181,</span>
+<span class="go">         31.59992209,  31.79994159,  32.        ],</span>
+<span class="go">       [ 31.50205758,  31.70211582,  31.90213504,  32.10212499,</span>
+<span class="go">         32.30209545,  32.50205617,  32.7020169 ,  32.9019874 ,</span>
+<span class="go">         33.10197739,  33.3019966 ,  33.50205476],</span>
+<span class="go">       [ 33.        ,  33.2000585 ,  33.40007799,  33.60006824,</span>
+<span class="go">         33.80003899,  34.        ,  34.19996101,  34.39993178,</span>
+<span class="go">         34.59992203,  34.79994152,  35.        ],</span>
+<span class="go">       [ 34.49794665,  34.69800483,  34.89802404,  35.09801402,</span>
+<span class="go">         35.29798451,  35.49794524,  35.69790597,  35.89787643,</span>
+<span class="go">         36.09786639,  36.29788561,  36.49794383],</span>
+<span class="go">       [ 36.        ,  36.20005843,  36.40007793,  36.6000682 ,</span>
+<span class="go">         36.80003898,  37.        ,  37.199961  ,  37.39993174,</span>
+<span class="go">         37.59992197,  37.79994146,  38.        ]]), array([[ -4.50000000e+00,  -4.29998537e+00,  -4.09998049e+00,</span>
+<span class="go">         -3.89998294e+00,  -3.69999025e+00,  -3.50000000e+00,</span>
+<span class="go">         -3.30000975e+00,  -3.10001705e+00,  -2.90001949e+00,</span>
+<span class="go">         -2.70001461e+00,  -2.50000000e+00],</span>
+<span class="go">       [ -2.99948561e+00,  -2.79947101e+00,  -2.59946617e+00,</span>
+<span class="go">         -2.39946865e+00,  -2.19947600e+00,  -1.99948578e+00,</span>
+<span class="go">         -1.79949556e+00,  -1.59950291e+00,  -1.39950538e+00,</span>
+<span class="go">         -1.19950054e+00,  -9.99485958e-01],</span>
+<span class="go">       [ -1.50000000e+00,  -1.29998538e+00,  -1.09998050e+00,</span>
+<span class="go">         -8.99982941e-01,  -6.99990252e-01,  -5.00000000e-01,</span>
+<span class="go">         -3.00009747e-01,  -1.00017058e-01,   9.99805052e-02,</span>
+<span class="go">          2.99985379e-01,   5.00000000e-01],</span>
+<span class="go">       [ -5.13865763e-04,   1.99500719e-01,   3.99505557e-01,</span>
+<span class="go">          5.99503086e-01,   7.99495741e-01,   9.99485958e-01,</span>
+<span class="go">          1.19947617e+00,   1.39946883e+00,   1.59946635e+00,</span>
+<span class="go">          1.79947119e+00,   1.99948578e+00],</span>
+<span class="go">       [  1.50000000e+00,   1.70001462e+00,   1.90001949e+00,</span>
+<span class="go">          2.10001705e+00,   2.30000975e+00,   2.50000000e+00,</span>
+<span class="go">          2.69999025e+00,   2.89998294e+00,   3.09998050e+00,</span>
+<span class="go">          3.29998537e+00,   3.50000000e+00]]))</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="predefined-functions-for-satellite-data">
+<h2><a class="toc-backref" href="#id4">Predefined functions for satellite data</a><a class="headerlink" href="#predefined-functions-for-satellite-data" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="geotiepoints.metop20kmto1km">
+<tt class="descclassname">geotiepoints.</tt><tt class="descname">metop20kmto1km</tt><big>(</big><em>lons20km</em>, <em>lats20km</em><big>)</big><a class="headerlink" href="#geotiepoints.metop20kmto1km" title="Permalink to this definition">¶</a></dt>
+<dd><p>Getting 1km geolocation for metop avhrr from 20km tiepoints.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="geotiepoints.modis5kmto1km">
+<tt class="descclassname">geotiepoints.</tt><tt class="descname">modis5kmto1km</tt><big>(</big><em>lons5km</em>, <em>lats5km</em><big>)</big><a class="headerlink" href="#geotiepoints.modis5kmto1km" title="Permalink to this definition">¶</a></dt>
+<dd><p>Getting 1km geolocation for modis from 5km tiepoints.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="geotiepoints.modis1kmto500m">
+<tt class="descclassname">geotiepoints.</tt><tt class="descname">modis1kmto500m</tt><big>(</big><em>lons1km</em>, <em>lats1km</em><big>)</big><a class="headerlink" href="#geotiepoints.modis1kmto500m" title="Permalink to this definition">¶</a></dt>
+<dd><p>Getting 500m geolocation for modis from 1km tiepoints.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="geotiepoints.modis1kmto250m">
+<tt class="descclassname">geotiepoints.</tt><tt class="descname">modis1kmto250m</tt><big>(</big><em>lons1km</em>, <em>lats1km</em><big>)</big><a class="headerlink" href="#geotiepoints.modis1kmto250m" title="Permalink to this definition">¶</a></dt>
+<dd><p>Getting 250m geolocation for modis from 1km tiepoints.</p>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h1><a class="toc-backref" href="#id5">Indices and tables</a><a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><a class="reference internal" href="genindex.html"><em>Index</em></a></li>
+<li><a class="reference internal" href="py-modindex.html"><em>Module Index</em></a></li>
+<li><a class="reference internal" href="search.html"><em>Search Page</em></a></li>
+</ul>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li><a href="#">python-geotiepoints v0.1.0 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2012, Adam Dybbroe, Martin Raspaud.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
