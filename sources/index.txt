@@ -102,7 +102,8 @@ Example - Aqua/Terra MODIS data
 -------------------------------
 
 The application is currently being used in operation at SMHI to upsample the
-thinned MODIS products received via EUMETCast. 
+thinned MODIS products received via EUMETCast. For this purpose the performance
+is good, both in terms of achieved accuracy and processing speed.
 
 EUMETSAT is relaying Terra and Aqua MODIS level 1 data from NOAA in real time
 for the European User community. The data are disseminated via EUMETCast and
@@ -130,11 +131,31 @@ now available on EUMETCast one would need access to the exact terrain model
 used in the MODIS processing, and also some more advanced method than what is
 provided with this application.
 
-But outside areas with rough topography the accuracy is pretty good with this tool.
-Please see the exmple provided below:
+But outside areas with high and rough topography the accuracy is rather good
+using this tool. Below is an example with a 5 minute granule over Western
+Africa and the Canary Islands from August 21st, 2011. First we show the
+accuracy of the geolocation after interpolation. And then the image data first
+the raw unprojected granule, and then the projected (1km Mercator) data.
+
+Comparing interpolated lon,lat with the true ones for the granule shown below.
+
+.. image:: images/scatter_cartesian_distances_thumb.png
+
+We see that the method applied give deviations far less than one pixel, except
+for a few pixels towards the edge of the swath. These larger deviations we
+refer to the inherrent problem of interpolating terrain corrected geolocation
+without the knowledge of the terrain model used.
 
 
-.. image:: images/scatter_cartesian_distances.png
+Below is an RGB image of the granule.
+
+.. image:: images/terra_20110821_1115_rednsow_int_thumb.png
+
+
+And here the projected data.
+
+.. image:: images/terra_20110821_1115_maspalomas_rednsow_int_thumb.png
+
 
 
 

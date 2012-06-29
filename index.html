@@ -170,7 +170,8 @@ package should be generic enough to be used for any kind of data.</p>
 <div class="section" id="example-aqua-terra-modis-data">
 <h2><a class="toc-backref" href="#id4">Example - Aqua/Terra MODIS data</a><a class="headerlink" href="#example-aqua-terra-modis-data" title="Permalink to this headline">¶</a></h2>
 <p>The application is currently being used in operation at SMHI to upsample the
-thinned MODIS products received via EUMETCast.</p>
+thinned MODIS products received via EUMETCast. For this purpose the performance
+is good, both in terms of achieved accuracy and processing speed.</p>
 <p>EUMETSAT is relaying Terra and Aqua MODIS level 1 data from NOAA in real time
 for the European User community. The data are disseminated via EUMETCast and
 can be received with a common DVB antenna. Before uploading it EUMETSAT is
@@ -193,9 +194,21 @@ restore the full 1km geolocation data from the thinned tiepoint gridded data
 now available on EUMETCast one would need access to the exact terrain model
 used in the MODIS processing, and also some more advanced method than what is
 provided with this application.</p>
-<p>But outside areas with rough topography the accuracy is pretty good with this tool.
-Please see the exmple provided below:</p>
-<img alt="images/scatter_cartesian_distances.png" src="images/scatter_cartesian_distances.png" />
+<p>But outside areas with high and rough topography the accuracy is rather good
+using this tool. Below is an example with a 5 minute granule over Western
+Africa and the Canary Islands from August 21st, 2011. First we show the
+accuracy of the geolocation after interpolation. And then the image data first
+the raw unprojected granule, and then the projected (1km Mercator) data.</p>
+<p>Comparing interpolated lon,lat with the true ones for the granule shown below.</p>
+<img alt="images/scatter_cartesian_distances_thumb.png" src="images/scatter_cartesian_distances_thumb.png" />
+<p>We see that the method applied give deviations far less than one pixel, except
+for a few pixels towards the edge of the swath. These larger deviations we
+refer to the inherrent problem of interpolating terrain corrected geolocation
+without the knowledge of the terrain model used.</p>
+<p>Below is an RGB image of the granule.</p>
+<img alt="images/terra_20110821_1115_rednsow_int_thumb.png" src="images/terra_20110821_1115_rednsow_int_thumb.png" />
+<p>And here the projected data.</p>
+<img alt="images/terra_20110821_1115_maspalomas_rednsow_int_thumb.png" src="images/terra_20110821_1115_maspalomas_rednsow_int_thumb.png" />
 </div>
 <div class="section" id="predefined-functions-for-satellite-data">
 <h2><a class="toc-backref" href="#id5">Predefined functions for satellite data</a><a class="headerlink" href="#predefined-functions-for-satellite-data" title="Permalink to this headline">¶</a></h2>
