@@ -41,6 +41,7 @@
 <li><a class="reference internal" href="#">Python-geotiepoints</a><ul>
 <li><a class="reference internal" href="#installation">Installation</a></li>
 <li><a class="reference internal" href="#usage">Usage</a></li>
+<li><a class="reference internal" href="#example-aqua-terra-modis-data">Example - Aqua/Terra MODIS data</a></li>
 <li><a class="reference internal" href="#predefined-functions-for-satellite-data">Predefined functions for satellite data</a></li>
 </ul>
 </li>
@@ -88,10 +89,11 @@ package should be generic enough to be used for any kind of data.</p>
 <li><a class="reference internal" href="#python-geotiepoints" id="id1">Python-geotiepoints</a><ul>
 <li><a class="reference internal" href="#installation" id="id2">Installation</a></li>
 <li><a class="reference internal" href="#usage" id="id3">Usage</a></li>
-<li><a class="reference internal" href="#predefined-functions-for-satellite-data" id="id4">Predefined functions for satellite data</a></li>
+<li><a class="reference internal" href="#example-aqua-terra-modis-data" id="id4">Example - Aqua/Terra MODIS data</a></li>
+<li><a class="reference internal" href="#predefined-functions-for-satellite-data" id="id5">Predefined functions for satellite data</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#indices-and-tables" id="id5">Indices and tables</a></li>
+<li><a class="reference internal" href="#indices-and-tables" id="id6">Indices and tables</a></li>
 </ul>
 </div>
 <div class="section" id="installation">
@@ -165,8 +167,38 @@ package should be generic enough to be used for any kind of data.</p>
 </pre></div>
 </div>
 </div>
+<div class="section" id="example-aqua-terra-modis-data">
+<h2><a class="toc-backref" href="#id4">Example - Aqua/Terra MODIS data</a><a class="headerlink" href="#example-aqua-terra-modis-data" title="Permalink to this headline">¶</a></h2>
+<p>The application is currently being used in operation at SMHI to upsample the
+thinned MODIS products received via EUMETCast.</p>
+<p>EUMETSAT is relaying Terra and Aqua MODIS level 1 data from NOAA in real time
+for the European User community. The data are disseminated via EUMETCast and
+can be received with a common DVB antenna. Before uploading it EUMETSAT is
+thinning the data to contain only a subset of MODIS channels, and also data are
+being filtered so only data over the European area are being sent.</p>
+<p>The radiance data (reflectances and brightness temperatures) are in 1km
+resolution but contain geolocation only on a thinned grid - on tiepoints every
+5th km. So in order to project and further process the data we need to upsample or
+interpolate and exrapolate the data to the full 1km grid.</p>
+<p>We have checked the accuracy against the full resolution geolocation
+data. These full geolocation data were available previously in seperate files
+on the same EUMETCast stream. But due to the significant band width occupied
+and the relatively modets usage of the data EUMETSAT decided to stop this
+dissemination in February 2012 and save costs and band width for other
+products. With this tool the need for the full resolution geolocation is no
+more as critical as before.</p>
+<p>There is one significant issue here, however, which is that the geolocation
+provided in the MODIS level1b products are terrain corrected. So in order to
+restore the full 1km geolocation data from the thinned tiepoint gridded data
+now available on EUMETCast one would need access to the exact terrain model
+used in the MODIS processing, and also some more advanced method than what is
+provided with this application.</p>
+<p>But outside areas with rough topography the accuracy is pretty good with this tool.
+Please see the exmple provided below:</p>
+<img alt="images/scatter_cartesian_distances.png" src="images/scatter_cartesian_distances.png" />
+</div>
 <div class="section" id="predefined-functions-for-satellite-data">
-<h2><a class="toc-backref" href="#id4">Predefined functions for satellite data</a><a class="headerlink" href="#predefined-functions-for-satellite-data" title="Permalink to this headline">¶</a></h2>
+<h2><a class="toc-backref" href="#id5">Predefined functions for satellite data</a><a class="headerlink" href="#predefined-functions-for-satellite-data" title="Permalink to this headline">¶</a></h2>
 <dl class="function">
 <dt id="geotiepoints.metop20kmto1km">
 <tt class="descclassname">geotiepoints.</tt><tt class="descname">metop20kmto1km</tt><big>(</big><em>lons20km</em>, <em>lats20km</em><big>)</big><a class="headerlink" href="#geotiepoints.metop20kmto1km" title="Permalink to this definition">¶</a></dt>
@@ -194,7 +226,7 @@ package should be generic enough to be used for any kind of data.</p>
 </div>
 </div>
 <div class="section" id="indices-and-tables">
-<h1><a class="toc-backref" href="#id5">Indices and tables</a><a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<h1><a class="toc-backref" href="#id6">Indices and tables</a><a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
 <ul class="simple">
 <li><a class="reference internal" href="genindex.html"><em>Index</em></a></li>
 <li><a class="reference internal" href="py-modindex.html"><em>Module Index</em></a></li>
