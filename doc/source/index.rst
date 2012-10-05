@@ -6,10 +6,10 @@
 Python-geotiepoints
 ===================
 
-Python-geotiepoints is a python modules that interpolates (and extrapolates if
-needed) geographical tiepoints into a larger geographical grid. This is usefull
+Python-geotiepoints is an application for the interpolation (and extrapolation if
+needed) of geographical tiepoints into a larger/denser geographical grid. This is usefull
 when the full resolution lon/lat grid is needed while only a lower resolution
-grid of tiepoints was provided.
+grid of tiepoints is available.
 
 Some helper functions are provided to accomodate for satellite data, but the
 package should be generic enough to be used for any kind of data.
@@ -96,7 +96,69 @@ A typical usage of the package.
             2.10001705e+00,   2.30000975e+00,   2.50000000e+00,
             2.69999025e+00,   2.89998294e+00,   3.09998050e+00,
             3.29998537e+00,   3.50000000e+00]]))
+
     
+Example - Aqua/Terra MODIS data
+-------------------------------
+
+The application is currently being used in operation at SMHI to upsample the
+thinned MODIS products received via EUMETCast. For this purpose the performance
+is good, both in terms of achieved accuracy and processing speed.
+
+EUMETSAT is relaying Terra and Aqua MODIS level 1 data from NOAA in real time
+for the European User community. The data are disseminated via EUMETCast and
+can be received with a common DVB antenna. Before uploading it EUMETSAT is
+thinning the data to contain only a subset of MODIS channels, and also data are 
+being filtered so only data over the European area are being sent.
+
+The radiance data (reflectances and brightness temperatures) are in 1km
+resolution but contain geolocation only on a thinned grid - on tiepoints every
+5th km. So in order to project and further process the data we need to upsample or
+interpolate and exrapolate the data to the full 1km grid.
+
+We have checked the accuracy against the full resolution geolocation
+data. These full geolocation data were available previously in seperate files
+on the same EUMETCast stream. But due to the significant band width occupied
+and the relatively modets usage of the data EUMETSAT decided to stop this
+dissemination in February 2012 and save costs and band width for other
+products. With this tool the need for the full resolution geolocation is no
+more as critical as before.
+
+There is one significant issue here, however, which is that the geolocation
+provided in the MODIS level1b products are terrain corrected. So in order to
+restore the full 1km geolocation data from the thinned tiepoint gridded data
+now available on EUMETCast one would need access to the exact terrain model
+used in the MODIS processing, and also some more advanced method than what is
+provided with this application.
+
+But outside areas with high and rough topography the accuracy is rather good
+using this tool. Below is an example with a 5 minute granule over Western
+Africa and the Canary Islands from August 21st, 2011. First we show the
+accuracy of the geolocation after interpolation. And then the image data first
+the raw unprojected granule, and then the projected (1km Mercator) data.
+
+Comparing interpolated lon,lat with the true ones for the granule shown below.
+
+.. image:: images/scatter_cartesian_distances_thumb.png
+
+We see that the method applied give deviations far less than one pixel, except
+for a few pixels towards the edge of the swath. These larger deviations we
+refer to the inherrent problem of interpolating terrain corrected geolocation
+without the knowledge of the terrain model used.
+
+
+Below is an RGB image of the granule.
+
+.. image:: images/terra_20110821_1115_rednsow_int_thumb.png
+
+
+And here the projected data.
+
+.. image:: images/terra_20110821_1115_maspalomas_rednsow_int_thumb.png
+
+
+
+
 Predefined functions for satellite data
 ---------------------------------------
 
