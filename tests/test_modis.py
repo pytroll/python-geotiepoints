@@ -19,11 +19,13 @@ class TestMODIS(unittest.TestCase):
     def test_5_to_1(self):
         """test the 5km to 1km interpolation facility
         """
-        gfilename = "../testdata/MOD03_A12097_174256_2012097175435.hdf"
-        filename = "../testdata/MOD021km_A12097_174256_2012097175435.hdf"
+        #gfilename = "testdata/MOD03_A12097_174256_2012097175435.hdf"
+        gfilename = "/san1/test/data/modis/MOD03_A12097_174256_2012097175435.hdf"
+        #filename = "testdata/MOD021km_A12097_174256_2012097175435.hdf"
+        filename = "/san1/test/data/modis/MOD021km_A12097_174256_2012097175435.hdf"
         from pyhdf.SD import SD
         from pyhdf.error import HDF4Error
-        
+
         try:
             gdata = SD(gfilename)
             data = SD(filename)
@@ -46,16 +48,14 @@ class TestMODIS(unittest.TestCase):
     def test_1000m_to_250m(self):
         """test the 1 km to 250 meter interpolation facility
         """
-        gfilename_hdf = "../testdata/MOD03_A12278_113638_2012278145123.hdf"
-        gfilename = "../testdata/250m_lonlat_section_input.npz"
-        result_filename = "../testdata/250m_lonlat_section_result.npz"
+        gfilename_hdf = "testdata/MOD03_A12278_113638_2012278145123.hdf"
+        gfilename = "testdata/250m_lonlat_section_input.npz"
+        result_filename = "testdata/250m_lonlat_section_result.npz"
 
         from pyhdf.SD import SD
         from pyhdf.error import HDF4Error
         
         gdata = None
-        indata = np.load(gfilename)
-        """
         try:
             gdata = SD(gfilename_hdf)
         except HDF4Error:
@@ -64,7 +64,6 @@ class TestMODIS(unittest.TestCase):
                 indata = np.load(gfilename)
             except IOError:
                 return
-        """
 
         if gdata:
             lats = gdata.select("Latitude")[20:50, :]
