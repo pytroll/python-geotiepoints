@@ -5,7 +5,8 @@ Unit tests for python-geotiepoints: MODIS examples
 import unittest
 import numpy as np
 
-from geotiepoints import modis5kmto1km, modis1kmto250m
+from geotiepoints import (modis5kmto1km, modis1kmto250m, 
+                          faster_modis1kmto250m)
 
 
 class TestMODIS(unittest.TestCase):
@@ -75,7 +76,7 @@ class TestMODIS(unittest.TestCase):
         verif = np.load(result_filename)
         vlons = verif['lon'] / 1000.
         vlats = verif['lat'] / 1000.
-        tlons, tlats = modis1kmto250m(lons, lats)
+        tlons, tlats = faster_modis1kmto250m(lons, lats)
 
         self.assert_(np.allclose(tlons, vlons, atol=0.05))
         self.assert_(np.allclose(tlats, vlats, atol=0.05))

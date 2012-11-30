@@ -7,6 +7,7 @@
  
 #   Adam Dybbroe <adam.dybbroe@smhise>
 #   Martin Raspaud <martin.raspaud@smhi.se>
+#   Panu Lahtinen <panu.lahtinen@fmi.fi>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,12 +25,46 @@
 """Interpolation of geographical tiepoints.
 """
 
+import os, sys
+
 import numpy as np
 from numpy import arccos, sign, rad2deg, sqrt, arcsin
 from scipy.interpolate import RectBivariateSpline, splrep, splev
 
 
 EARTH_RADIUS = 6370997.0
+
+import logging
+LOG = logging.getLogger(__name__)
+
+#: Default time format
+_DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+
+#: Default log format
+_DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
+
+_PYTHON_GEOTIEPOINTS_LOGFILE = os.environ.get('PYTHON_GEOTIEPOINTS_LOGFILE', None)
+if _PYTHON_GEOTIEPOINTS_LOGFILE:
+    ndays = int(OPTIONS.get("log_rotation_days", 1))
+    ncount = int(OPTIONS.get("log_rotation_backup", 5))
+    handler = handlers.TimedRotatingFileHandler(_PYTHON_GEOTIEPOINTS_LOGFILE,
+                                                when='midnight', 
+                                                interval=ndays, 
+                                                backupCount=ncount, 
+                                                encoding=None, 
+                                                delay=False, 
+                                                utc=True)
+
+else:
+    handler = logging.StreamHandler(sys.stderr)
+
+formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
+                              datefmt=_DEFAULT_TIME_FORMAT)
+handler.setFormatter(formatter)
+
+handler.setLevel(logging.DEBUG)
+LOG.setLevel(logging.DEBUG)
+LOG.addHandler(handler)
 
 
 def metop20kmto1km(lons20km, lats20km):
@@ -115,6 +150,99 @@ def modis1kmto250m(lons1km, lats1km):
                                    chunk_size=40)
     satint.fill_borders("y", "x")
     lons250m, lats250m = satint.interpolate()
+    return lons250m, lats250m
+
+
+def faster_modis1kmto250m(lons1km, lats1km, parallel=True, ncpus=None):
+    """Getting 250m geolocation for modis from 1km tiepoints.
+    Using multiprocesing to speed up performance.
+    """
+    cols1km = np.arange(0, 5416, 4)
+    cols250m = np.arange(5416)
+
+    along_track_order = 1
+    cross_track_order = 3
+    
+    from multiprocessing import Process, cpu_count, Queue
+
+    def ipol_scene(scene_lons, scene_lats, que=None):
+        lines = scene_lons.shape[0] * 4
+        rows1km = np.arange(1.5, lines, 4)
+        rows250m = np.arange(lines)
+
+        satint = SatelliteInterpolator((scene_lons, scene_lats),
+                                       (rows1km, cols1km),
+                                       (rows250m, cols250m),
+                                       along_track_order,
+                                       cross_track_order,
+                                       chunk_size=40)
+        satint.fill_borders("y", "x")
+        lons_250m, lats_250m = satint.interpolate()
+        if que:
+            que.put((lons_250m, lats_250m))
+
+        return (lons_250m, lats_250m)
+
+    if ncpus:
+        if ncpus > cpu_count():
+            LOG.warning("Asking to use more CPUs than what is available!")
+            number_of_cpus = cpu_count()
+            LOG.info("Setting number of CPUs to %d" % ncpus)
+        else:
+            number_of_cpus = ncpus
+    else:
+        number_of_cpus = cpu_count()
+
+    LOG.debug('Number of CPUs detected = %d' % number_of_cpus)
+
+    # A Modis 1km scan spans 10 lines:
+    N_1KM_LINES = 10
+    numoflines_in_swath = lons1km.shape[0]
+    nlines_subscene = N_1KM_LINES  * (((numoflines_in_swath / number_of_cpus) 
+                                      + N_1KM_LINES) / N_1KM_LINES)
+    if nlines_subscene > numoflines_in_swath:
+        nlines_subscene = numoflines_in_swath
+
+    if number_of_cpus == 1 or not parallel:
+        return ipol_scene(lons1km, lats1km, False)
+
+    else:
+        # Cut the swath in pieces and do processing in parallel:
+        linenum = 0
+        scenes = []
+        queuelist = []
+        idx = 0
+        while linenum < numoflines_in_swath:
+            subscene_lons = lons1km[linenum:linenum + nlines_subscene, ::]
+            subscene_lats = lats1km[linenum:linenum + nlines_subscene, ::]
+            linenum = linenum + nlines_subscene
+            LOG.debug("Line number: " + str(linenum))
+            
+            queuelist.append(Queue())
+            scene = Process(target=ipol_scene, 
+                            args=(subscene_lons, subscene_lats, queuelist[idx]))
+            scenes.append(scene)
+            idx = idx + 1
+
+        LOG.debug("Number of queues: " + str(len(queuelist)))
+        LOG.debug("Number of processes: " + str(len(scenes)))
+
+        # Go through the Process list:
+        starts = [ scene.start() for scene in scenes ]
+        LOG.debug("Processes startet")
+
+        results = [ que.get() for que in queuelist ]
+        LOG.debug("Results retrieved")
+
+        joins = [ scene.join() for scene in scenes ]
+        LOG.debug("Processes joined")
+
+        lonlist = [ res[0] for res in results ]
+        latlist = [ res[1] for res in results ]
+        
+        lons250m = np.concatenate(lonlist)
+        lats250m = np.concatenate(latlist)
+
     return lons250m, lats250m
 
 
@@ -554,76 +682,3 @@ def get_lats_from_cartesian(x__, y__, z__, thr=0.8):
                                          / EARTH_RADIUS))))
     return lats
 
-
-import unittest
-
-class TestMODIS(unittest.TestCase):
-    """Class for system testing the MODIS interpolation.
-    """
-
-    def test_5_to_1(self):
-        """test the 5km to 1km interpolation facility
-        """
-        gfilename = \
-              "/san1/test/data/modis/MOD03_A12097_174256_2012097175435.hdf"
-        filename = \
-              "/san1/test/data/modis/MOD021km_A12097_174256_2012097175435.hdf"
-        from pyhdf.SD import SD
-        from pyhdf.error import HDF4Error
-        
-        try:
-            gdata = SD(gfilename)
-            data = SD(filename)
-        except HDF4Error:
-            print "Failed reading both eos-hdf files %s and %s" % (gfilename, filename)
-            return
-        
-        glats = gdata.select("Latitude")[:]
-        glons = gdata.select("Longitude")[:]
-    
-        lats = data.select("Latitude")[:]
-        lons = data.select("Longitude")[:]
-        
-        tlons, tlats = modis5kmto1km(lons, lats)
-
-        self.assert_(np.allclose(tlons, glons, atol=0.05))
-        self.assert_(np.allclose(tlats, glats, atol=0.05))
-
-
-    def test_1000m_to_250m(self):
-        """test the 1 km to 250 meter interpolation facility
-        """
-        #gfilename = \
-        #      "/san1/test/data/modis/MOD03_A12278_113638_2012278145123.hdf"
-        gfilename = \
-              "/local_disk/src/python-geotiepoints/tests/MOD03_A12278_113638_2012278145123.hdf"
-        #result_filename = \
-        #      "/san1/test/data/modis/250m_lonlat_results.npz"
-        result_filename = \
-              "/local_disk/src/python-geotiepoints/tests/250m_lonlat_results.npz"
-
-        from pyhdf.SD import SD
-        from pyhdf.error import HDF4Error
-        
-        try:
-            gdata = SD(gfilename)
-        except HDF4Error:
-            print "Failed reading eos-hdf file %s" % gfilename
-            return
-        
-        lats = gdata.select("Latitude")[0:50, :]
-        lons = gdata.select("Longitude")[0:50, :]
-    
-        verif = np.load(result_filename)
-        vlons = verif['lons']
-        vlats = verif['lats']
-        tlons, tlats = modis1kmto250m(lons, lats)
-
-        self.assert_(np.allclose(tlons, vlons, atol=0.05))
-        self.assert_(np.allclose(tlats, vlats, atol=0.05))
-
-
-if __name__ == "__main__":
-    unittest.main()
-
-    
