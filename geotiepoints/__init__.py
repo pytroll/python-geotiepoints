@@ -240,6 +240,7 @@ class SatelliteInterpolator(object):
         >>> satint.col_indices
         array([ 0,  2,  7, 12, 17, 22, 23])
         """
+        
         to_run = []
         cases = {"y": self._fill_row_borders,
                  "x": self._fill_col_borders}
@@ -253,7 +254,7 @@ class SatelliteInterpolator(object):
             fun()
 
 
-    def _extrapolate_cols(self, data):
+    def _extrapolate_cols(self, data, first=True, last=True):
         """Extrapolate the column of data, to get the first and last together
         with the data.
 
@@ -274,18 +275,30 @@ class SatelliteInterpolator(object):
                  6205711.40650728]])
         """
 
-        pos = self.col_indices[:2]
-        first_column = _linear_extrapolate(pos,
-                                           (data[:, 0], data[:, 1]),
-                                           self.hcol_indices[0])
-        pos = self.col_indices[-2:]
-        last_column = _linear_extrapolate(pos,
-                                          (data[:, -2], data[:, -1]),
-                                          self.hcol_indices[-1])
+        if first:
+            pos = self.col_indices[:2]
+            first_column = _linear_extrapolate(pos,
+                                               (data[:, 0], data[:, 1]),
+                                               self.hcol_indices[0])
+        if last:
+            pos = self.col_indices[-2:]
+            last_column = _linear_extrapolate(pos,
+                                              (data[:, -2], data[:, -1]),
+                                              self.hcol_indices[-1])
 
-        return np.hstack((np.expand_dims(first_column, 1),
-                          data,
-                          np.expand_dims(last_column, 1))) 
+        if first and last:
+            return np.hstack((np.expand_dims(first_column, 1),
+                              data,
+                              np.expand_dims(last_column, 1))) 
+        elif first:
+            return np.hstack((np.expand_dims(first_column, 1),
+                              data))
+        elif last:
+            return np.hstack((data,
+                              np.expand_dims(last_column, 1)))
+        else:
+            return data
+
 
     def _fill_col_borders(self):
         """Add the first and last column to the data by extrapolation.
@@ -309,14 +322,29 @@ class SatelliteInterpolator(object):
         >>> satint.col_indices
         array([ 0,  2,  7, 12, 17, 22, 23])
         """
+        
+        first = True
+        last = True
+        if self.col_indices[0] == self.hcol_indices[0]:
+            first = False
+        if self.col_indices[-1] == self.hcol_indices[-1]:
+            last = False        
 
-        self.x__ = self._extrapolate_cols(self.x__)
-        self.y__ = self._extrapolate_cols(self.y__)
-        self.z__ = self._extrapolate_cols(self.z__)
+        self.x__ = self._extrapolate_cols(self.x__, first, last)
+        self.y__ = self._extrapolate_cols(self.y__, first, last)
+        self.z__ = self._extrapolate_cols(self.z__, first, last)
   
-        self.col_indices = np.concatenate((np.array([self.hcol_indices[0]]),
-                                           self.col_indices,
-                                           np.array([self.hcol_indices[-1]])))
+        if first and last:
+            self.col_indices = np.concatenate((np.array([self.hcol_indices[0]]),
+                                               self.col_indices,
+                                               np.array([self.hcol_indices[-1]])))
+        elif first:
+            self.col_indices = np.concatenate((np.array([self.hcol_indices[0]]),
+                                               self.col_indices))
+        elif last:
+            self.col_indices = np.concatenate((self.col_indices,
+                                               np.array([self.hcol_indices[-1]])))
+
 
     def _extrapolate_rows(self, data):
         """Extrapolate the rows of data, to get the first and last together
@@ -547,6 +575,7 @@ class TestMODIS(unittest.TestCase):
             gdata = SD(gfilename)
             data = SD(filename)
         except HDF4Error:
+            print "Failed reading both eos-hdf files %s and %s" % (gfilename, filename)
             return
         
         glats = gdata.select("Latitude")[:]
@@ -560,6 +589,38 @@ class TestMODIS(unittest.TestCase):
         self.assert_(np.allclose(tlons, glons, atol=0.05))
         self.assert_(np.allclose(tlats, glats, atol=0.05))
 
+
+    def test_1000m_to_250m(self):
+        """test the 1 km to 250 meter interpolation facility
+        """
+        #gfilename = \
+        #      "/san1/test/data/modis/MOD03_A12278_113638_2012278145123.hdf"
+        gfilename = \
+              "/local_disk/src/python-geotiepoints/tests/MOD03_A12278_113638_2012278145123.hdf"
+        #result_filename = \
+        #      "/san1/test/data/modis/250m_lonlat_results.npz"
+        result_filename = \
+              "/local_disk/src/python-geotiepoints/tests/250m_lonlat_results.npz"
+
+        from pyhdf.SD import SD
+        from pyhdf.error import HDF4Error
+        
+        try:
+            gdata = SD(gfilename)
+        except HDF4Error:
+            print "Failed reading eos-hdf file %s" % gfilename
+            return
+        
+        lats = gdata.select("Latitude")[0:50, :]
+        lons = gdata.select("Longitude")[0:50, :]
+    
+        verif = np.load(result_filename)
+        vlons = verif['lons']
+        vlats = verif['lats']
+        tlons, tlats = modis1kmto250m(lons, lats)
+
+        self.assert_(np.allclose(tlons, vlons, atol=0.05))
+        self.assert_(np.allclose(tlats, vlats, atol=0.05))
 
 
 if __name__ == "__main__":
