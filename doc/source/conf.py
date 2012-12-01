@@ -17,6 +17,35 @@ import sys, os
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('../../'))
+sys.path.insert(0, os.path.abspath('../../geotiepoints'))
+
+
+
+class Mock(object):
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return Mock()
+
+    @classmethod
+    def __getattr__(cls, name):
+        if name in ('__file__', '__path__'):
+            return '/dev/null'
+        elif name[0] == name[0].upper():
+            mockType = type(name, (), {})
+            mockType.__module__ = __name__
+            return mockType
+        else:
+            return Mock()
+
+
+MOCK_MODULES = ['numpy', 'scipy.interpolate', 'scipy', 'pyresample',
+                'pyhdf.SD', 'pyhdf.error']
+for mod_name in MOCK_MODULES:
+    sys.modules[mod_name] = Mock()
+
 
 # -- General configuration -----------------------------------------------------
 
@@ -25,10 +54,13 @@ import sys, os
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest', 'sphinx.ext.coverage', 'sphinxtogithub']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest']
+#extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest', 
+#              'sphinx.ext.coverage', 'sphinxtogithub']
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['.templates']
+#templates_path = ['.templates']
+templates_path = ['sphinx_templates']
 
 # The suffix of source filenames.
 source_suffix = '.rst'
@@ -41,7 +73,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'python-geotiepoints'
-copyright = u'2012, Adam Dybbroe, Martin Raspaud'
+copyright = u'2012, Pytroll crew'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -91,7 +123,8 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'sphinxdoc'
+#html_theme = 'sphinxdoc'
+html_theme = 'default'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -120,7 +153,8 @@ html_theme = 'sphinxdoc'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['.static']
+#html_static_path = ['.static']
+html_static_path = ['sphinx_static']
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -179,7 +213,7 @@ htmlhelp_basename = 'python-geotiepointsdoc'
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
   ('index', 'python-geotiepoints.tex', u'python-geotiepoints Documentation',
-   u'Adam Dybbroe, Martin Raspaud', 'manual'),
+   u'Pytroll crew', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -212,5 +246,5 @@ latex_documents = [
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'python-geotiepoints', u'python-geotiepoints Documentation',
-     [u'Adam Dybbroe, Martin Raspaud'], 1)
+     [u'Pytroll crew'], 1)
 ]
