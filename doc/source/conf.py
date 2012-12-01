@@ -40,7 +40,9 @@ class Mock(object):
         else:
             return Mock()
 
-MOCK_MODULES = ['numpy', 'scipy', 'pyresample']
+
+MOCK_MODULES = ['numpy', 'scipy.interpolate', 'scipy', 'pyresample',
+                'pyhdf.SD', 'pyhdf.error']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = Mock()
 
