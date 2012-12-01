@@ -41,7 +41,7 @@ setup(name='python-geotiepoints',
       url="https://github.com/adybbroe/python-geotiepoints",
       download_url="https://github.com/adybbroe/python-geotiepoints/tarball/v0.1.0#egg=python-geotiepoints-v0.1.0",
       packages = ['geotiepoints'],      
-      install_requires=['numpy', 'scipy'],
+      install_requires=['numpy', 'scipy', 'pyresample'],
       zip_safe = False
       )
 
