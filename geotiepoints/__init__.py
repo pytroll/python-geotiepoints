@@ -171,17 +171,23 @@ def modis1kmto250m(lons1km, lats1km, parallel=True, ncpus=None):
     # A Modis 1km scan spans 10 lines:
     scene_splits = get_scene_splits(lons1km.shape[0], 
                                     10, num_of_cpus)
+    LOG.debug("Scene-splits: " + str(scene_splits))
 
     # Cut the swath in pieces and do processing in parallel:
     scenes = []
     queuelist = []
-    lons_subscenes = np.hsplit(lons1km, scene_splits)
-    lats_subscenes = np.hsplit(lats1km, scene_splits)
-    for idx in range(len(scene_splits)):
+    lons_subscenes = np.vsplit(lons1km, scene_splits)
+    lats_subscenes = np.vsplit(lats1km, scene_splits)
+    LOG.debug("len(lons_subscenes): " + str(len(lons_subscenes)))
+    for longs in lons_subscenes: 
+        LOG.debug("lons-subscene shapes: " + str(longs.shape))
+
+    for idx in range(len(lons_subscenes)):
         lons = lons_subscenes[idx]
         lats = lats_subscenes[idx]
-        LOG.debug("Line number: " + str(scene_splits[idx]))
-            
+        #LOG.debug("Line number: " + str(scene_splits[idx]))
+        LOG.debug("Shape of lon/lat arrays: " + str(lons.shape))
+        
         queuelist.append(Queue())
         scene = Process(target=_modis1kmto250m, 
                         args=(lons, lats, queuelist[idx]))
@@ -236,6 +242,8 @@ def _modis1kmto250m(scene_lons, scene_lats, que=None):
     return (lons_250m, lats_250m)
 
 
+
+
 def faster_modis1kmto250m(lons1km, lats1km, parallel=True, ncpus=None):
     """Getting 250m geolocation for modis from 1km tiepoints.
     Using multiprocesing to speed up performance.
@@ -278,8 +286,8 @@ def faster_modis1kmto250m(lons1km, lats1km, parallel=True, ncpus=None):
     # Cut the swath in pieces and do processing in parallel:
     scenes = []
     queuelist = []
-    lons_subscenes = np.hsplit(lons1km, scene_splits)
-    lats_subscenes = np.hsplit(lats1km, scene_splits)
+    lons_subscenes = np.vsplit(lons1km, scene_splits)
+    lats_subscenes = np.vsplit(lats1km, scene_splits)
     for idx in range(len(scene_splits)):
         lons = lons_subscenes[idx]
         lats = lats_subscenes[idx]
