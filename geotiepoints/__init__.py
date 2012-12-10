@@ -66,6 +66,33 @@ handler.setLevel(logging.DEBUG)
 LOG.setLevel(logging.DEBUG)
 LOG.addHandler(handler)
 
+def get_scene_splits(nlines_swath, nlines_scan, n_cpus):
+    """Calculate the line numbers where the swath will be split in smaller
+    granules for parallel processing"""
+
+    nscans = nlines_swath / nlines_scan
+    nscans_subscene = (nscans + n_cpus ) / n_cpus
+    nlines_subscene = nscans_subscene * nlines_scan
+
+    return range(nlines_subscene, nlines_swath, nlines_subscene)
+
+
+def get_cpus(n_cpus):
+    """Get the number of CPUs to use for parallel proccessing"""
+    from multiprocessing import cpu_count
+
+    ncpus_available = cpu_count()
+    LOG.debug('Number of CPUs detected = %d' % ncpus_available)
+    if n_cpus:
+        if n_cpus > ncpus_available:
+            LOG.warning("Asking to use more CPUs than what is available!")
+            LOG.info("Setting number of CPUs to %d" % ncpus_available)
+            n_cpus = ncpus_available
+    else:
+        n_cpus = ncpus_available
+
+    LOG.debug('Using %d CPUs...' % n_cpus)
+    return n_cpus
 
 def metop20kmto1km(lons20km, lats20km):
     """Getting 1km geolocation for metop avhrr from 20km tiepoints.
@@ -130,27 +157,83 @@ def modis1kmto500m(lons1km, lats1km):
     lons500m, lats500m = satint.interpolate()
     return lons500m, lats500m
 
-def modis1kmto250m(lons1km, lats1km):
+def modis1kmto250m(lons1km, lats1km, parallel=True, ncpus=None):
+    """Getting 250m geolocation for modis from 1km tiepoints.
+    Using multiprocessing in case of several cpus available
+    """
+    from multiprocessing import Process, Queue
+
+    if (ncpus and ncpus == 1) or not parallel:
+        return _modis1kmto250m(lons1km, lats1km, False)
+
+    num_of_cpus = get_cpus(ncpus)
+
+    # A Modis 1km scan spans 10 lines:
+    scene_splits = get_scene_splits(lons1km.shape[0], 
+                                    10, num_of_cpus)
+
+    # Cut the swath in pieces and do processing in parallel:
+    scenes = []
+    queuelist = []
+    lons_subscenes = np.hsplit(lons1km, scene_splits)
+    lats_subscenes = np.hsplit(lats1km, scene_splits)
+    for idx in range(len(scene_splits)):
+        lons = lons_subscenes[idx]
+        lats = lats_subscenes[idx]
+        LOG.debug("Line number: " + str(scene_splits[idx]))
+            
+        queuelist.append(Queue())
+        scene = Process(target=_modis1kmto250m, 
+                        args=(lons, lats, queuelist[idx]))
+        scenes.append(scene)
+
+    LOG.debug("Number of queues: " + str(len(queuelist)))
+    LOG.debug("Number of processes: " + str(len(scenes)))
+
+    # Go through the Process list:
+    starts = [ scene.start() for scene in scenes ]
+    LOG.debug("%d processes startet" % len(starts))
+
+    results = [ que.get() for que in queuelist ]
+    LOG.debug("%d results retrieved" % len(results))
+
+    joins = [ scene.join() for scene in scenes ]
+    LOG.debug("%d processes joined" % len(joins))
+
+    lonlist = [ res[0] for res in results ]
+    latlist = [ res[1] for res in results ]
+        
+    lons250m = np.concatenate(lonlist)
+    lats250m = np.concatenate(latlist)
+
+    return lons250m, lats250m
+
+
+def _modis1kmto250m(scene_lons, scene_lats, que=None):
     """Getting 250m geolocation for modis from 1km tiepoints.
     """
     cols1km = np.arange(0, 5416, 4)
     cols250m = np.arange(5416)
-    lines = lons1km.shape[0] * 4
-    rows1km = np.arange(1.5, lines, 4)
-    rows250m = np.arange(lines)
 
     along_track_order = 1
     cross_track_order = 3
     
-    satint = SatelliteInterpolator((lons1km, lats1km),
+    lines = scene_lons.shape[0] * 4
+    rows1km = np.arange(1.5, lines, 4)
+    rows250m = np.arange(lines)
+
+    satint = SatelliteInterpolator((scene_lons, scene_lats),
                                    (rows1km, cols1km),
                                    (rows250m, cols250m),
                                    along_track_order,
                                    cross_track_order,
                                    chunk_size=40)
     satint.fill_borders("y", "x")
-    lons250m, lats250m = satint.interpolate()
-    return lons250m, lats250m
+    lons_250m, lats_250m = satint.interpolate()
+    if que:
+        que.put((lons_250m, lats_250m))
+
+    return (lons_250m, lats_250m)
 
 
 def faster_modis1kmto250m(lons1km, lats1km, parallel=True, ncpus=None):
@@ -163,7 +246,7 @@ def faster_modis1kmto250m(lons1km, lats1km, parallel=True, ncpus=None):
     along_track_order = 1
     cross_track_order = 3
     
-    from multiprocessing import Process, cpu_count, Queue
+    from multiprocessing import Process, Queue
 
     def ipol_scene(scene_lons, scene_lats, que=None):
         lines = scene_lons.shape[0] * 4
@@ -183,65 +266,48 @@ def faster_modis1kmto250m(lons1km, lats1km, parallel=True, ncpus=None):
 
         return (lons_250m, lats_250m)
 
-    if ncpus:
-        if ncpus > cpu_count():
-            LOG.warning("Asking to use more CPUs than what is available!")
-            number_of_cpus = cpu_count()
-            LOG.info("Setting number of CPUs to %d" % ncpus)
-        else:
-            number_of_cpus = ncpus
-    else:
-        number_of_cpus = cpu_count()
-
-    LOG.debug('Number of CPUs detected = %d' % number_of_cpus)
-
-    # A Modis 1km scan spans 10 lines:
-    N_1KM_LINES = 10
-    numoflines_in_swath = lons1km.shape[0]
-    nlines_subscene = N_1KM_LINES  * (((numoflines_in_swath / number_of_cpus) 
-                                      + N_1KM_LINES) / N_1KM_LINES)
-    if nlines_subscene > numoflines_in_swath:
-        nlines_subscene = numoflines_in_swath
-
-    if number_of_cpus == 1 or not parallel:
+    if (ncpus and ncpus == 1) or not parallel:
         return ipol_scene(lons1km, lats1km, False)
 
-    else:
-        # Cut the swath in pieces and do processing in parallel:
-        linenum = 0
-        scenes = []
-        queuelist = []
-        idx = 0
-        while linenum < numoflines_in_swath:
-            subscene_lons = lons1km[linenum:linenum + nlines_subscene, ::]
-            subscene_lats = lats1km[linenum:linenum + nlines_subscene, ::]
-            linenum = linenum + nlines_subscene
-            LOG.debug("Line number: " + str(linenum))
+    num_of_cpus = get_cpus(ncpus)
+
+    # A Modis 1km scan spans 10 lines:
+    scene_splits = get_scene_splits(lons1km.shape[0], 
+                                    10, num_of_cpus)
+
+    # Cut the swath in pieces and do processing in parallel:
+    scenes = []
+    queuelist = []
+    lons_subscenes = np.hsplit(lons1km, scene_splits)
+    lats_subscenes = np.hsplit(lats1km, scene_splits)
+    for idx in range(len(scene_splits)):
+        lons = lons_subscenes[idx]
+        lats = lats_subscenes[idx]
+        LOG.debug("Line number: " + str(scene_splits[idx]))
             
-            queuelist.append(Queue())
-            scene = Process(target=ipol_scene, 
-                            args=(subscene_lons, subscene_lats, queuelist[idx]))
-            scenes.append(scene)
-            idx = idx + 1
+        queuelist.append(Queue())
+        scene = Process(target=ipol_scene, 
+                        args=(lons, lats, queuelist[idx]))
+        scenes.append(scene)
 
-        LOG.debug("Number of queues: " + str(len(queuelist)))
-        LOG.debug("Number of processes: " + str(len(scenes)))
+    LOG.debug("Number of queues: " + str(len(queuelist)))
+    LOG.debug("Number of processes: " + str(len(scenes)))
 
-        # Go through the Process list:
-        starts = [ scene.start() for scene in scenes ]
-        LOG.debug("Processes startet")
+    # Go through the Process list:
+    starts = [ scene.start() for scene in scenes ]
+    LOG.debug("%d processes startet" % len(starts))
 
-        results = [ que.get() for que in queuelist ]
-        LOG.debug("Results retrieved")
+    results = [ que.get() for que in queuelist ]
+    LOG.debug("%d results retrieved" % len(results))
 
-        joins = [ scene.join() for scene in scenes ]
-        LOG.debug("Processes joined")
+    joins = [ scene.join() for scene in scenes ]
+    LOG.debug("%d processes joined" % len(joins))
 
-        lonlist = [ res[0] for res in results ]
-        latlist = [ res[1] for res in results ]
+    lonlist = [ res[0] for res in results ]
+    latlist = [ res[1] for res in results ]
         
-        lons250m = np.concatenate(lonlist)
-        lats250m = np.concatenate(latlist)
+    lons250m = np.concatenate(lonlist)
+    lats250m = np.concatenate(latlist)
 
     return lons250m, lats250m
 
