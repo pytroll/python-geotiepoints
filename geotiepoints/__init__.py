@@ -144,7 +144,7 @@ class SatelliteInterpolator(object):
     Handles interpolation of geolocation data from a grid of tie points.  It is
     preferable to have tie-points out till the edges if the tiepoint grid, but
     a method is provided to extrapolate linearly the tiepoints to the borders
-    of the grid.
+    of the grid. The extrapolation is done automatically if it seems necessary.
 
     Uses numpy, scipy, and pyresample
 
