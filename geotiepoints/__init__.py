@@ -760,10 +760,10 @@ class SatelliteInterpolator(object):
             self.newz[cnt, :] = splev(self.hcol_indices, tck, der=0)
 
 
-    def interpolate(self, cores=1):
+    def interpolate(self):
         """Do the interpolation, and return resulting longitudes and latitudes.
         """
-        self._interp(cores)
+        self._interp()
 
         self.longitude = get_lons_from_cartesian(self.newx, self.newy)
 
