@@ -5,8 +5,7 @@ Unit tests for python-geotiepoints: MODIS examples
 import unittest
 import numpy as np
 
-from geotiepoints import (modis5kmto1km, modis1kmto250m, 
-                          faster_modis1kmto250m)
+from geotiepoints import (modis5kmto1km, modis1kmto250m)
 
 from geotiepoints import get_scene_splits
 

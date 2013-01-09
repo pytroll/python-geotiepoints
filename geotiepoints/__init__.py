@@ -691,7 +691,7 @@ class SatelliteInterpolator(object):
 
         self.row_indices = np.concatenate(row_indices)
     
-    def _interp(self, cores=1):
+    def _interp(self):
         """Interpolate the cartesian coordinates.
         """
         if np.all(self.hrow_indices == self.row_indices):
