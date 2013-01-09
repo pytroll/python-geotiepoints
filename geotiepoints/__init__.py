@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2010-2012.
+# Copyright (c) 2010-2013.
 
 # Author(s):
  
@@ -30,69 +30,74 @@ import os, sys
 import numpy as np
 from numpy import arccos, sign, rad2deg, sqrt, arcsin
 from scipy.interpolate import RectBivariateSpline, splrep, splev
+from multiprocessing import Pool
+
 
 
 EARTH_RADIUS = 6370997.0
 
-import logging
-LOG = logging.getLogger(__name__)
+# import logging
+# LOG = logging.getLogger(__name__)
 
-#: Default time format
-_DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+# #: Default time format
+# _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
-#: Default log format
-_DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
+# #: Default log format
+# _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
-_PYTHON_GEOTIEPOINTS_LOGFILE = os.environ.get('PYTHON_GEOTIEPOINTS_LOGFILE', None)
-if _PYTHON_GEOTIEPOINTS_LOGFILE:
-    ndays = int(OPTIONS.get("log_rotation_days", 1))
-    ncount = int(OPTIONS.get("log_rotation_backup", 5))
-    handler = handlers.TimedRotatingFileHandler(_PYTHON_GEOTIEPOINTS_LOGFILE,
-                                                when='midnight', 
-                                                interval=ndays, 
-                                                backupCount=ncount, 
-                                                encoding=None, 
-                                                delay=False, 
-                                                utc=True)
+# _PYTHON_GEOTIEPOINTS_LOGFILE = os.environ.get('PYTHON_GEOTIEPOINTS_LOGFILE', None)
+# if _PYTHON_GEOTIEPOINTS_LOGFILE:
+#     ndays = int(OPTIONS.get("log_rotation_days", 1))
+#     ncount = int(OPTIONS.get("log_rotation_backup", 5))
+#     handler = handlers.TimedRotatingFileHandler(_PYTHON_GEOTIEPOINTS_LOGFILE,
+#                                                 when='midnight', 
+#                                                 interval=ndays, 
+#                                                 backupCount=ncount, 
+#                                                 encoding=None, 
+#                                                 delay=False, 
+#                                                 utc=True)
 
-else:
-    handler = logging.StreamHandler(sys.stderr)
+# else:
+#     handler = logging.StreamHandler(sys.stderr)
 
-formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
-                              datefmt=_DEFAULT_TIME_FORMAT)
-handler.setFormatter(formatter)
+# formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
+#                               datefmt=_DEFAULT_TIME_FORMAT)
+# handler.setFormatter(formatter)
 
-handler.setLevel(logging.DEBUG)
-LOG.setLevel(logging.DEBUG)
-LOG.addHandler(handler)
+# handler.setLevel(logging.DEBUG)
+# LOG.setLevel(logging.DEBUG)
+# LOG.addHandler(handler)
 
 def get_scene_splits(nlines_swath, nlines_scan, n_cpus):
     """Calculate the line numbers where the swath will be split in smaller
     granules for parallel processing"""
 
     nscans = nlines_swath / nlines_scan
-    nscans_subscene = (nscans + n_cpus ) / n_cpus
+    if nscans < n_cpus:
+        nscans_subscene = 1
+    else:
+        nscans_subscene = nscans / n_cpus
     nlines_subscene = nscans_subscene * nlines_scan
 
     return range(nlines_subscene, nlines_swath, nlines_subscene)
 
 
-def get_cpus(n_cpus):
-    """Get the number of CPUs to use for parallel proccessing"""
-    from multiprocessing import cpu_count
+# def get_cpus(n_cpus):
+#     """Get the number of CPUs to use for parallel proccessing"""
+#     from multiprocessing import cpu_count
 
-    ncpus_available = cpu_count()
-    LOG.debug('Number of CPUs detected = %d' % ncpus_available)
-    if n_cpus:
-        if n_cpus > ncpus_available:
-            LOG.warning("Asking to use more CPUs than what is available!")
-            LOG.info("Setting number of CPUs to %d" % ncpus_available)
-            n_cpus = ncpus_available
-    else:
-        n_cpus = ncpus_available
+#     ncpus_available = cpu_count()
+#     LOG.debug('Number of CPUs detected = %d' % ncpus_available)
+#     if n_cpus:
+#         if n_cpus > ncpus_available:
+#             LOG.warning("Asking to use more CPUs than what is available!")
+#             LOG.info("Setting number of CPUs to %d" % ncpus_available)
+#             n_cpus = ncpus_available
+#     else:
+#         n_cpus = ncpus_available
 
-    LOG.debug('Using %d CPUs...' % n_cpus)
-    return n_cpus
+#     LOG.debug('Using %d CPUs...' % n_cpus)
+#     return n_cpus
 
 def metop20kmto1km(lons20km, lats20km):
     """Getting 1km geolocation for metop avhrr from 20km tiepoints.
@@ -135,9 +140,34 @@ def modis5kmto1km(lons5km, lats5km):
     lons1km, lats1km = satint.interpolate()
     return lons1km, lats1km
 
-def modis1kmto500m(lons1km, lats1km):
+def _multi(fun, lons, lats, chunk_size, cores=1):
+    """Work on multiple cores.
+    """
+    pool = Pool(processes=cores)
+
+    splits = get_scene_splits(lons.shape[0], chunk_size, cores)
+
+    lons_parts = np.vsplit(lons, splits)
+    lats_parts = np.vsplit(lats, splits)
+    
+    results = [pool.apply_async(fun,
+                                (lons_parts[i],
+                                 lats_parts[i]))
+               for i in range(len(lons_parts))]
+    
+    pool.close()
+    pool.join()
+
+    lons, lats = zip(*(res.get() for res in results))
+
+    return np.vstack(lons), np.vstack(lats)
+    
+def modis1kmto500m(lons1km, lats1km, cores=1):
     """Getting 500m geolocation for modis from 1km tiepoints.
     """
+    if cores > 1:
+        return _multi(modis1kmto500m, lons1km, lats1km, 10, cores)
+    
     cols1km = np.arange(0, 2708, 2)
     cols500m = np.arange(2708)
     lines = lons1km.shape[0] * 2
@@ -157,167 +187,170 @@ def modis1kmto500m(lons1km, lats1km):
     lons500m, lats500m = satint.interpolate()
     return lons500m, lats500m
 
-def modis1kmto250m(lons1km, lats1km, parallel=True, ncpus=None):
-    """Getting 250m geolocation for modis from 1km tiepoints.
-    Using multiprocessing in case of several cpus available
-    """
-    from multiprocessing import Process, Queue
-
-    if (ncpus and ncpus == 1) or not parallel:
-        return _modis1kmto250m(lons1km, lats1km, False)
-
-    num_of_cpus = get_cpus(ncpus)
-
-    # A Modis 1km scan spans 10 lines:
-    scene_splits = get_scene_splits(lons1km.shape[0], 
-                                    10, num_of_cpus)
-    LOG.debug("Scene-splits: " + str(scene_splits))
-
-    # Cut the swath in pieces and do processing in parallel:
-    scenes = []
-    queuelist = []
-    lons_subscenes = np.vsplit(lons1km, scene_splits)
-    lats_subscenes = np.vsplit(lats1km, scene_splits)
-    LOG.debug("len(lons_subscenes): " + str(len(lons_subscenes)))
-    for longs in lons_subscenes: 
-        LOG.debug("lons-subscene shapes: " + str(longs.shape))
-
-    for idx in range(len(lons_subscenes)):
-        lons = lons_subscenes[idx]
-        lats = lats_subscenes[idx]
-        #LOG.debug("Line number: " + str(scene_splits[idx]))
-        LOG.debug("Shape of lon/lat arrays: " + str(lons.shape))
-        
-        queuelist.append(Queue())
-        scene = Process(target=_modis1kmto250m, 
-                        args=(lons, lats, queuelist[idx]))
-        scenes.append(scene)
-
-    LOG.debug("Number of queues: " + str(len(queuelist)))
-    LOG.debug("Number of processes: " + str(len(scenes)))
-
-    # Go through the Process list:
-    starts = [ scene.start() for scene in scenes ]
-    LOG.debug("%d processes startet" % len(starts))
-
-    results = [ que.get() for que in queuelist ]
-    LOG.debug("%d results retrieved" % len(results))
-
-    joins = [ scene.join() for scene in scenes ]
-    LOG.debug("%d processes joined" % len(joins))
-
-    lonlist = [ res[0] for res in results ]
-    latlist = [ res[1] for res in results ]
-        
-    lons250m = np.concatenate(lonlist)
-    lats250m = np.concatenate(latlist)
-
-    return lons250m, lats250m
 
 
-def _modis1kmto250m(scene_lons, scene_lats, que=None):
+def modis1kmto250m(lons1km, lats1km, cores=1):
     """Getting 250m geolocation for modis from 1km tiepoints.
     """
+    if cores > 1:
+        return _multi(modis1kmto250m, lons1km, lats1km, 10, cores)
+    
     cols1km = np.arange(0, 5416, 4)
     cols250m = np.arange(5416)
 
     along_track_order = 1
     cross_track_order = 3
     
-    lines = scene_lons.shape[0] * 4
+    lines = lons1km.shape[0] * 4
     rows1km = np.arange(1.5, lines, 4)
     rows250m = np.arange(lines)
 
-    satint = SatelliteInterpolator((scene_lons, scene_lats),
+    satint = SatelliteInterpolator((lons1km, lats1km),
                                    (rows1km, cols1km),
                                    (rows250m, cols250m),
                                    along_track_order,
                                    cross_track_order,
                                    chunk_size=40)
     satint.fill_borders("y", "x")
-    lons_250m, lats_250m = satint.interpolate()
-    if que:
-        que.put((lons_250m, lats_250m))
-
-    return (lons_250m, lats_250m)
-
-
-
-
-def faster_modis1kmto250m(lons1km, lats1km, parallel=True, ncpus=None):
-    """Getting 250m geolocation for modis from 1km tiepoints.
-    Using multiprocesing to speed up performance.
-    """
-    cols1km = np.arange(0, 5416, 4)
-    cols250m = np.arange(5416)
-
-    along_track_order = 1
-    cross_track_order = 3
-    
-    from multiprocessing import Process, Queue
-
-    def ipol_scene(scene_lons, scene_lats, que=None):
-        lines = scene_lons.shape[0] * 4
-        rows1km = np.arange(1.5, lines, 4)
-        rows250m = np.arange(lines)
-
-        satint = SatelliteInterpolator((scene_lons, scene_lats),
-                                       (rows1km, cols1km),
-                                       (rows250m, cols250m),
-                                       along_track_order,
-                                       cross_track_order,
-                                       chunk_size=40)
-        satint.fill_borders("y", "x")
-        lons_250m, lats_250m = satint.interpolate()
-        if que:
-            que.put((lons_250m, lats_250m))
-
-        return (lons_250m, lats_250m)
-
-    if (ncpus and ncpus == 1) or not parallel:
-        return ipol_scene(lons1km, lats1km, False)
-
-    num_of_cpus = get_cpus(ncpus)
-
-    # A Modis 1km scan spans 10 lines:
-    scene_splits = get_scene_splits(lons1km.shape[0], 
-                                    10, num_of_cpus)
-
-    # Cut the swath in pieces and do processing in parallel:
-    scenes = []
-    queuelist = []
-    lons_subscenes = np.vsplit(lons1km, scene_splits)
-    lats_subscenes = np.vsplit(lats1km, scene_splits)
-    for idx in range(len(scene_splits)):
-        lons = lons_subscenes[idx]
-        lats = lats_subscenes[idx]
-        LOG.debug("Line number: " + str(scene_splits[idx]))
-            
-        queuelist.append(Queue())
-        scene = Process(target=ipol_scene, 
-                        args=(lons, lats, queuelist[idx]))
-        scenes.append(scene)
-
-    LOG.debug("Number of queues: " + str(len(queuelist)))
-    LOG.debug("Number of processes: " + str(len(scenes)))
-
-    # Go through the Process list:
-    starts = [ scene.start() for scene in scenes ]
-    LOG.debug("%d processes startet" % len(starts))
-
-    results = [ que.get() for que in queuelist ]
-    LOG.debug("%d results retrieved" % len(results))
-
-    joins = [ scene.join() for scene in scenes ]
-    LOG.debug("%d processes joined" % len(joins))
-
-    lonlist = [ res[0] for res in results ]
-    latlist = [ res[1] for res in results ]
-        
-    lons250m = np.concatenate(lonlist)
-    lats250m = np.concatenate(latlist)
+    lons250m, lats250m = satint.interpolate()
 
     return lons250m, lats250m
+
+
+# def modis1kmto250m(lons1km, lats1km, parallel=True, ncpus=None):
+#     """Getting 250m geolocation for modis from 1km tiepoints.
+#     Using multiprocessing in case of several cpus available
+#     """
+#     from multiprocessing import Process, Queue
+#     #from threading import Thread as Process
+#     #from Queue import Queue
+
+#     if (ncpus and ncpus == 1) or not parallel:
+#         return _modis1kmto250m(lons1km, lats1km, False)
+
+#     num_of_cpus = get_cpus(ncpus)
+
+#     # A Modis 1km scan spans 10 lines:
+#     scene_splits = get_scene_splits(lons1km.shape[0], 
+#                                     10, num_of_cpus)
+#     LOG.debug("Scene-splits: " + str(scene_splits))
+
+#     # Cut the swath in pieces and do processing in parallel:
+#     scenes = []
+#     queuelist = []
+#     lons_subscenes = np.vsplit(lons1km, scene_splits)
+#     lats_subscenes = np.vsplit(lats1km, scene_splits)
+#     LOG.debug("len(lons_subscenes): " + str(len(lons_subscenes)))
+#     for longs in lons_subscenes: 
+#         LOG.debug("lons-subscene shapes: " + str(longs.shape))
+
+#     for idx in range(len(lons_subscenes)):
+#         lons = lons_subscenes[idx]
+#         lats = lats_subscenes[idx]
+#         #LOG.debug("Line number: " + str(scene_splits[idx]))
+#         LOG.debug("Shape of lon/lat arrays: " + str(lons.shape))
+        
+#         queuelist.append(Queue())
+#         scene = Process(target=_modis1kmto250m, 
+#                         args=(lons, lats, queuelist[idx]))
+#         scenes.append(scene)
+
+#     LOG.debug("Number of queues: " + str(len(queuelist)))
+#     LOG.debug("Number of processes: " + str(len(scenes)))
+
+#     # Go through the Process list:
+#     starts = [ scene.start() for scene in scenes ]
+#     LOG.debug("%d processes startet" % len(starts))
+
+#     results = [ que.get() for que in queuelist ]
+#     LOG.debug("%d results retrieved" % len(results))
+
+#     joins = [ scene.join() for scene in scenes ]
+#     LOG.debug("%d processes joined" % len(joins))
+
+#     lonlist = [ res[0] for res in results ]
+#     latlist = [ res[1] for res in results ]
+        
+#     lons250m = np.concatenate(lonlist)
+#     lats250m = np.concatenate(latlist)
+
+#     return lons250m, lats250m
+
+
+# def faster_modis1kmto250m(lons1km, lats1km, parallel=True, ncpus=None):
+#     """Getting 250m geolocation for modis from 1km tiepoints.
+#     Using multiprocesing to speed up performance.
+#     """
+#     cols1km = np.arange(0, 5416, 4)
+#     cols250m = np.arange(5416)
+
+#     along_track_order = 1
+#     cross_track_order = 3
+    
+#     from multiprocessing import Process, Queue
+
+#     def ipol_scene(scene_lons, scene_lats, que=None):
+#         lines = scene_lons.shape[0] * 4
+#         rows1km = np.arange(1.5, lines, 4)
+#         rows250m = np.arange(lines)
+
+#         satint = SatelliteInterpolator((scene_lons, scene_lats),
+#                                        (rows1km, cols1km),
+#                                        (rows250m, cols250m),
+#                                        along_track_order,
+#                                        cross_track_order,
+#                                        chunk_size=40)
+#         satint.fill_borders("y", "x")
+#         lons_250m, lats_250m = satint.interpolate()
+#         if que:
+#             que.put((lons_250m, lats_250m))
+
+#         return (lons_250m, lats_250m)
+
+#     if (ncpus and ncpus == 1) or not parallel:
+#         return ipol_scene(lons1km, lats1km, False)
+
+#     num_of_cpus = get_cpus(ncpus)
+
+#     # A Modis 1km scan spans 10 lines:
+#     scene_splits = get_scene_splits(lons1km.shape[0], 
+#                                     10, num_of_cpus)
+
+#     # Cut the swath in pieces and do processing in parallel:
+#     scenes = []
+#     queuelist = []
+#     lons_subscenes = np.vsplit(lons1km, scene_splits)
+#     lats_subscenes = np.vsplit(lats1km, scene_splits)
+#     for idx in range(len(scene_splits)):
+#         lons = lons_subscenes[idx]
+#         lats = lats_subscenes[idx]
+#         LOG.debug("Line number: " + str(scene_splits[idx]))
+            
+#         queuelist.append(Queue())
+#         scene = Process(target=ipol_scene, 
+#                         args=(lons, lats, queuelist[idx]))
+#         scenes.append(scene)
+
+#     LOG.debug("Number of queues: " + str(len(queuelist)))
+#     LOG.debug("Number of processes: " + str(len(scenes)))
+
+#     # Go through the Process list:
+#     starts = [ scene.start() for scene in scenes ]
+#     LOG.debug("%d processes startet" % len(starts))
+
+#     results = [ que.get() for que in queuelist ]
+#     LOG.debug("%d results retrieved" % len(results))
+
+#     joins = [ scene.join() for scene in scenes ]
+#     LOG.debug("%d processes joined" % len(joins))
+
+#     lonlist = [ res[0] for res in results ]
+#     latlist = [ res[1] for res in results ]
+        
+#     lons250m = np.concatenate(lonlist)
+#     lats250m = np.concatenate(latlist)
+
+#     return lons250m, lats250m
 
 
 # NOTE: extrapolate on a sphere ?
@@ -658,7 +691,7 @@ class SatelliteInterpolator(object):
 
         self.row_indices = np.concatenate(row_indices)
     
-    def _interp(self):
+    def _interp(self, cores=1):
         """Interpolate the cartesian coordinates.
         """
         if np.all(self.hrow_indices == self.row_indices):
@@ -666,6 +699,7 @@ class SatelliteInterpolator(object):
         
         xpoints, ypoints = np.meshgrid(self.hrow_indices,
                                        self.hcol_indices)
+
         spl = RectBivariateSpline(self.row_indices,
                                   self.col_indices,
                                   self.x__,
@@ -696,6 +730,7 @@ class SatelliteInterpolator(object):
         self.newz = spl.ev(xpoints.ravel(), ypoints.ravel())
         self.newz = self.newz.reshape(xpoints.shape).T
 
+
     def _interp1d(self):
         """Interpolate in one dimension.
         """
@@ -725,10 +760,10 @@ class SatelliteInterpolator(object):
             self.newz[cnt, :] = splev(self.hcol_indices, tck, der=0)
 
 
-    def interpolate(self):
+    def interpolate(self, cores=1):
         """Do the interpolation, and return resulting longitudes and latitudes.
         """
-        self._interp()
+        self._interp(cores)
 
         self.longitude = get_lons_from_cartesian(self.newx, self.newy)
 
