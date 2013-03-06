@@ -75,7 +75,7 @@ class TestMODIS(unittest.TestCase):
         verif = np.load(result_filename)
         vlons = verif['lon'] / 1000.
         vlats = verif['lat'] / 1000.
-        tlons, tlats = modis1kmto250m(lons, lats)
+        tlons, tlats = modis1kmto250m(lons, lats, cores=4)
 
         self.assert_(np.allclose(tlons, vlons, atol=0.05))
         self.assert_(np.allclose(tlats, vlats, atol=0.05))
