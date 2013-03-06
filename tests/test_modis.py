@@ -5,9 +5,30 @@ Unit tests for python-geotiepoints: MODIS examples
 import unittest
 import numpy as np
 
-from geotiepoints import modis5kmto1km, modis1kmto250m
+from geotiepoints import (modis5kmto1km, modis1kmto250m)
+
+from geotiepoints import get_scene_splits
 
 
+class TestUtils(unittest.TestCase):
+    """Class for unit testing the ancillary interpolation functions
+    """
+
+    def setUp(self):
+        pass
+
+
+    def test_get_numof_subscene_lines(self):
+        """Test getting the number of sub-scene lines dependent on the number
+        of CPUs and for various number of lines in a scan"""
+
+        ncpus = 3 
+        scene_splits = get_scene_splits(1060,
+                                        10, ncpus)
+        
+    
+
+        
 class TestMODIS(unittest.TestCase):
     """Class for system testing the MODIS interpolation.
     """
@@ -75,6 +96,10 @@ class TestMODIS(unittest.TestCase):
         verif = np.load(result_filename)
         vlons = verif['lon'] / 1000.
         vlats = verif['lat'] / 1000.
+        tlons, tlats = modis1kmto250m(lons, lats)
+        self.assert_(np.allclose(tlons, vlons, atol=0.05))
+        self.assert_(np.allclose(tlats, vlats, atol=0.05))
+
         tlons, tlats = modis1kmto250m(lons, lats, cores=4)
 
         self.assert_(np.allclose(tlons, vlons, atol=0.05))

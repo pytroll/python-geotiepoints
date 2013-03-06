@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2010-2012.
+# Copyright (c) 2010-2013.
 
 # Author(s):
  
 #   Adam Dybbroe <adam.dybbroe@smhise>
 #   Martin Raspaud <martin.raspaud@smhi.se>
+#   Panu Lahtinen <panu.lahtinen@fmi.fi>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,12 +25,30 @@
 """Interpolation of geographical tiepoints.
 """
 
+import os, sys
+
 import numpy as np
 from numpy import arccos, sign, rad2deg, sqrt, arcsin
 from scipy.interpolate import RectBivariateSpline, splrep, splev
+from multiprocessing import Pool
+
 
 
 EARTH_RADIUS = 6370997.0
+
+
+def get_scene_splits(nlines_swath, nlines_scan, n_cpus):
+    """Calculate the line numbers where the swath will be split in smaller
+    granules for parallel processing"""
+
+    nscans = nlines_swath / nlines_scan
+    if nscans < n_cpus:
+        nscans_subscene = 1
+    else:
+        nscans_subscene = nscans / n_cpus
+    nlines_subscene = nscans_subscene * nlines_scan
+
+    return range(nlines_subscene, nlines_swath, nlines_subscene)
 
 
 def metop20kmto1km(lons20km, lats20km):
@@ -73,9 +92,34 @@ def modis5kmto1km(lons5km, lats5km):
     lons1km, lats1km = satint.interpolate()
     return lons1km, lats1km
 
-def modis1kmto500m(lons1km, lats1km):
+def _multi(fun, lons, lats, chunk_size, cores=1):
+    """Work on multiple cores.
+    """
+    pool = Pool(processes=cores)
+
+    splits = get_scene_splits(lons.shape[0], chunk_size, cores)
+
+    lons_parts = np.vsplit(lons, splits)
+    lats_parts = np.vsplit(lats, splits)
+    
+    results = [pool.apply_async(fun,
+                                (lons_parts[i],
+                                 lats_parts[i]))
+               for i in range(len(lons_parts))]
+    
+    pool.close()
+    pool.join()
+
+    lons, lats = zip(*(res.get() for res in results))
+
+    return np.vstack(lons), np.vstack(lats)
+    
+def modis1kmto500m(lons1km, lats1km, cores=1):
     """Getting 500m geolocation for modis from 1km tiepoints.
     """
+    if cores > 1:
+        return _multi(modis1kmto500m, lons1km, lats1km, 10, cores)
+    
     cols1km = np.arange(0, 2708, 2)
     cols500m = np.arange(2708)
     lines = lons1km.shape[0] * 2
@@ -95,18 +139,24 @@ def modis1kmto500m(lons1km, lats1km):
     lons500m, lats500m = satint.interpolate()
     return lons500m, lats500m
 
-def modis1kmto250m(lons1km, lats1km):
+
+
+def modis1kmto250m(lons1km, lats1km, cores=1):
     """Getting 250m geolocation for modis from 1km tiepoints.
     """
+    if cores > 1:
+        return _multi(modis1kmto250m, lons1km, lats1km, 10, cores)
+    
     cols1km = np.arange(0, 5416, 4)
     cols250m = np.arange(5416)
-    lines = lons1km.shape[0] * 4
-    rows1km = np.arange(1.5, lines, 4)
-    rows250m = np.arange(lines)
 
     along_track_order = 1
     cross_track_order = 3
     
+    lines = lons1km.shape[0] * 4
+    rows1km = np.arange(1.5, lines, 4)
+    rows250m = np.arange(lines)
+
     satint = SatelliteInterpolator((lons1km, lats1km),
                                    (rows1km, cols1km),
                                    (rows250m, cols250m),
@@ -115,6 +165,7 @@ def modis1kmto250m(lons1km, lats1km):
                                    chunk_size=40)
     satint.fill_borders("y", "x")
     lons250m, lats250m = satint.interpolate()
+
     return lons250m, lats250m
 
 
@@ -464,6 +515,7 @@ class SatelliteInterpolator(object):
         
         xpoints, ypoints = np.meshgrid(self.hrow_indices,
                                        self.hcol_indices)
+
         spl = RectBivariateSpline(self.row_indices,
                                   self.col_indices,
                                   self.x__,
@@ -493,6 +545,7 @@ class SatelliteInterpolator(object):
 
         self.newz = spl.ev(xpoints.ravel(), ypoints.ravel())
         self.newz = self.newz.reshape(xpoints.shape).T
+
 
     def _interp1d(self):
         """Interpolate in one dimension.
@@ -554,76 +607,3 @@ def get_lats_from_cartesian(x__, y__, z__, thr=0.8):
                                          / EARTH_RADIUS))))
     return lats
 
-
-import unittest
-
-class TestMODIS(unittest.TestCase):
-    """Class for system testing the MODIS interpolation.
-    """
-
-    def test_5_to_1(self):
-        """test the 5km to 1km interpolation facility
-        """
-        gfilename = \
-              "/san1/test/data/modis/MOD03_A12097_174256_2012097175435.hdf"
-        filename = \
-              "/san1/test/data/modis/MOD021km_A12097_174256_2012097175435.hdf"
-        from pyhdf.SD import SD
-        from pyhdf.error import HDF4Error
-        
-        try:
-            gdata = SD(gfilename)
-            data = SD(filename)
-        except HDF4Error:
-            print "Failed reading both eos-hdf files %s and %s" % (gfilename, filename)
-            return
-        
-        glats = gdata.select("Latitude")[:]
-        glons = gdata.select("Longitude")[:]
-    
-        lats = data.select("Latitude")[:]
-        lons = data.select("Longitude")[:]
-        
-        tlons, tlats = modis5kmto1km(lons, lats)
-
-        self.assert_(np.allclose(tlons, glons, atol=0.05))
-        self.assert_(np.allclose(tlats, glats, atol=0.05))
-
-
-    def test_1000m_to_250m(self):
-        """test the 1 km to 250 meter interpolation facility
-        """
-        #gfilename = \
-        #      "/san1/test/data/modis/MOD03_A12278_113638_2012278145123.hdf"
-        gfilename = \
-              "/local_disk/src/python-geotiepoints/tests/MOD03_A12278_113638_2012278145123.hdf"
-        #result_filename = \
-        #      "/san1/test/data/modis/250m_lonlat_results.npz"
-        result_filename = \
-              "/local_disk/src/python-geotiepoints/tests/250m_lonlat_results.npz"
-
-        from pyhdf.SD import SD
-        from pyhdf.error import HDF4Error
-        
-        try:
-            gdata = SD(gfilename)
-        except HDF4Error:
-            print "Failed reading eos-hdf file %s" % gfilename
-            return
-        
-        lats = gdata.select("Latitude")[0:50, :]
-        lons = gdata.select("Longitude")[0:50, :]
-    
-        verif = np.load(result_filename)
-        vlons = verif['lons']
-        vlats = verif['lats']
-        tlons, tlats = modis1kmto250m(lons, lats)
-
-        self.assert_(np.allclose(tlons, vlons, atol=0.05))
-        self.assert_(np.allclose(tlats, vlats, atol=0.05))
-
-
-if __name__ == "__main__":
-    unittest.main()
-
-    
