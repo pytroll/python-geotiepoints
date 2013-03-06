@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2012 Adam Dybbroe, Martin Raspaud
+# Copyright (c) 2012, 2013 Adam Dybbroe, Martin Raspaud
 
 # Author(s):
 
@@ -27,7 +27,7 @@
 from setuptools import setup
 
 setup(name='python-geotiepoints',
-      version="v0.1.0",
+      version="0.2.0",
       description='Interpolation of geographic tiepoints in Python',
       author='Adam Dybbroe, Martin Raspaud',
       author_email='martin.raspaud@smhi.se',
@@ -39,7 +39,6 @@ setup(name='python-geotiepoints',
                    "Programming Language :: Python",
                    "Topic :: Scientific/Engineering"],
       url="https://github.com/adybbroe/python-geotiepoints",
-      download_url="https://github.com/adybbroe/python-geotiepoints/tarball/v0.1.0#egg=python-geotiepoints-v0.1.0",
       packages = ['geotiepoints'],      
       install_requires=['numpy', 'scipy', 'pyresample'],
       zip_safe = False
