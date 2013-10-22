@@ -67,9 +67,9 @@ class GeoInterpolator(Interpolator):
             self.tie_data = [x__, y__, z__]
 
 
+        self.new_data = []
         for num in range(len(self.tie_data)):
             self.new_data.append([])
-
 
 
     def set_tiepoints(self, lon, lat):
