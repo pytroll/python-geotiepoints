@@ -44,12 +44,12 @@ or, if you want to hack the package::
   $> python setup.py develop
 
 
-Usage
------
+Usage for longitude and latitude interpolation
+----------------------------------------------
 
 A typical usage of the package.
 
-  >>> from geotiepoints import SatelliteInterpolator
+  >>> from geotiepoints.geointerpolator import GeoInterpolator
   >>> import numpy as np
   >>> tie_cols = np.arange(0, 11, 5)
   >>> tie_rows = np.arange(0, 5, 2)
@@ -57,10 +57,10 @@ A typical usage of the package.
   >>> fine_rows = np.arange(0, 5)
   >>> tie_lons = (np.arange(3*3) + 30).reshape((3, 3))
   >>> tie_lats = (np.arange(3*3) - 4.5).reshape((3, 3))
-  >>> interpolator = SatelliteInterpolator((tie_lons, tie_lats),
-  ...                                      (tie_rows, tie_cols),        
-  ...                                      (fine_rows, fine_cols),
-  ...                                      2, 2)
+  >>> interpolator = GeoInterpolator((tie_lons, tie_lats),
+  ...                                (tie_rows, tie_cols),        
+  ...                                (fine_rows, fine_cols),
+  ...                                2, 2)
   >>> interpolator.interpolate()
   (array([[ 30.        ,  30.20005856,  30.40007805,  30.60006827,
            30.800039  ,  31.        ,  31.19996102,  31.39993181,
