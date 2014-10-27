@@ -1,5 +1,5 @@
 import numpy as np
-from memory_profiler import profile
+# from memory_profiler import profile
 from pandas import DataFrame, Series
 
 class BasicSatelliteInterpolator(object):
@@ -40,7 +40,7 @@ class BasicSatelliteInterpolator(object):
         return interpol_data
 
 
-    @profile
+    # @profile
     def _interp_axis(self, data, axis):
         """The *data* field contains the data to be interpolated. It is
         expected that values reach out to the *data* boundaries.
