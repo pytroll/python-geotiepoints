@@ -40,7 +40,7 @@ setup(name='python-geotiepoints',
                    "Topic :: Scientific/Engineering"],
       url="https://github.com/adybbroe/python-geotiepoints",
       packages = ['geotiepoints'],      
-      install_requires=['numpy', 'scipy', 'pyresample'],
+      install_requires=['numpy', 'scipy', 'pyresample', 'pandas'],
       zip_safe = False
       )
 
