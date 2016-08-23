@@ -23,7 +23,8 @@
 """Generic interpolation routines.
 """
 import numpy as np
-from scipy.interpolate import RectBivariateSpline, splrep, splev
+from scipy.interpolate import RectBivariateSpline, splev, splrep
+
 
 def generic_modis5kmto1km(*data5km):
     """Getting 1km data for modis from 5km tiepoints.
@@ -47,6 +48,8 @@ def generic_modis5kmto1km(*data5km):
     return satint.interpolate()
 
 # NOTE: extrapolate on a sphere ?
+
+
 def _linear_extrapolate(pos, data, xev):
     """
 
@@ -66,8 +69,6 @@ def _linear_extrapolate(pos, data, xev):
 
     return data[1] + ((xev - pos[1]) / (1.0 * (pos[0] - pos[1])) *
                       (data[0] - data[1]))
-
-
 
 
 class Interpolator(object):
@@ -99,17 +100,18 @@ class Interpolator(object):
             self.tie_data = [data]
         else:
             self.tie_data = list(data)
+
         self.new_data = []
         for num in range(len(self.tie_data)):
             self.new_data.append([])
 
         self.kx_, self.ky_ = kx_, ky_
-        
+
     def fill_borders(self, *args):
         """Extrapolate tiepoint lons and lats to fill in the border of the
         chunks.
         """
-        
+
         to_run = []
         cases = {"y": self._fill_row_borders,
                  "x": self._fill_col_borders}
@@ -117,11 +119,10 @@ class Interpolator(object):
             try:
                 to_run.append(cases[dim])
             except KeyError:
-                raise NameError("Unrecognized dimension: "+str(dim))
+                raise NameError("Unrecognized dimension: " + str(dim))
 
         for fun in to_run:
             fun()
-
 
     def _extrapolate_cols(self, data, first=True, last=True):
         """Extrapolate the column of data, to get the first and last together
@@ -143,7 +144,7 @@ class Interpolator(object):
         if first and last:
             return np.hstack((np.expand_dims(first_column, 1),
                               data,
-                              np.expand_dims(last_column, 1))) 
+                              np.expand_dims(last_column, 1)))
         elif first:
             return np.hstack((np.expand_dims(first_column, 1),
                               data))
@@ -153,11 +154,10 @@ class Interpolator(object):
         else:
             return data
 
-
     def _fill_col_borders(self):
         """Add the first and last column to the data by extrapolation.
         """
-        
+
         first = True
         last = True
         if self.col_indices[0] == self.hcol_indices[0]:
@@ -166,7 +166,7 @@ class Interpolator(object):
             last = False
         for num, data in enumerate(self.tie_data):
             self.tie_data[num] = self._extrapolate_cols(data, first, last)
-  
+
         if first and last:
             self.col_indices = np.concatenate((np.array([self.hcol_indices[0]]),
                                                self.col_indices,
@@ -178,60 +178,64 @@ class Interpolator(object):
             self.col_indices = np.concatenate((self.col_indices,
                                                np.array([self.hcol_indices[-1]])))
 
-
-    def _extrapolate_rows(self, data):
+    def _extrapolate_rows(self, data, row_indices, first_index, last_index):
         """Extrapolate the rows of data, to get the first and last together
         with the data.
         """
 
-        pos = self.row_indices[:2]
+        pos = row_indices[:2]
         first_row = _linear_extrapolate(pos,
                                         (data[0, :], data[1, :]),
-                                        self.hrow_indices[0])
-        pos = self.row_indices[-2:]
+                                        first_index)
+        pos = row_indices[-2:]
         last_row = _linear_extrapolate(pos,
                                        (data[-2, :], data[-1, :]),
-                                       self.hrow_indices[-1])
-
+                                       last_index)
         return np.vstack((np.expand_dims(first_row, 0),
                           data,
-                          np.expand_dims(last_row, 0))) 
+                          np.expand_dims(last_row, 0)))
 
     def _fill_row_borders(self):
         """Add the first and last rows to the data by extrapolation.
         """
         lines = len(self.hrow_indices)
         chunk_size = self.chunk_size or lines
+        factor = len(self.hrow_indices) / len(self.row_indices)
 
         tmp_data = []
         for num in range(len(self.tie_data)):
             tmp_data.append([])
         row_indices = []
         for index in range(0, lines, chunk_size):
-            ties = np.argwhere(np.logical_and(self.row_indices >= index,
-                                              self.row_indices < index
-                                              + chunk_size)).squeeze()
-            tiepos = self.row_indices[np.logical_and(self.row_indices >= index,
-                                                     self.row_indices < index
-                                                     + chunk_size)].squeeze()
+            indices = np.logical_and(self.row_indices >= index / factor,
+                                     self.row_indices < (index
+                                                         + chunk_size) / factor)
+            ties = np.argwhere(indices).squeeze()
+            tiepos = self.row_indices[indices].squeeze()
+
             for num, data in enumerate(self.tie_data):
-                
-                tmp_data[num].append(self._extrapolate_rows(data[ties, :]))
+                to_extrapolate = data[ties, :]
+                if len(to_extrapolate) > 0:
+                    extrapolated = self._extrapolate_rows(to_extrapolate,
+                                                          tiepos,
+                                                          self.hrow_indices[index],
+                                                          self.hrow_indices[index + chunk_size - 1])
+                    tmp_data[num].append(extrapolated)
             row_indices.append(np.array([self.hrow_indices[index]]))
             row_indices.append(tiepos)
             row_indices.append(np.array([self.hrow_indices[index
                                                            + chunk_size - 1]]))
+
         for num in range(len(self.tie_data)):
             self.tie_data[num] = np.vstack(tmp_data[num])
-
         self.row_indices = np.concatenate(row_indices)
-    
+
     def _interp(self):
         """Interpolate the cartesian coordinates.
         """
         if np.all(self.hrow_indices == self.row_indices):
             return self._interp1d()
-        
+
         xpoints, ypoints = np.meshgrid(self.hrow_indices,
                                        self.hcol_indices)
 
@@ -245,7 +249,6 @@ class Interpolator(object):
 
             self.new_data[num] = spl.ev(xpoints.ravel(), ypoints.ravel())
             self.new_data[num] = self.new_data[num].reshape(xpoints.shape).T
-
 
     def _interp1d(self):
         """Interpolate in one dimension.
@@ -267,4 +270,3 @@ class Interpolator(object):
         self._interp()
 
         return self.new_data
-
