@@ -27,7 +27,7 @@
 from setuptools import setup
 
 setup(name='python-geotiepoints',
-      version="v0.3.0",
+      version="v1.0.0",
       description='Interpolation of geographic tiepoints in Python',
       author='Adam Dybbroe, Martin Raspaud',
       author_email='martin.raspaud@smhi.se',
