@@ -25,7 +25,6 @@
 """
 
 from setuptools import setup
-#from setuptools.command.build_ext import build_ext
 from distutils.extension import Extension
 from Cython.Distutils import build_ext
 
