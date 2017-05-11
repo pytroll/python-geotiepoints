@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2012, 2013 Adam Dybbroe, Martin Raspaud
+# Copyright (c) 2012, 2013, 2017 Adam Dybbroe, Martin Raspaud
 
 # Author(s):
 
@@ -25,6 +25,9 @@
 """
 
 from setuptools import setup
+#from setuptools.command.build_ext import build_ext
+from distutils.extension import Extension
+from Cython.Distutils import build_ext
 
 setup(name='python-geotiepoints',
       version="v1.0.0",
@@ -39,8 +42,19 @@ setup(name='python-geotiepoints',
                    "Programming Language :: Python",
                    "Topic :: Scientific/Engineering"],
       url="https://github.com/adybbroe/python-geotiepoints",
-      packages = ['geotiepoints'],      
-      install_requires=['numpy', 'scipy', 'pyresample', 'pandas'],
-      zip_safe = False
-      )
+      packages=['geotiepoints'],
 
+      cmdclass={'build_ext': build_ext},
+
+      ext_modules=[
+
+          Extension(
+              'geotiepoints.multilinear_cython',
+              ['geotiepoints/multilinear_cython.pyx'],
+              extra_compile_args=['-O3']
+          ),
+      ],
+
+      install_requires=['numpy', 'scipy', 'pyresample', 'pandas', 'cython'],
+      zip_safe=False
+      )
