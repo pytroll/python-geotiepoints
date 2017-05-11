@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2012, 2013, 2017 Adam Dybbroe, Martin Raspaud
+# Copyright (c) 2012-2017 Adam Dybbroe, Martin Raspaud
 
 # Author(s):
 
