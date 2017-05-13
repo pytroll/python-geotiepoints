@@ -28,6 +28,8 @@ from setuptools import setup
 from distutils.extension import Extension
 from Cython.Distutils import build_ext
 
+test_requires = []
+
 setup(name='python-geotiepoints',
       version="v1.0.0",
       description='Interpolation of geographic tiepoints in Python',
@@ -55,5 +57,7 @@ setup(name='python-geotiepoints',
       ],
 
       install_requires=['numpy', 'scipy', 'pyresample', 'pandas', 'cython'],
+      test_suite='geotiepoints.tests.suite',
+      tests_require=test_requires,
       zip_safe=False
       )

@@ -1,16 +1,8 @@
 from __future__ import division
 
-import numpy
 import numpy as np
 
 from geotiepoints.multilinear_cython import multilinear_interpolation
-#
-# try:
-#     print("Using compiled linear interpolator")
-# except Exception as e:
-#from multilinear_python import multilinear_interpolation
-#     from multilinear_python import multilinear_interpolation as multilinear_interpolation_double
-#     print('Failing back on python implementation')
 
 
 def mlinspace(smin, smax, orders):
@@ -20,7 +12,7 @@ def mlinspace(smin, smax, orders):
         return res.copy()  # workaround for strange bug
     else:
         meshes = np.meshgrid(
-            *[numpy.linspace(smin[i], smax[i], orders[i]) for i in range(len(orders))], indexing='ij')
+            *[np.linspace(smin[i], smax[i], orders[i]) for i in range(len(orders))], indexing='ij')
         return np.row_stack([l.flatten() for l in meshes])
 
 
@@ -69,10 +61,10 @@ class MultilinearInterpolator:
 
     __grid__ = None
 
-    def __init__(self, smin, smax, orders, values=None, dtype=numpy.float64):
-        self.smin = numpy.array(smin, dtype=dtype)
-        self.smax = numpy.array(smax, dtype=dtype)
-        self.orders = numpy.array(orders, dtype=numpy.int)
+    def __init__(self, smin, smax, orders, values=None, dtype=np.float64):
+        self.smin = np.array(smin, dtype=dtype)
+        self.smax = np.array(smax, dtype=dtype)
+        self.orders = np.array(orders, dtype=np.int)
         self.d = len(orders)
         self.dtype = dtype
         if values is not None:
@@ -85,10 +77,10 @@ class MultilinearInterpolator:
         return self.__grid__
 
     def set_values(self, values):
-        self.values = numpy.ascontiguousarray(values, dtype=self.dtype)
+        self.values = np.ascontiguousarray(values, dtype=self.dtype)
 
     def interpolate(self, s):
-        s = numpy.ascontiguousarray(s, dtype=self.dtype)
+        s = np.ascontiguousarray(s, dtype=self.dtype)
         a = multilinear_interpolation(
             self.smin, self.smax, self.orders, self.values, s)
         return a
