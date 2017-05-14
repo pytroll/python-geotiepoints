@@ -100,19 +100,23 @@ class TestInterpolator(unittest.TestCase):
         self.assertTrue(np.allclose(satint.col_indices,
                                     np.array([0,  2,  7, 12, 17, 22, 23])))
 
-    # def test_extrapolate_rows(self):
-    #     lons = np.arange(10).reshape((2, 5), order="F")
-    #     lats = np.arange(10).reshape((2, 5), order="C")
-    #     lines = np.array([2, 7])
-    #     cols = np.array([2, 7, 12, 17, 22])
-    #     hlines = np.arange(10)
-    #     hcols = np.arange(24)
-    #     satint = Interpolator((lons, lats), (lines, cols), (hlines, hcols))
-    #     self.assertTrue(np.allclose(satint._extrapolate_rows(lons),
-    #                                 np.array([[-0.4,  1.6,  3.6,  5.6,  7.6],
-    #                                           [0.,  2.,  4.,  6.,  8.],
-    #                                           [1.,  3.,  5.,  7.,  9.],
-    #                                           [1.4,  3.4,  5.4,  7.4,  9.4]])))
+    def test_extrapolate_rows(self):
+        lons = np.arange(10).reshape((2, 5), order="F")
+        lats = np.arange(10).reshape((2, 5), order="C")
+        lines = np.array([2, 7])
+        cols = np.array([2, 7, 12, 17, 22])
+        hlines = np.arange(10)
+        hcols = np.arange(24)
+        satint = Interpolator((lons, lats), (lines, cols), (hlines, hcols))
+        first_idx = satint.hrow_indices[0]
+        last_idx = satint.hrow_indices[-1]
+        self.assertTrue(np.allclose(satint._extrapolate_rows(lons,
+                                                             lines,
+                                                             first_idx, last_idx),
+                                    np.array([[-0.4,  1.6,  3.6,  5.6,  7.6],
+                                              [0.,  2.,  4.,  6.,  8.],
+                                              [1.,  3.,  5.,  7.,  9.],
+                                              [1.4,  3.4,  5.4,  7.4,  9.4]])))
 
     # def test_fill_row_borders(self):
     #     lons = np.arange(20).reshape((4, 5), order="F")
