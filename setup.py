@@ -56,7 +56,7 @@ setup(name='python-geotiepoints',
           ),
       ],
 
-      install_requires=['numpy', 'scipy', 'pyresample', 'pandas', 'cython'],
+      install_requires=['numpy', 'scipy', 'pandas', 'cython'],
       test_suite='geotiepoints.tests.suite',
       tests_require=test_requires,
       zip_safe=False
