@@ -31,7 +31,7 @@ from Cython.Distutils import build_ext
 test_requires = []
 
 setup(name='python-geotiepoints',
-      version="v1.0.0",
+      version="v1.1.0",
       description='Interpolation of geographic tiepoints in Python',
       author='Adam Dybbroe, Martin Raspaud',
       author_email='martin.raspaud@smhi.se',
