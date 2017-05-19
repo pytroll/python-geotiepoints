@@ -207,9 +207,9 @@ class Interpolator(object):
             tmp_data.append([])
         row_indices = []
         for index in range(0, lines, chunk_size):
-            indices = np.logical_and(self.row_indices >= index / factor,
+            indices = np.logical_and(self.row_indices >= index,
                                      self.row_indices < (index
-                                                         + chunk_size) / factor)
+                                                         + chunk_size))
             ties = np.argwhere(indices).squeeze()
             tiepos = self.row_indices[indices].squeeze()
 
@@ -218,7 +218,8 @@ class Interpolator(object):
                 if len(to_extrapolate) > 0:
                     extrapolated = self._extrapolate_rows(to_extrapolate,
                                                           tiepos,
-                                                          self.hrow_indices[index],
+                                                          self.hrow_indices[
+                                                              index],
                                                           self.hrow_indices[index + chunk_size - 1])
                     tmp_data[num].append(extrapolated)
             row_indices.append(np.array([self.hrow_indices[index]]))
@@ -262,7 +263,8 @@ class Interpolator(object):
 
             for cnt in range(lines):
                 tck = splrep(self.col_indices, data[cnt, :], k=self.ky_, s=0)
-                self.new_data[num][cnt, :] = splev(self.hcol_indices, tck, der=0)
+                self.new_data[num][cnt, :] = splev(
+                    self.hcol_indices, tck, der=0)
 
     def interpolate(self):
         """Do the interpolation, and return resulting longitudes and latitudes.

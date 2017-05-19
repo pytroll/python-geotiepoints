@@ -24,6 +24,7 @@
 """
 
 import unittest
+
 import numpy as np
 
 from geotiepoints.geointerpolator import GeoInterpolator
@@ -115,21 +116,21 @@ class TestGeoInterpolator(unittest.TestCase):
     def setUp(self):
         pass
 
-    # def test_fillborders(self):
-    #     lons = np.arange(20).reshape((4, 5), order="F")
-    #     lats = np.arange(20).reshape((4, 5), order="C")
-    #     lines = np.array([2, 7, 12, 17])
-    #     cols = np.array([2, 7, 12, 17, 22])
-    #     hlines = np.arange(20)
-    #     hcols = np.arange(24)
-    #     satint = GeoInterpolator(
-    #         (lons, lats), (lines, cols), (hlines, hcols), chunk_size=10)
-    #     satint.fill_borders('x', 'y')
-    #     self.assertTrue(np.allclose(satint.tie_data[0], TIES_EXP1))
-    #     self.assertTrue(
-    #         np.allclose(satint.row_indices, np.array([0,  2,  7,  9, 10, 12, 17, 19])))
-    #     self.assertTrue(
-    # np.allclose(satint.col_indices, np.array([0,  2,  7, 12, 17, 22, 23])))
+    def test_fillborders(self):
+        lons = np.arange(20).reshape((4, 5), order="F")
+        lats = np.arange(20).reshape((4, 5), order="C")
+        lines = np.array([2, 7, 12, 17])
+        cols = np.array([2, 7, 12, 17, 22])
+        hlines = np.arange(20)
+        hcols = np.arange(24)
+        satint = GeoInterpolator(
+            (lons, lats), (lines, cols), (hlines, hcols), chunk_size=10)
+        satint.fill_borders('x', 'y')
+        self.assertTrue(np.allclose(satint.tie_data[0], TIES_EXP1))
+        self.assertTrue(
+            np.allclose(satint.row_indices, np.array([0,  2,  7,  9, 10, 12, 17, 19])))
+        self.assertTrue(
+            np.allclose(satint.col_indices, np.array([0,  2,  7, 12, 17, 22, 23])))
 
     def test_extrapolate_cols(self):
         lons = np.arange(10).reshape((2, 5), order="F")
@@ -152,42 +153,42 @@ class TestGeoInterpolator(unittest.TestCase):
         hcols = np.arange(24)
         satint = GeoInterpolator((lons, lats), (lines, cols), (hlines, hcols))
         satint._fill_col_borders()
-        self.assertTrue(np.allclose(satint.tie_data[0], TIES_EXP7))
-        self.assertTrue(np.allclose(satint.col_indices,
-                                    np.array([0,  2,  7, 12, 17, 22, 23])))
+        np.testing.assert_allclose(satint.tie_data[0], TIES_EXP7)
+        np.testing.assert_allclose(satint.col_indices,
+                                   np.array([0,  2,  7, 12, 17, 22, 23]))
 
-    # def test_extrapolate_rows(self):
-    #     lons = np.arange(10).reshape((2, 5), order="F")
-    #     lats = np.arange(10).reshape((2, 5), order="C")
-    #     lines = np.array([2, 7])
-    #     cols = np.array([2, 7, 12, 17, 22])
-    #     hlines = np.arange(10)
-    #     hcols = np.arange(24)
-    #     satint = GeoInterpolator((lons, lats), (lines, cols), (hlines, hcols))
-    #     self.assertTrue(np.allclose(satint._extrapolate_rows(satint.tie_data[0],
-    #                                                          hlines, 0, 10),
-    #                                 TIES_EXP4))
+    def test_extrapolate_rows(self):
+        lons = np.arange(10).reshape((2, 5), order="F")
+        lats = np.arange(10).reshape((2, 5), order="C")
+        lines = np.array([2, 7])
+        cols = np.array([2, 7, 12, 17, 22])
+        hlines = np.arange(10)
+        hcols = np.arange(24)
+        satint = GeoInterpolator((lons, lats), (lines, cols), (hlines, hcols))
+        np.testing.assert_allclose(satint._extrapolate_rows(satint.tie_data[0],
+                                                            hlines, -0.4, 9.4),
+                                   TIES_EXP4)
 
-    # def test_fill_row_borders(self):
-    #     lons = np.arange(20).reshape((4, 5), order="F")
-    #     lats = np.arange(20).reshape((4, 5), order="C")
-    #     lines = np.array([2, 7, 12, 17])
-    #     cols = np.array([2, 7, 12, 17, 22])
-    #     hlines = np.arange(20)
-    #     hcols = np.arange(24)
-    #     satint = GeoInterpolator((lons, lats), (lines, cols), (hlines, hcols))
-    #     satint._fill_row_borders()
-    #     self.assertTrue(np.allclose(satint.tie_data[0],
-    #                                 TIES_EXP5))
-    #     self.assertTrue(np.allclose(satint.row_indices,
-    #                                 np.array([0,  2,  7, 12, 17, 19])))
-    #     satint = GeoInterpolator((lons, lats), (lines, cols),
-    #                              (hlines, hcols), chunk_size=10)
-    #     satint._fill_row_borders()
-    #     self.assertTrue(np.allclose(satint.tie_data[0],
-    #                                 TIES_EXP6))
-    #     self.assertTrue(np.allclose(satint.row_indices,
-    # np.array([0,  2,  7,  9, 10, 12, 17, 19])))
+    def test_fill_row_borders(self):
+        lons = np.arange(20).reshape((4, 5), order="F")
+        lats = np.arange(20).reshape((4, 5), order="C")
+        lines = np.array([2, 7, 12, 17])
+        cols = np.array([2, 7, 12, 17, 22])
+        hlines = np.arange(20)
+        hcols = np.arange(24)
+        satint = GeoInterpolator((lons, lats), (lines, cols), (hlines, hcols))
+        satint._fill_row_borders()
+        self.assertTrue(np.allclose(satint.tie_data[0],
+                                    TIES_EXP5))
+        self.assertTrue(np.allclose(satint.row_indices,
+                                    np.array([0,  2,  7, 12, 17, 19])))
+        satint = GeoInterpolator((lons, lats), (lines, cols),
+                                 (hlines, hcols), chunk_size=10)
+        satint._fill_row_borders()
+        np.testing.assert_allclose(satint.tie_data[0],
+                                   TIES_EXP6)
+        np.testing.assert_allclose(satint.row_indices,
+                                   np.array([0,  2,  7,  9, 10, 12, 17, 19]))
 
 
 def suite():
