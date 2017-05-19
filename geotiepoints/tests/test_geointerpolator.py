@@ -119,16 +119,16 @@ class TestGeoInterpolator(unittest.TestCase):
     def test_fillborders(self):
         lons = np.arange(20).reshape((4, 5), order="F")
         lats = np.arange(20).reshape((4, 5), order="C")
-        lines = np.array([2, 7, 12, 17])
+        lines = np.array([2, 7, 12, 17]) / 5.0
         cols = np.array([2, 7, 12, 17, 22])
-        hlines = np.arange(20)
+        hlines = np.arange(20) / 5.0
         hcols = np.arange(24)
         satint = GeoInterpolator(
             (lons, lats), (lines, cols), (hlines, hcols), chunk_size=10)
         satint.fill_borders('x', 'y')
-        self.assertTrue(np.allclose(satint.tie_data[0], TIES_EXP1))
-        self.assertTrue(
-            np.allclose(satint.row_indices, np.array([0,  2,  7,  9, 10, 12, 17, 19])))
+        np.testing.assert_allclose(satint.tie_data[0], TIES_EXP1)
+        np.testing.assert_allclose(satint.row_indices, np.array(
+            [0,  2,  7,  9, 10, 12, 17, 19]) / 5.0)
         self.assertTrue(
             np.allclose(satint.col_indices, np.array([0,  2,  7, 12, 17, 22, 23])))
 
@@ -172,23 +172,23 @@ class TestGeoInterpolator(unittest.TestCase):
     def test_fill_row_borders(self):
         lons = np.arange(20).reshape((4, 5), order="F")
         lats = np.arange(20).reshape((4, 5), order="C")
-        lines = np.array([2, 7, 12, 17])
+        lines = np.array([2, 7, 12, 17]) / 5.0
         cols = np.array([2, 7, 12, 17, 22])
-        hlines = np.arange(20)
+        hlines = np.arange(20) / 5.0
         hcols = np.arange(24)
         satint = GeoInterpolator((lons, lats), (lines, cols), (hlines, hcols))
         satint._fill_row_borders()
-        self.assertTrue(np.allclose(satint.tie_data[0],
-                                    TIES_EXP5))
-        self.assertTrue(np.allclose(satint.row_indices,
-                                    np.array([0,  2,  7, 12, 17, 19])))
+        np.testing.assert_allclose(satint.tie_data[0],
+                                   TIES_EXP5)
+        np.testing.assert_allclose(satint.row_indices,
+                                   np.array([0,  2,  7, 12, 17, 19]) / 5.0)
         satint = GeoInterpolator((lons, lats), (lines, cols),
                                  (hlines, hcols), chunk_size=10)
         satint._fill_row_borders()
         np.testing.assert_allclose(satint.tie_data[0],
                                    TIES_EXP6)
         np.testing.assert_allclose(satint.row_indices,
-                                   np.array([0,  2,  7,  9, 10, 12, 17, 19]))
+                                   np.array([0,  2,  7,  9, 10, 12, 17, 19]) / 5.0)
 
 
 def suite():

@@ -206,10 +206,10 @@ class Interpolator(object):
         for num in range(len(self.tie_data)):
             tmp_data.append([])
         row_indices = []
+
         for index in range(0, lines, chunk_size):
-            indices = np.logical_and(self.row_indices >= index,
-                                     self.row_indices < (index
-                                                         + chunk_size))
+            indices = np.logical_and(self.row_indices >= index / factor,
+                                     self.row_indices < (index + chunk_size) / factor)
             ties = np.argwhere(indices).squeeze()
             tiepos = self.row_indices[indices].squeeze()
 
