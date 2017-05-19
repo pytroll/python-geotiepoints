@@ -1,6 +1,47 @@
 Changelog
 =========
 
+v1.1.0 (2017-05-19)
+-------------------
+
+- Update changelog. [Adam.Dybbroe]
+
+- Bump version: 1.0.0 → 1.1.0. [Adam.Dybbroe]
+
+- Merge pull request #3 from pytroll/multilinear-cython. [Adam Dybbroe]
+
+  Multilinear cython
+
+- Fix unittests. [Martin Raspaud]
+
+- Merge remote-tracking branch 'origin/multilinear-cython' into
+  multilinear-cython. [Martin Raspaud]
+
+- Remove pyresample from the list of required packages. [Adam.Dybbroe]
+
+- Fix extrapolation after lowres indices are in highres numberspace.
+  [Martin Raspaud]
+
+- Add back and fix the test_extrapolate_rows test. [Adam.Dybbroe]
+
+- Restructure test-suite. Comment out tests that hasn't been maintained.
+  [Adam.Dybbroe]
+
+- Add badges to frontpage. [Adam.Dybbroe]
+
+- Add unittest for multilinear interpolation. [Adam.Dybbroe]
+
+- Add Cython to requirements file. [Adam.Dybbroe]
+
+- Add requirements file. [Adam.Dybbroe]
+
+- Rename README file. [Adam.Dybbroe]
+
+- Prepare for travis, and clean up. [Adam.Dybbroe]
+
+- Add fast multilinear interpolation on regular grid with Cython.
+  [Adam.Dybbroe]
+
 v1.0.0 (2016-10-27)
 -------------------
 
