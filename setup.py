@@ -26,38 +26,111 @@
 
 from setuptools import setup
 from distutils.extension import Extension
-from Cython.Distutils import build_ext
+#from Cython.Distutils import build_ext
+from setuptools import Extension, find_packages, setup
+from setuptools.command.build_ext import build_ext as _build_ext
+import sys
+import os
 
+requirements = ['numpy', 'scipy', 'pandas'],
 test_requires = []
 
-setup(name='python-geotiepoints',
-      version="v1.1.0",
-      description='Interpolation of geographic tiepoints in Python',
-      author='Adam Dybbroe, Martin Raspaud',
-      author_email='martin.raspaud@smhi.se',
-      classifiers=["Development Status :: 4 - Beta",
-                   "Intended Audience :: Science/Research",
-                   "License :: OSI Approved :: GNU General Public License v3 " +
-                   "or later (GPLv3+)",
-                   "Operating System :: OS Independent",
-                   "Programming Language :: Python",
-                   "Topic :: Scientific/Engineering"],
-      url="https://github.com/adybbroe/python-geotiepoints",
-      packages=['geotiepoints'],
+if sys.platform.startswith("win"):
+    extra_compile_args = []
+else:
+    extra_compile_args = ["-O3"]
 
-      cmdclass={'build_ext': build_ext},
+EXTENSIONS = [
+    Extension(
+        'geotiepoints.multilinear_cython',
+        sources=['geotiepoints/multilinear_cython.pyx'],
+        extra_compile_args=extra_compile_args
+    ),
+    Extension(
+        'geotiepoints.multilinear_cython',
+        sources=['geotiepoints/multilinear_cython.pyx',
+                 'geotiepoints/multilinear_cython.c'],
+        language='c', extra_compile_args=extra_compile_args,
+        depends=[]
+    )
 
-      ext_modules=[
+]
 
-          Extension(
-              'geotiepoints.multilinear_cython',
-              ['geotiepoints/multilinear_cython.pyx'],
-              extra_compile_args=['-O3']
-          ),
-      ],
+try:
+    from Cython.Build import cythonize
+except ImportError:
+    cythonize = None
 
-      install_requires=['numpy', 'scipy', 'pandas', 'cython'],
-      test_suite='geotiepoints.tests.suite',
-      tests_require=test_requires,
-      zip_safe=False
-      )
+
+def set_builtin(name, value):
+    if isinstance(__builtins__, dict):
+        __builtins__[name] = value
+    else:
+        setattr(__builtins__, name, value)
+
+
+class build_ext(_build_ext):
+
+    """Work around to bootstrap numpy includes in to extensions.
+
+    Copied from:
+
+        http://stackoverflow.com/questions/19919905/how-to-bootstrap-numpy-installation-in-setup-py
+
+    """
+
+    def finalize_options(self):
+        _build_ext.finalize_options(self)
+        # Prevent numpy from thinking it is still in its setup process:
+        set_builtin('__NUMPY_SETUP__', False)
+        import numpy
+        self.include_dirs.append(numpy.get_include())
+
+
+if __name__ == "__main__":
+    if not os.getenv("USE_CYTHON", False) or cythonize is None:
+        print(
+            "Cython will not be used. Use environment variable 'USE_CYTHON=True' to use it")
+
+        def cythonize(extensions, **dummy):
+            """Fake function to compile from C/C++ files instead of compiling .pyx files with cython.
+            """
+            for extension in extensions:
+                sources = []
+                for sfile in extension.sources:
+                    path, ext = os.path.splitext(sfile)
+                    if ext in ('.pyx', '.py'):
+                        if extension.language == 'c++':
+                            ext = '.cpp'
+                        else:
+                            ext = '.c'
+                        sfile = path + ext
+                    sources.append(sfile)
+                extension.sources[:] = sources
+            return extensions
+
+    setup(name='python-geotiepoints',
+          version="v1.1.0",
+          description='Interpolation of geographic tiepoints in Python',
+          author='Adam Dybbroe, Martin Raspaud',
+          author_email='martin.raspaud@smhi.se',
+          classifiers=["Development Status :: 4 - Beta",
+                       "Intended Audience :: Science/Research",
+                       "License :: OSI Approved :: GNU General Public License v3 " +
+                       "or later (GPLv3+)",
+                       "Operating System :: OS Independent",
+                       "Programming Language :: Python",
+                       "Topic :: Scientific/Engineering"],
+          url="https://github.com/pytroll/python-geotiepoints",
+          packages=['geotiepoints'],
+          # packages=find_packages(),
+          setup_requires=['numpy'],
+          cmdclass={'build_ext': build_ext},
+
+          install_requires=requirements,
+          ext_modules=cythonize(EXTENSIONS),
+
+          test_suite='geotiepoints.tests.suite',
+          tests_require=test_requires,
+          zip_safe=False
+          )
