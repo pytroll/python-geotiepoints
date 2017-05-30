@@ -104,7 +104,7 @@ def suite():
     loader = unittest.TestLoader()
     mysuite = unittest.TestSuite()
     mysuite.addTest(loader.loadTestsFromTestCase(TestUtils))
-    mysuite.addTest(loader.loadTestsFromTestCase(TestMODIS))
+    # mysuite.addTest(loader.loadTestsFromTestCase(TestMODIS))
 
     return mysuite
 
