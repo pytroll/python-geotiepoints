@@ -6,12 +6,16 @@ os:
 matrix:
   allow_failures:
     - os: osx
-# command to install dependencies, e.g. 
-install: 
+# command to install dependencies, e.g.
+install:
   - if [[ $TRAVIS_PYTHON_VERSION == "2.7" ]]; then travis_wait mvn; pip install "scipy>=0.14"; fi
   - pip install -r requirements.txt
   - pip install .
   - pip install coveralls
+addons:
+  apt_packages:
+    - libhdf5-serial-dev
+    - cython
 # command to run tests, e.g. python setup.py test
 #script:  python setup.py test
 script: coverage run --source=python-geotiepoints setup.py test

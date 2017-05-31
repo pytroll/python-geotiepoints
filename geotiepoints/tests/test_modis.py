@@ -4,6 +4,18 @@ Unit tests for python-geotiepoints: MODIS examples
 
 import unittest
 import numpy as np
+import h5py
+import os
+
+FILENAME_250M_RESULT = os.path.join(
+    os.path.dirname(__file__), '../../testdata/250m_lonlat_section_result.h5')
+FILENAME_250M_INPUT = os.path.join(
+    os.path.dirname(__file__), '../../testdata/250m_lonlat_section_input.h5')
+
+FILENAME_FULL = os.path.join(
+    os.path.dirname(__file__), '../../testdata/test_5_to_1_geoloc_full.h5')
+FILENAME_5KM = os.path.join(
+    os.path.dirname(__file__), '../../testdata/test_5_to_1_geoloc_5km.h5')
 
 from geotiepoints import (modis5kmto1km, modis1kmto250m)
 
@@ -38,25 +50,14 @@ class TestMODIS(unittest.TestCase):
     def test_5_to_1(self):
         """test the 5km to 1km interpolation facility
         """
-        #gfilename = "testdata/MOD03_A12097_174256_2012097175435.hdf"
-        gfilename = "/san1/test/data/modis/MOD03_A12097_174256_2012097175435.hdf"
-        #filename = "testdata/MOD021km_A12097_174256_2012097175435.hdf"
-        filename = "/san1/test/data/modis/MOD021km_A12097_174256_2012097175435.hdf"
-        from pyhdf.SD import SD
-        from pyhdf.error import HDF4Error
 
-        try:
-            gdata = SD(gfilename)
-            data = SD(filename)
-        except HDF4Error:
-            print "Failed reading both eos-hdf files %s and %s" % (gfilename, filename)
-            return
+        with h5py.File(FILENAME_FULL) as h5f:
+            glons = h5f['longitude'][:] / 1000.
+            glats = h5f['latitude'][:] / 1000.
 
-        glats = gdata.select("Latitude")[:]
-        glons = gdata.select("Longitude")[:]
-
-        lats = data.select("Latitude")[:]
-        lons = data.select("Longitude")[:]
+        with h5py.File(FILENAME_5KM) as h5f:
+            lons = h5f['longitude'][:] / 1000.
+            lats = h5f['latitude'][:] / 1000.
 
         tlons, tlats = modis5kmto1km(lons, lats)
 
@@ -66,41 +67,24 @@ class TestMODIS(unittest.TestCase):
     def test_1000m_to_250m(self):
         """test the 1 km to 250 meter interpolation facility
         """
-        gfilename_hdf = "../testdata/MOD03_A12278_113638_2012278145123.hdf"
-        gfilename = "../testdata/250m_lonlat_section_input.npz"
-        result_filename = "../testdata/250m_lonlat_section_result.npz"
 
-        from pyhdf.SD import SD
-        from pyhdf.error import HDF4Error
+        with h5py.File(FILENAME_250M_RESULT) as h5f:
+            glons = h5f['longitude'][:] / 1000.
+            glats = h5f['latitude'][:] / 1000.
 
-        gdata = None
-        try:
-            gdata = SD(gfilename_hdf)
-        except HDF4Error:
-            print "Failed reading eos-hdf file %s" % gfilename_hdf
-            try:
-                indata = np.load(gfilename)
-            except IOError:
-                return
+        with h5py.File(FILENAME_250M_INPUT) as h5f:
+            lons = h5f['longitude'][:] / 1000.
+            lats = h5f['latitude'][:] / 1000.
 
-        if gdata:
-            lats = gdata.select("Latitude")[20:50, :]
-            lons = gdata.select("Longitude")[20:50, :]
-        else:
-            lats = indata['lat'] / 1000.
-            lons = indata['lon'] / 1000.
-
-        verif = np.load(result_filename)
-        vlons = verif['lon'] / 1000.
-        vlats = verif['lat'] / 1000.
         tlons, tlats = modis1kmto250m(lons, lats)
-        self.assert_(np.allclose(tlons, vlons, atol=0.05))
-        self.assert_(np.allclose(tlats, vlats, atol=0.05))
+
+        self.assert_(np.allclose(tlons, glons, atol=0.05))
+        self.assert_(np.allclose(tlats, glats, atol=0.05))
 
         tlons, tlats = modis1kmto250m(lons, lats, cores=4)
 
-        self.assert_(np.allclose(tlons, vlons, atol=0.05))
-        self.assert_(np.allclose(tlats, vlats, atol=0.05))
+        self.assert_(np.allclose(tlons, glons, atol=0.05))
+        self.assert_(np.allclose(tlats, glats, atol=0.05))
 
 
 def suite():
@@ -108,7 +92,7 @@ def suite():
     loader = unittest.TestLoader()
     mysuite = unittest.TestSuite()
     mysuite.addTest(loader.loadTestsFromTestCase(TestUtils))
-    # mysuite.addTest(loader.loadTestsFromTestCase(TestMODIS))
+    mysuite.addTest(loader.loadTestsFromTestCase(TestMODIS))
 
     return mysuite
 

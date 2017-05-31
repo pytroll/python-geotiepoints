@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013 Martin Raspaud
+# Copyright (c) 2013-2017 Martin Raspaud
 
 # Author(s):
 
@@ -72,6 +72,7 @@ def _linear_extrapolate(pos, data, xev):
 
 
 class Interpolator(object):
+
     """
     Handles interpolation of data from a grid of tie points.  It is preferable
     to have tie-points out till the edges if the tiepoint grid, but a method is
@@ -209,7 +210,8 @@ class Interpolator(object):
 
         for index in range(0, lines, chunk_size):
             indices = np.logical_and(self.row_indices >= index / factor,
-                                     self.row_indices < (index + chunk_size) / factor)
+                                     self.row_indices < (index
+                                                         + chunk_size) / factor)
             ties = np.argwhere(indices).squeeze()
             tiepos = self.row_indices[indices].squeeze()
 
@@ -222,6 +224,7 @@ class Interpolator(object):
                                                               index],
                                                           self.hrow_indices[index + chunk_size - 1])
                     tmp_data[num].append(extrapolated)
+
             row_indices.append(np.array([self.hrow_indices[index]]))
             row_indices.append(tiepos)
             row_indices.append(np.array([self.hrow_indices[index

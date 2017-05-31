@@ -126,6 +126,7 @@ class TestGeoInterpolator(unittest.TestCase):
         satint = GeoInterpolator(
             (lons, lats), (lines, cols), (hlines, hcols), chunk_size=10)
         satint.fill_borders('x', 'y')
+
         np.testing.assert_allclose(satint.tie_data[0], TIES_EXP1)
         np.testing.assert_allclose(satint.row_indices, np.array(
             [0,  2,  7,  9, 10, 12, 17, 19]) / 5.0)
