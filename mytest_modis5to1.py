@@ -27,8 +27,8 @@ import h5py
 import numpy as np
 from geotiepoints import modis5kmto1km
 
-FILENAME_FULL = './test_5_to_1_geoloc_full.h5'
-FILENAME_5KM = './test_5_to_1_geoloc_5km.h5'
+FILENAME_FULL = 'testdata/test_5_to_1_geoloc_full.h5'
+FILENAME_5KM = 'testdata/test_5_to_1_geoloc_5km.h5'
 
 with h5py.File(FILENAME_FULL) as h5f:
     glons = h5f['longitude'][:] / 1000.

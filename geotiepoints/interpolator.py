@@ -25,7 +25,7 @@
 import numpy as np
 from scipy.interpolate import RectBivariateSpline, splev, splrep
 
-OLD_CODE = False
+OLD_CODE = True
 
 
 def generic_modis5kmto1km(*data5km):
