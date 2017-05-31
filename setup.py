@@ -24,16 +24,16 @@
 """Setting up the geo_interpolator project.
 """
 
-from setuptools import setup
+import os
+import sys
 from distutils.extension import Extension
+
 #from Cython.Distutils import build_ext
 from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext as _build_ext
-import sys
-import os
 
 requirements = ['numpy', 'scipy', 'pandas'],
-test_requires = []
+test_requires = ['h5py']
 
 if sys.platform.startswith("win"):
     extra_compile_args = []
