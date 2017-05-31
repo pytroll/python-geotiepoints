@@ -25,8 +25,6 @@
 import numpy as np
 from scipy.interpolate import RectBivariateSpline, splev, splrep
 
-OLD_CODE = True
-
 
 def generic_modis5kmto1km(*data5km):
     """Getting 1km data for modis from 5km tiepoints.
@@ -186,18 +184,14 @@ class Interpolator(object):
         with the data.
         """
 
-        # pos = self.row_indices[:2]
         pos = row_indices[:2]
         first_row = _linear_extrapolate(pos,
                                         (data[0, :], data[1, :]),
                                         first_index)
-        # self.hrow_indices[0])
         pos = row_indices[-2:]
-        # pos = self.row_indices[-2:]
         last_row = _linear_extrapolate(pos,
                                        (data[-2, :], data[-1, :]),
                                        last_index)
-        # self.hrow_indices[-1])
         return np.vstack((np.expand_dims(first_row, 0),
                           data,
                           np.expand_dims(last_row, 0)))
@@ -215,21 +209,11 @@ class Interpolator(object):
         row_indices = []
 
         for index in range(0, lines, chunk_size):
-            if OLD_CODE:
-                ties = np.argwhere(np.logical_and(self.row_indices >= index,
-                                                  self.row_indices < index
-                                                  + chunk_size)).squeeze()
-                tiepos = self.row_indices[np.logical_and(self.row_indices >= index,
-                                                         self.row_indices < index
-                                                         + chunk_size)].squeeze()
-            else:
-                indices = np.logical_and(self.row_indices >= index / factor,
-                                         self.row_indices < (index
-                                                             + chunk_size) / factor)
-                # self.row_indices < (index / factor
-                #                     + chunk_size))
-                ties = np.argwhere(indices).squeeze()
-                tiepos = self.row_indices[indices].squeeze()
+            indices = np.logical_and(self.row_indices >= index / factor,
+                                     self.row_indices < (index
+                                                         + chunk_size) / factor)
+            ties = np.argwhere(indices).squeeze()
+            tiepos = self.row_indices[indices].squeeze()
 
             for num, data in enumerate(self.tie_data):
                 to_extrapolate = data[ties, :]
