@@ -1,6 +1,35 @@
 Changelog
 =========
 
+v1.1.1 (2017-05-31)
+-------------------
+
+- Update changelog. [Adam.Dybbroe]
+
+- Bump version: 1.1.0 → 1.1.1. [Adam.Dybbroe]
+
+- Merge branch 'bugfix_201608_change' into develop. [Adam.Dybbroe]
+
+- Fix tests for modis data interpolation. [Adam.Dybbroe]
+
+- Add h5py to test_requires. [Martin Raspaud]
+
+- Fix modis interpolators. [Martin Raspaud]
+
+- Fix temporary mytest code. [Adam.Dybbroe]
+
+- Comment out test that fails in the post aug2016 ode change.
+  [Adam.Dybbroe]
+
+- Add unittest for modis5kmto1km. Make testing of code before and after
+  the august 2016 change possible. [Adam.Dybbroe]
+
+- Add Cython generated C-code and make installation possible without
+  having Cython and numpy header files available. [Adam.Dybbroe]
+
+  Looked at how it was done for pyresample.
+
+
 v1.1.0 (2017-05-19)
 -------------------
 
