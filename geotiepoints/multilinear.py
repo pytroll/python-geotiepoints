@@ -45,10 +45,8 @@ class MultilinearInterpolator:
     smax = [1,1]
     orders = [5,5]
 
-    f: lambda x: np.row_stack([
-        np.sqrt( x[0,:]**2 + x[1,:]**2 )
-        np.pow( x[0,:]**3 + x[1,:]**3, 1.0/3.0 )
-    ])
+    f = lambda x: np.row_stack([np.sqrt( x[0,:]**2 + x[1,:]**2 ), 
+                                np.power( x[0,:]**3 + x[1,:]**3, 1.0/3.0 )])
 
     interp = MultilinearInterpolator(smin,smax,orders)
     interp.set_values( f(interp.grid) )
