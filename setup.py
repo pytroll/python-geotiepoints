@@ -32,6 +32,10 @@ from distutils.extension import Extension
 from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext as _build_ext
 
+import imp
+version = imp.load_source('geotiepoints.version', 'geotiepoints/version.py')
+
+
 requirements = ['numpy', 'scipy', 'pandas'],
 test_requires = ['h5py']
 
@@ -110,7 +114,7 @@ if __name__ == "__main__":
             return extensions
 
     setup(name='python-geotiepoints',
-          version="v1.1.1",
+          version=version.__version__,
           description='Interpolation of geographic tiepoints in Python',
           author='Adam Dybbroe, Martin Raspaud',
           author_email='martin.raspaud@smhi.se',
