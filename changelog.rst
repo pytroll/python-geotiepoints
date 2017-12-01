@@ -1,6 +1,23 @@
 Changelog
 =========
 
+v1.1.2 (2017-12-01)
+-------------------
+
+- Update changelog. [Adam.Dybbroe]
+
+- Bump version: 1.1.1 → 1.1.2. [Adam.Dybbroe]
+
+- Fix bumpversion file. [Adam.Dybbroe]
+
+- Go back one version number - bumpversion will bump it. [Adam.Dybbroe]
+
+- Fix author mail address. [Adam.Dybbroe]
+
+- Add separate version file. [Adam.Dybbroe]
+
+- Bugfix documentation - code example. [Adam.Dybbroe]
+
 v1.1.1 (2017-05-31)
 -------------------
 
