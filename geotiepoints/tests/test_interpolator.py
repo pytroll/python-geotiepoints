@@ -118,6 +118,17 @@ class TestInterpolator(unittest.TestCase):
                                               [1.,  3.,  5.,  7.,  9.],
                                               [1.4,  3.4,  5.4,  7.4,  9.4]])))
 
+    def test_results_in_c_order(self):
+        lons = np.arange(10).reshape((2, 5), order="F")
+        lats = np.arange(10).reshape((2, 5), order="C")
+        lines = np.array([2, 7])
+        cols = np.array([2, 7, 12, 17, 22])
+        hlines = np.arange(10)
+        hcols = np.arange(24)
+        satint = Interpolator((lons, lats), (lines, cols), (hlines, hcols))
+        interp_results = satint.interpolate()
+        assert interp_results[0].flags['C_CONTIGUOUS'] is True
+
     # def test_fill_row_borders(self):
     #     lons = np.arange(20).reshape((4, 5), order="F")
     #     lats = np.arange(20).reshape((4, 5), order="C")

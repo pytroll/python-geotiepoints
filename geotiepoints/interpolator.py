@@ -251,8 +251,8 @@ class Interpolator(object):
                                       kx=self.kx_,
                                       ky=self.ky_)
 
-            self.new_data[num] = spl.ev(xpoints.ravel(), ypoints.ravel())
-            self.new_data[num] = self.new_data[num].reshape(xpoints.shape).T
+            new_data_ = spl.ev(xpoints.ravel(), ypoints.ravel())
+            self.new_data[num] = new_data_.reshape(xpoints.shape).T.copy(order='C')
 
     def _interp1d(self):
         """Interpolate in one dimension.
