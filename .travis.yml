@@ -37,4 +37,4 @@ deploy:
     tags: true
     repo: pytroll/python-geotiepoints
 notifications:
-  slack: pytroll:LR63XVq1cT8kVc3fnXKIZmYr
+  slack: pytroll:BTiIJLKkWvlePXCYRew0rliC
