@@ -1,6 +1,39 @@
 Changelog
 =========
 
+v1.1.3 (2018-03-12)
+-------------------
+
+- Update changelog. [Adam.Dybbroe]
+
+- Bump version: 1.1.2 → 1.1.3. [Adam.Dybbroe]
+
+- Add unittest2 as a test-requirement. [Adam.Dybbroe]
+
+  setuptools installs h5py2.8.0rc from PyPI, which in turn requires
+  unittest2, however, which is not in the h5py requirements!
+
+
+- Fix unit tests for Python 3. [Adam.Dybbroe]
+
+- Merge branch 'new_release' into develop. [Adam.Dybbroe]
+
+- Build and test Python 3.4, 3.5, 3.6 on Travis. [Adam.Dybbroe]
+
+- Fix doc tests. [Adam.Dybbroe]
+
+- Merge pull request #6 from mitkin/develop. [Adam Dybbroe]
+
+  Set "C" order of interpolated arrays explicitly
+
+- Set "C" order of interpolated arrays explicitly. [Mikhail Itkin]
+
+  It appears that scipy's spline interpolator returns an array that are in F and C
+  order simultaneously. Transposing and viewing the array converts it into
+  F-contiguous array. By specifying the order explicitly we convert it to
+  C order
+
+
 v1.1.2 (2017-12-01)
 -------------------
 
