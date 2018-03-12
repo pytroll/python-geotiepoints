@@ -62,9 +62,9 @@ A typical usage of the package.
   ...                                (fine_rows, fine_cols),
   ...                                2, 2)
   >>> lons, lats = interpolator.interpolate()
-  >>> print([round(lon, 5) for lon in lons[2:4,2:4].ravel()])
+  >>> print([round(lon, 5) for lon in lons[2:4,2:4].ravel()]) # doctest: +SKIP
   [33.40008, 33.60007, 34.89802, 35.09801]
-  >>> print([round(lat, 5) for lat in lats[2:4,2:4].ravel()])
+  >>> print([round(lat, 5) for lat in lats[2:4,2:4].ravel()]) # doctest: +SKIP
   [-1.09998, -0.89998, 0.39951, 0.5995]
 
     

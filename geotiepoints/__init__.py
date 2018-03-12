@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2010-2017.
+# Copyright (c) 2010-2018.
 
 # Author(s):
 
@@ -41,11 +41,11 @@ def get_scene_splits(nlines_swath, nlines_scan, n_cpus):
     """Calculate the line numbers where the swath will be split in smaller
     granules for parallel processing"""
 
-    nscans = nlines_swath / nlines_scan
+    nscans = nlines_swath // nlines_scan
     if nscans < n_cpus:
         nscans_subscene = 1
     else:
-        nscans_subscene = nscans / n_cpus
+        nscans_subscene = nscans // n_cpus
     nlines_subscene = nscans_subscene * nlines_scan
 
     return range(nlines_subscene, nlines_swath, nlines_subscene)
