@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013-2017 Martin Raspaud
+# Copyright (c) 2013-2018 PyTroll community
 
 # Author(s):
 
@@ -57,11 +57,13 @@ def _linear_extrapolate(pos, data, xev):
     >>> pos = np.array([1, 2])
     >>> data = np.arange(10).reshape((2, 5), order="F")
     >>> xev = 5
-    >>> _linear_extrapolate(pos, data, xev)
-    array([  4.,   6.,   8.,  10.,  12.])
+    >>> retv = _linear_extrapolate(pos, data, xev)
+    >>> print([val for val in retv])
+    [4.0, 6.0, 8.0, 10.0, 12.0]
     >>> xev = 0
-    >>> _linear_extrapolate(pos, data, xev)
-    array([-1.,  1.,  3.,  5.,  7.])
+    >>> retv = _linear_extrapolate(pos, data, xev)
+    >>> print([val for val in retv])
+    [-1.0, 1.0, 3.0, 5.0, 7.0]
     """
     if len(data) != 2 or len(pos) != 2:
         raise ValueError("len(pos) and the number of lines of data"
