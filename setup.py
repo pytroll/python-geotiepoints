@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2012-2017 Adam Dybbroe, Martin Raspaud
+# Copyright (c) 2012-2018 PyTroll community
 
 # Author(s):
 
@@ -37,7 +37,8 @@ version = imp.load_source('geotiepoints.version', 'geotiepoints/version.py')
 
 
 requirements = ['numpy', 'scipy', 'pandas'],
-test_requires = ['h5py']
+# unittest2 is required by h5py 2.8.0rc:
+test_requires = ['h5py', 'unittest2']
 
 if sys.platform.startswith("win"):
     extra_compile_args = []
