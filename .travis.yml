@@ -1,40 +1,35 @@
 language: python
 python:
-  - 2.7
-  - 3.4
-  - 3.5
-  - 3.6
+- 2.7
+- 3.6
 os:
 - linux
-matrix:
-  allow_failures:
-    - os: osx
-# command to install dependencies, e.g.
+env:
+  global:
+  - PYTHON_VERSION=$TRAVIS_PYTHON_VERSION
+  - NUMPY_VERSION=stable
+  - MAIN_CMD='python setup.py'
+  - CONDA_DEPENDENCIES='Cython pandas scipy numpy coveralls coverage h5py mock'
+  - PIP_DEPENDENCIES=''
+  - SETUP_XVFB=False
+  - EVENT_TYPE='push pull_request'
+  - SETUP_CMD='test'
+  - CONDA_CHANNELS='conda-forge'
 install:
-  - if [[ $TRAVIS_PYTHON_VERSION == "2.7" ]]; then travis_wait mvn; pip install "scipy>=0.14"; fi
-  - pip install -r requirements.txt
-  - pip install .
-  - pip install coveralls
-addons:
-  apt_packages:
-    - libhdf5-serial-dev
-    - cython
-# command to run tests, e.g. python setup.py test
-#script:  python setup.py test
-script: coverage run --source=python-geotiepoints setup.py test
-#virtualenv:
-#  system_site_packages: true
-before_install:
-  - sudo apt-get install libblas-dev liblapack-dev libatlas-base-dev gfortran
-  - sudo apt-get install -qq python-numpy
-after_success: coveralls
+- git clone --depth 1 git://github.com/astropy/ci-helpers.git
+- source ci-helpers/travis/setup_conda.sh
+script:
+- coverage run --source=python-geotiepoints setup.py test
+after_success:
+- if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]]; then coveralls; fi
 deploy:
-  provider: pypi
-  user: adybbroe
-  password:
-    secure: A/DAh5K6A1UzARPWsiNL+qiyLfHd1dS2fhmZlE0SNcS0zN1CalyY2s7znVKTE15fSF0oV/jah/jy1PQIMBFFbAhpc6nmnDx3DxJ3d9RWxGE2hLWKn9tYUHQ07k7oiRFrwQe2bEJlaLBQfBOZ/DIe4Umc3osC65UINX03oOHsPFI=
-  on:
-    tags: true
-    repo: pytroll/python-geotiepoints
+  - provider: pypi
+    user: dhoese
+    password:
+      secure: cnWXKNEvy9ggNw11czp1aUtBsuwM0V3x8tNyvo7zR1Wl8ktarTU6jTvD7PKpAyFT05rRSgi2K+jrHqsu4Xbo1rJNBsvqlHee7wCihfZOXOkwXJM6yjaQsf6e1TwA+JR4Sw/G1VLzzWufUTnKjEKSTvAka+GSo02MzyO6y5FXzc0=
+    distributions: sdist bdist_wheel
+    on:
+      tags: true
+      repo: pytroll/python-geotiepoints
 notifications:
   slack: pytroll:BTiIJLKkWvlePXCYRew0rliC
