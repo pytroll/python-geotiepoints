@@ -2,6 +2,14 @@ Changelog
 =========
 
 
+v1.1.5 (2018-05-21)
+-------------------
+- Update changelog. [davidh-ssec]
+- Bump version: 1.1.4 → 1.1.5. [davidh-ssec]
+- Remove wheel deployment on travis. [davidh-ssec]
+- Add skip_existing to travis deploy. [davidh-ssec]
+
+
 v1.1.4 (2018-05-21)
 -------------------
 - Update changelog. [davidh-ssec]
