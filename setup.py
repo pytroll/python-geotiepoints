@@ -130,6 +130,7 @@ if __name__ == "__main__":
           packages=['geotiepoints'],
           # packages=find_packages(),
           setup_requires=['numpy'],
+          python_requires='>=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*',
           cmdclass={'build_ext': build_ext},
 
           install_requires=requirements,

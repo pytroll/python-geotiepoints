@@ -1,0 +1,4 @@
+include docs/Makefile
+recursive-include docs/source *
+include LICENSE.txt
+include geotiepoints/multilinear_cython.pyx
