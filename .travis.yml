@@ -4,6 +4,7 @@ python:
 - 3.6
 os:
 - linux
+- osx
 env:
   global:
   - PYTHON_VERSION=$TRAVIS_PYTHON_VERSION
