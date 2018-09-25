@@ -2,6 +2,26 @@ Changelog
 =========
 
 
+v1.1.6 (2018-09-25)
+-------------------
+- Update changelog. [David Hoese]
+- Bump version: 1.1.5 → 1.1.6. [David Hoese]
+- Merge pull request #10 from pytroll/bugfix-travis-37. [David Hoese]
+
+  Fix python 3.7 environment on travis
+- Add generic language settings for osx environments on travis. [David
+  Hoese]
+- Remove generic language setting for travis and added OSX 3.7 env.
+  [David Hoese]
+- Merge pull request #9 from AmitAronovitch/py37-support. [David Hoese]
+
+  support Python 3.7
+- Add py3.7 on linux test in travis. [Amit Aronovitch]
+- Rebuild multilinear_cython.c with Cython 0.28 (supports py3.7) [Amit
+  Aronovitch]
+- Add templates for issues and PRs. [Adam.Dybbroe]
+
+
 v1.1.5 (2018-05-21)
 -------------------
 - Update changelog. [davidh-ssec]
