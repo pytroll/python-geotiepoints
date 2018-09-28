@@ -32,7 +32,7 @@ def to_da(arr):
     import xarray as xr
     import dask.array as da
 
-    return xr.DataArray(da.from_array(arr, chunks=4000), dims=['y', 'x'])
+    return xr.DataArray(da.from_array(arr, chunks=4096), dims=['y', 'x'])
 
 class TestModisInterpolator(unittest.TestCase):
     def test_modis(self):
