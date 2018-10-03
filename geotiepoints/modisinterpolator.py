@@ -20,13 +20,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Interpolation of geographical tiepoints using the second order interpolation
+scheme implemented in the CVIIRS software, as described here:
+Compact VIIRS SDR Product Format User Guide (V1J) 
+http://www.eumetsat.int/website/wcm/idc/idcplg?IdcService=GET_FILE&dDocName=PDF_DMT_708025&RevisionSelectionMethod=LatestReleased&Rendition=Web
+"""
+
 import xarray as xr
 import dask.array as da
 import numpy as np
 
 # TODO on interpolation:
 # - go over to cartesian coordinates for tricky situation (eg poles, dateline)
-# - test !!!
 
 R = 6371.
 # Aqua scan width and altitude in km
