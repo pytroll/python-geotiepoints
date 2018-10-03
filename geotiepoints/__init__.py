@@ -54,7 +54,7 @@ def get_scene_splits(nlines_swath, nlines_scan, n_cpus):
 def metop20kmto1km(lons20km, lats20km):
     """Getting 1km geolocation for metop avhrr from 20km tiepoints.
     """
-    cols20km = np.array([0] + range(4, 2048, 20) + [2047])
+    cols20km = np.array([0] + list(range(4, 2048, 20)) + [2047])
     cols1km = np.arange(2048)
     lines = lons20km.shape[0]
     rows20km = np.arange(lines)
