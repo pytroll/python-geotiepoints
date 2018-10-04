@@ -38,7 +38,7 @@ version = imp.load_source('geotiepoints.version', 'geotiepoints/version.py')
 
 requirements = ['numpy', 'scipy', 'pandas'],
 # unittest2 is required by h5py 2.8.0rc:
-test_requires = ['h5py', 'unittest2']
+test_requires = ['h5py', 'unittest2', 'xarray', 'dask']
 
 if sys.platform.startswith("win"):
     extra_compile_args = []

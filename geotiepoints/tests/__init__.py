@@ -28,7 +28,8 @@ from geotiepoints.tests import (test_geointerpolator,
                                 test_modis,
                                 test_satelliteinterpolator,
                                 test_interpolator,
-                                test_multilinear)
+                                test_multilinear,
+                                test_modisinterpolator)
 
 
 import sys
@@ -58,6 +59,7 @@ def suite():
     mysuite.addTests(test_satelliteinterpolator.suite())
     mysuite.addTests(test_interpolator.suite())
     mysuite.addTests(test_multilinear.suite())
+    mysuite.addTests(test_modisinterpolator.suite())
     return mysuite
 
 if __name__ == '__main__':
