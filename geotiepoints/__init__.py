@@ -175,3 +175,7 @@ def modis1kmto250m(lons1km, lats1km, cores=1):
     lons250m, lats250m = satint.interpolate()
 
     return lons250m, lats250m
+
+from .version import get_versions
+__version__ = get_versions()['version']
+del get_versions
