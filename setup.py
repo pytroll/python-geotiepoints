@@ -31,6 +31,7 @@ from distutils.extension import Extension
 #from Cython.Distutils import build_ext
 from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext as _build_ext
+import versioneer
 
 import imp
 version = imp.load_source('geotiepoints.version', 'geotiepoints/version.py')
@@ -73,8 +74,11 @@ def set_builtin(name, value):
     else:
         setattr(__builtins__, name, value)
 
+cmdclass = versioneer.get_cmdclass()
+versioneer_build_ext = cmdclass.get('build_ext', _build_ext)
 
-class build_ext(_build_ext):
+
+class build_ext(versioneer_build_ext):
 
     """Work around to bootstrap numpy includes in to extensions.
 
@@ -85,12 +89,13 @@ class build_ext(_build_ext):
     """
 
     def finalize_options(self):
-        _build_ext.finalize_options(self)
+        versioneer_build_ext.finalize_options(self)
         # Prevent numpy from thinking it is still in its setup process:
         set_builtin('__NUMPY_SETUP__', False)
         import numpy
         self.include_dirs.append(numpy.get_include())
 
+cmdclass['build_ext'] = build_ext
 
 if __name__ == "__main__":
     if not os.getenv("USE_CYTHON", False) or cythonize is None:
@@ -115,7 +120,7 @@ if __name__ == "__main__":
             return extensions
 
     setup(name='python-geotiepoints',
-          version=version.__version__,
+          version=versioneer.get_version(),
           description='Interpolation of geographic tiepoints in Python',
           author='Adam Dybbroe, Martin Raspaud',
           author_email='martin.raspaud@smhi.se',
@@ -131,7 +136,7 @@ if __name__ == "__main__":
           # packages=find_packages(),
           setup_requires=['numpy'],
           python_requires='>=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*',
-          cmdclass={'build_ext': build_ext},
+          cmdclass=cmdclass,
 
           install_requires=requirements,
           ext_modules=cythonize(EXTENSIONS),
