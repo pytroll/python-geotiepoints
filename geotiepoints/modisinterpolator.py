@@ -22,16 +22,13 @@
 
 """Interpolation of geographical tiepoints using the second order interpolation
 scheme implemented in the CVIIRS software, as described here:
-Compact VIIRS SDR Product Format User Guide (V1J) 
+Compact VIIRS SDR Product Format User Guide (V1J)
 http://www.eumetsat.int/website/wcm/idc/idcplg?IdcService=GET_FILE&dDocName=PDF_DMT_708025&RevisionSelectionMethod=LatestReleased&Rendition=Web
 """
 
 import xarray as xr
 import dask.array as da
 import numpy as np
-
-# TODO on interpolation:
-# - go over to cartesian coordinates for tricky situation (eg poles, dateline)
 
 R = 6371.
 # Aqua scan width and altitude in km
@@ -155,21 +152,13 @@ class ModisInterpolator():
         fscan_width = self.fscan_width
         fscan_len = self.fscan_len
 
-        scans = lat1.shape[0] // cscan_len
-        latattrs = lat1.attrs
-        lonattrs = lon1.attrs
-        dims = lat1.dims
-        lat1 = lat1.data
-        lon1 = lon1.data
+        scans = satz1.shape[0] // cscan_len
         satz1 = satz1.data
 
-        lat1 = lat1.reshape((-1, cscan_len, cscan_full_width))
-        lon1 = lon1.reshape((-1, cscan_len, cscan_full_width))
         satz1 = satz1.reshape((-1, cscan_len, cscan_full_width))
 
-        lats_a, lats_b, lats_c, lats_d = get_corners(lat1)
-        lons_a, lons_b, lons_c, lons_d = get_corners(lon1)
         satz_a, satz_b, satz_c, satz_d = get_corners(da.deg2rad(satz1))
+
         c_exp, c_ali = compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d)
 
         x, y = self.get_coords(scans)
@@ -190,24 +179,38 @@ class ModisInterpolator():
         a_track = s_t
         a_scan = (s_s + s_s * (1 - s_s) * c_exp_full + s_t*(1 - s_t) * c_ali_full)
 
-        lats_a = self.expand_tiepoint_array(lats_a, lines, cols)
-        lats_b = self.expand_tiepoint_array(lats_b, lines, cols)
-        lats_c = self.expand_tiepoint_array(lats_c, lines, cols)
-        lats_d = self.expand_tiepoint_array(lats_d, lines, cols)
-        lons_a = self.expand_tiepoint_array(lons_a, lines, cols)
-        lons_b = self.expand_tiepoint_array(lons_b, lines, cols)
-        lons_c = self.expand_tiepoint_array(lons_c, lines, cols)
-        lons_d = self.expand_tiepoint_array(lons_d, lines, cols)
+        res = []
 
-        lats_1 = (1 - a_scan) * lats_a + a_scan * lats_b
-        lats_2 = (1 - a_scan) * lats_d + a_scan * lats_c
-        lats = (1 - a_track) * lats_1 + a_track * lats_2
+        sublat = lat1[::16, ::16]
+        sublon = lon1[::16, ::16]
+        to_cart = abs(sublat).max() > 60 or (sublon.max() - sublon.min()) > 180
 
-        lons_1 = (1 - a_scan) * lons_a + a_scan * lons_b
-        lons_2 = (1 - a_scan) * lons_d + a_scan * lons_c
-        lons = (1 - a_track) * lons_1 + a_track * lons_2
+        if to_cart:
+            datasets = lonlat2xyz(lon1, lat1)
+        else:
+            datasets = [lon1, lat1]
 
-        return xr.DataArray(lons, attrs=lonattrs, dims=dims), xr.DataArray(lats, attrs=latattrs, dims=dims)
+        for data in datasets:
+            data_attrs = data.attrs
+            dims = data.dims
+            data = data.data
+            data = data.reshape((-1, cscan_len, cscan_full_width))
+            data_a, data_b, data_c, data_d = get_corners(data)
+            data_a = self.expand_tiepoint_array(data_a, lines, cols)
+            data_b = self.expand_tiepoint_array(data_b, lines, cols)
+            data_c = self.expand_tiepoint_array(data_c, lines, cols)
+            data_d = self.expand_tiepoint_array(data_d, lines, cols)
+
+            data_1 = (1 - a_scan) * data_a + a_scan * data_b
+            data_2 = (1 - a_scan) * data_d + a_scan * data_c
+            data = (1 - a_track) * data_1 + a_track * data_2
+
+            res.append(xr.DataArray(data, attrs=data_attrs, dims=dims))
+
+        if to_cart:
+            return xyz2lonlat(*res)
+        else:
+            return res
 
 
 def modis_1km_to_250m(lon1, lat1, satz1):
@@ -226,3 +229,20 @@ def modis_5km_to_1km(lon1, lat1, satz1):
 
     interp = ModisInterpolator(5000, 1000)
     return interp.interpolate(lon1, lat1, satz1)
+
+def lonlat2xyz(lons, lats):
+    """Convert lons and lats to cartesian coordinates."""
+    R = 6370997.0
+    x_coords = R * da.cos(da.deg2rad(lats)) * da.cos(da.deg2rad(lons))
+    y_coords = R * da.cos(da.deg2rad(lats)) * da.sin(da.deg2rad(lons))
+    z_coords = R * da.sin(da.deg2rad(lats))
+    return x_coords, y_coords, z_coords
+
+def xyz2lonlat(x__, y__, z__):
+    """Get longitudes from cartesian coordinates.
+    """
+    R = 6370997.0
+    lons = da.rad2deg(da.arccos(x__ / da.sqrt(x__ ** 2 + y__ ** 2))) * da.sign(y__)
+    lats = da.sign(z__) * (90 - da.rad2deg(da.arcsin(da.sqrt(x__ ** 2 + y__ ** 2) / R)))
+
+    return lons, lats
