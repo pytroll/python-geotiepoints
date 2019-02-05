@@ -63,6 +63,25 @@ class TestModisInterpolator(unittest.TestCase):
         self.assertTrue(np.allclose(lon1, lons, atol=1e-2))
         self.assertTrue(np.allclose(lat1, lats, atol=1e-2))
 
+    def test_poles_datum(self):
+        import xarray as xr
+        h5f = h5py.File(FILENAME_DATA, 'r')
+        orig_lon = to_da(h5f['lon_1km'])
+        lon1 = orig_lon + 180
+        lon1 = xr.where(lon1 > 180, lon1 - 360, lon1)
+        lat1 = to_da(h5f['lat_1km'])
+        satz1 = to_da(h5f['satz_1km'])
+
+        lat5 = lat1[2::5, 2::5]
+        lon5 = lon1[2::5, 2::5]
+
+        satz5 = satz1[2::5, 2::5]
+        lons, lats = modis_5km_to_1km(lon5, lat5, satz5)
+        lons = lons + 180
+        lons = xr.where(lons > 180, lons - 360, lons)
+        self.assertTrue(np.allclose(orig_lon, lons, atol=1e-2))
+        self.assertTrue(np.allclose(lat1, lats, atol=1e-2))
+
 def suite():
     """The suite for MODIS"""
     loader = unittest.TestLoader()
