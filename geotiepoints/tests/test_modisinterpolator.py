@@ -63,6 +63,16 @@ class TestModisInterpolator(unittest.TestCase):
         self.assertTrue(np.allclose(lon1, lons, atol=1e-2))
         self.assertTrue(np.allclose(lat1, lats, atol=1e-2))
 
+        # Test level 2
+        lat5 = lat1[2::5, 2:-5:5]
+        lon5 = lon1[2::5, 2:-5:5]
+
+        satz5 = satz1[2::5, 2:-5:5]
+        lons, lats = modis_5km_to_1km(lon5, lat5, satz5)
+        self.assertTrue(np.allclose(lon1, lons, atol=1e-2))
+        self.assertTrue(np.allclose(lat1, lats, atol=1e-2))
+
+
 def suite():
     """The suite for MODIS"""
     loader = unittest.TestLoader()

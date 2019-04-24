@@ -2,9 +2,8 @@ language: python
 env:
   global:
   - PYTHON_VERSION=$PYTHON_VERSION
-  - NUMPY_VERSION=stable
   - MAIN_CMD='python setup.py'
-  - CONDA_DEPENDENCIES='cython pandas scipy numpy coveralls coverage h5py mock dask xarray'
+  - CONDA_DEPENDENCIES='cython pandas scipy coveralls coverage h5py mock dask xarray'
   - PIP_DEPENDENCIES=''
   - SETUP_XVFB=False
   - EVENT_TYPE='push pull_request'

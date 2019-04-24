@@ -86,7 +86,7 @@ def get_corners(arr):
 
 class ModisInterpolator():
 
-    def __init__(self, cres, fres):
+    def __init__(self, cres, fres, cscan_full_width=None):
         if cres == 1000:
             self.cscan_len = 10
             self.cscan_width = 1
@@ -94,7 +94,10 @@ class ModisInterpolator():
         elif cres == 5000:
             self.cscan_len = 2
             self.cscan_width = 5
-            self.cscan_full_width = 271
+            if cscan_full_width is None:
+                self.cscan_full_width = 271
+            else:
+                self.cscan_full_width = cscan_full_width
 
         if fres == 250:
             self.fscan_width = 4 * self.cscan_width
@@ -135,7 +138,10 @@ class ModisInterpolator():
     def _expand_tiepoint_array_5km(self, arr, lines, cols):
         arr = da.repeat(arr, lines * 2, axis=1)
         arr = da.repeat(arr.reshape((-1, self.cscan_full_width - 1)), cols, axis=1)
-        return da.hstack((arr[:, :2], arr, arr[:, -2:]))
+        if self.cscan_full_width == 271:
+            return da.hstack((arr[:, :2], arr, arr[:, -2:]))
+        else:
+            return da.hstack((arr[:, :2], arr, arr[:, -5:], arr[:, -2:]))
 
     def _get_coords_5km(self, scans):
         y = np.arange(self.fscan_len * self.cscan_len) - 2
@@ -144,8 +150,19 @@ class ModisInterpolator():
         x = (np.arange(self.fscan_full_width) - 2) % self.fscan_width
         x[0] = -2
         x[1] = -1
-        x[-2] = 5
-        x[-1] = 6
+        if self.cscan_full_width == 271:
+            x[-2] = 5
+            x[-1] = 6
+        elif self.cscan_full_width == 270:
+            x[-7] = 5
+            x[-6] = 6
+            x[-5] = 7
+            x[-4] = 8
+            x[-3] = 9
+            x[-2] = 10
+            x[-1] = 11
+        else:
+            raise NotImplementedError("Can't interpolate if 5km tiepoints have less than 270 columns.")
         return x, y
 
     def interpolate(self, lon1, lat1, satz1):
@@ -224,5 +241,5 @@ def modis_1km_to_500m(lon1, lat1, satz1):
 
 def modis_5km_to_1km(lon1, lat1, satz1):
 
-    interp = ModisInterpolator(5000, 1000)
+    interp = ModisInterpolator(5000, 1000, lon1.shape[1])
     return interp.interpolate(lon1, lat1, satz1)
