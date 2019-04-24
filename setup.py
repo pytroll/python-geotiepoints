@@ -26,16 +26,10 @@
 
 import os
 import sys
-from distutils.extension import Extension
 
-#from Cython.Distutils import build_ext
-from setuptools import Extension, find_packages, setup
+from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext as _build_ext
 import versioneer
-
-import imp
-version = imp.load_source('geotiepoints.version', 'geotiepoints/version.py')
-
 
 requirements = ['numpy', 'scipy', 'pandas'],
 # unittest2 is required by h5py 2.8.0rc:
@@ -74,6 +68,7 @@ def set_builtin(name, value):
     else:
         setattr(__builtins__, name, value)
 
+
 cmdclass = versioneer.get_cmdclass()
 versioneer_build_ext = cmdclass.get('build_ext', _build_ext)
 
@@ -94,6 +89,7 @@ class build_ext(versioneer_build_ext):
         set_builtin('__NUMPY_SETUP__', False)
         import numpy
         self.include_dirs.append(numpy.get_include())
+
 
 cmdclass['build_ext'] = build_ext
 
