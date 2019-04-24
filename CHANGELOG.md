@@ -1,3 +1,20 @@
+## Version v1.1.8 (2019/04/24)
+
+### Issues Closed
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 14](https://github.com/pytroll/python-geotiepoints/pull/14) - Fix modis interpolation in tricky places
+
+#### Features added
+
+* [PR 15](https://github.com/pytroll/python-geotiepoints/pull/15) - Add support for modis l2 geolocation interpolation
+
+In this release 2 pull requests were closed.
+
+
 ## Version v1.1.7 (2018/10/09)
 
 ### Issues Closed
