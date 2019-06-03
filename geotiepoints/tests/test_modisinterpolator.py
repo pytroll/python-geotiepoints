@@ -24,7 +24,11 @@ import unittest
 import numpy as np
 import h5py
 import os
-from geotiepoints.modisinterpolator import modis_1km_to_250m, modis_1km_to_500m, modis_5km_to_1km
+from geotiepoints.modisinterpolator import (modis_1km_to_250m,
+                                            modis_1km_to_500m,
+                                            modis_5km_to_1km,
+                                            modis_5km_to_500m,
+                                            modis_5km_to_250m)
 FILENAME_DATA = os.path.join(
     os.path.dirname(__file__), '../../testdata/modis_test_data.h5')
 
@@ -33,6 +37,7 @@ def to_da(arr):
     import dask.array as da
 
     return xr.DataArray(da.from_array(arr, chunks=4096), dims=['y', 'x'])
+
 
 class TestModisInterpolator(unittest.TestCase):
     def test_modis(self):
@@ -63,6 +68,20 @@ class TestModisInterpolator(unittest.TestCase):
         self.assertTrue(np.allclose(lon1, lons, atol=1e-2))
         self.assertTrue(np.allclose(lat1, lats, atol=1e-2))
 
+        # 5km to 500m
+        lons, lats = modis_5km_to_500m(lon5, lat5, satz5)
+        self.assertEqual(lon500.shape, lons.shape)
+        self.assertEqual(lat500.shape, lats.shape)
+        # self.assertTrue(np.allclose(lon500, lons, atol=1e-2))
+        # self.assertTrue(np.allclose(lat500, lats, atol=1e-2))
+
+        # 5km to 250m
+        lons, lats = modis_5km_to_250m(lon5, lat5, satz5)
+        self.assertEqual(lon250.shape, lons.shape)
+        self.assertEqual(lat250.shape, lats.shape)
+        # self.assertTrue(np.allclose(lon250, lons, atol=1e-2))
+        # self.assertTrue(np.allclose(lat250, lats, atol=1e-2))
+
         # Test level 2
         lat5 = lat1[2::5, 2:-5:5]
         lon5 = lon1[2::5, 2:-5:5]
@@ -71,7 +90,7 @@ class TestModisInterpolator(unittest.TestCase):
         lons, lats = modis_5km_to_1km(lon5, lat5, satz5)
         self.assertTrue(np.allclose(lon1, lons, atol=1e-2))
         self.assertTrue(np.allclose(lat1, lats, atol=1e-2))
-        
+
     def test_poles_datum(self):
         import xarray as xr
         h5f = h5py.File(FILENAME_DATA, 'r')
