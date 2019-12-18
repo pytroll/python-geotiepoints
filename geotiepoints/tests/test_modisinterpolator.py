@@ -71,7 +71,14 @@ class TestModisInterpolator(unittest.TestCase):
         lons, lats = modis_5km_to_1km(lon5, lat5, satz5)
         self.assertTrue(np.allclose(lon1, lons, atol=1e-2))
         self.assertTrue(np.allclose(lat1, lats, atol=1e-2))
-        
+
+        # Test nans issue (#19)
+        satz1 = to_da(abs(np.linspace(-65.4, 65.4, 1354)).repeat(20).reshape(-1, 20).T)
+        lons, lats = modis_1km_to_500m(lon1, lat1, satz1)
+        self.assertFalse(np.any(np.isnan(lons.compute())))
+        self.assertFalse(np.any(np.isnan(lats.compute())))
+
+
     def test_poles_datum(self):
         import xarray as xr
         h5f = h5py.File(FILENAME_DATA, 'r')
