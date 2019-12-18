@@ -28,11 +28,13 @@ from geotiepoints.modisinterpolator import modis_1km_to_250m, modis_1km_to_500m,
 FILENAME_DATA = os.path.join(
     os.path.dirname(__file__), '../../testdata/modis_test_data.h5')
 
+
 def to_da(arr):
     import xarray as xr
     import dask.array as da
 
     return xr.DataArray(da.from_array(arr, chunks=4096), dims=['y', 'x'])
+
 
 class TestModisInterpolator(unittest.TestCase):
     def test_modis(self):
@@ -78,7 +80,6 @@ class TestModisInterpolator(unittest.TestCase):
         self.assertFalse(np.any(np.isnan(lons.compute())))
         self.assertFalse(np.any(np.isnan(lats.compute())))
 
-
     def test_poles_datum(self):
         import xarray as xr
         h5f = h5py.File(FILENAME_DATA, 'r')
@@ -106,6 +107,7 @@ def suite():
     mysuite.addTest(loader.loadTestsFromTestCase(TestModisInterpolator))
 
     return mysuite
+
 
 if __name__ == "__main__":
     unittest.main()
