@@ -29,6 +29,7 @@ http://www.eumetsat.int/website/wcm/idc/idcplg?IdcService=GET_FILE&dDocName=PDF_
 import xarray as xr
 import dask.array as da
 import numpy as np
+import warnings
 
 R = 6371.
 # Aqua scan width and altitude in km
@@ -83,13 +84,15 @@ def get_corners(arr):
     return arr_a, arr_b, arr_c, arr_d
 
 
-class ModisInterpolator():
+class ModisInterpolator(object):
 
     def __init__(self, cres, fres, cscan_full_width=None):
         if cres == 1000:
             self.cscan_len = 10
             self.cscan_width = 1
             self.cscan_full_width = 1354
+            self.get_coords = self._get_coords_1km
+            self.expand_tiepoint_array = self._expand_tiepoint_array_1km
         elif cres == 5000:
             self.cscan_len = 2
             self.cscan_width = 5
@@ -97,25 +100,21 @@ class ModisInterpolator():
                 self.cscan_full_width = 271
             else:
                 self.cscan_full_width = cscan_full_width
+            self.expand_tiepoint_array = self._expand_tiepoint_array_5km
+            self.get_coords = self._get_coords_5km
 
         if fres == 250:
             self.fscan_width = 4 * self.cscan_width
             self.fscan_full_width = 1354 * 4
             self.fscan_len = 4 * 10 // self.cscan_len
-            self.get_coords = self._get_coords_1km
-            self.expand_tiepoint_array = self._expand_tiepoint_array_1km
         elif fres == 500:
             self.fscan_width = 2 * self.cscan_width
             self.fscan_full_width = 1354 * 2
             self.fscan_len = 2 * 10 // self.cscan_len
-            self.get_coords = self._get_coords_1km
-            self.expand_tiepoint_array = self._expand_tiepoint_array_1km
         elif fres == 1000:
             self.fscan_width = 1 * self.cscan_width
             self.fscan_full_width = 1354
             self.fscan_len = 1 * 10 // self.cscan_len
-            self.get_coords = self._get_coords_5km
-            self.expand_tiepoint_array = self._expand_tiepoint_array_5km
 
     def _expand_tiepoint_array_1km(self, arr, lines, cols):
         arr = da.repeat(arr, lines, axis=1)
@@ -137,10 +136,11 @@ class ModisInterpolator():
     def _expand_tiepoint_array_5km(self, arr, lines, cols):
         arr = da.repeat(arr, lines * 2, axis=1)
         arr = da.repeat(arr.reshape((-1, self.cscan_full_width - 1)), cols, axis=1)
+        factor = self.fscan_width // self.cscan_width
         if self.cscan_full_width == 271:
-            return da.hstack((arr[:, :2], arr, arr[:, -2:]))
+            return da.hstack((arr[:, :2 * factor], arr, arr[:, -2 * factor:]))
         else:
-            return da.hstack((arr[:, :2], arr, arr[:, -5:], arr[:, -2:]))
+            return da.hstack((arr[:, :2 * factor], arr, arr[:, -self.fscan_width:], arr[:, -2 * factor:]))
 
     def _get_coords_5km(self, scans):
         y = np.arange(self.fscan_len * self.cscan_len) - 2
@@ -233,21 +233,38 @@ class ModisInterpolator():
 
 
 def modis_1km_to_250m(lon1, lat1, satz1):
-
+    """Interpolate MODIS geolocation from 1km to 250m resolution."""
     interp = ModisInterpolator(1000, 250)
     return interp.interpolate(lon1, lat1, satz1)
 
 
 def modis_1km_to_500m(lon1, lat1, satz1):
-
+    """Interpolate MODIS geolocation from 1km to 500m resolution."""
     interp = ModisInterpolator(1000, 500)
     return interp.interpolate(lon1, lat1, satz1)
 
 
 def modis_5km_to_1km(lon1, lat1, satz1):
-
+    """Interpolate MODIS geolocation from 5km to 1km resolution."""
     interp = ModisInterpolator(5000, 1000, lon1.shape[1])
     return interp.interpolate(lon1, lat1, satz1)
+
+
+def modis_5km_to_500m(lon1, lat1, satz1):
+    """Interpolate MODIS geolocation from 5km to 500m resolution."""
+    warnings.warn("Interpolating 5km geolocation to 500m resolution "
+                  "may result in poor quality")
+    interp = ModisInterpolator(5000, 500, lon1.shape[1])
+    return interp.interpolate(lon1, lat1, satz1)
+
+
+def modis_5km_to_250m(lon1, lat1, satz1):
+    """Interpolate MODIS geolocation from 5km to 250m resolution."""
+    warnings.warn("Interpolating 5km geolocation to 250m resolution "
+                  "may result in poor quality")
+    interp = ModisInterpolator(5000, 250, lon1.shape[1])
+    return interp.interpolate(lon1, lat1, satz1)
+
 
 def lonlat2xyz(lons, lats):
     """Convert lons and lats to cartesian coordinates."""
