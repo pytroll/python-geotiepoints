@@ -61,15 +61,17 @@ def compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d):
     phi = (phi_a + phi_b) / 2
     zeta = compute_zeta(phi)
     theta = compute_theta(zeta, phi)
+    # Workaround for tiepoints symetrical about the subsatellite-track
+    denominator = np.where(theta_a == theta_b, theta_a * 2, theta_a - theta_b)
 
-    c_expansion = 4 * (((theta_a + theta_b) / 2 - theta) / (theta_a - theta_b))
+    c_expansion = 4 * (((theta_a + theta_b) / 2 - theta) / denominator)
 
     sin_beta_2 = scan_width / (2 * H)
 
     d = ((R + H) / R * np.cos(phi) - np.cos(zeta)) * sin_beta_2
     e = np.cos(zeta) - np.sqrt(np.cos(zeta) ** 2 - d ** 2)
 
-    c_alignment = 4 * e * np.sin(zeta) / (theta_a - theta_b)
+    c_alignment = 4 * e * np.sin(zeta) / denominator
 
     return c_expansion, c_alignment
 
@@ -194,7 +196,7 @@ class ModisInterpolator(object):
         c_ali_full = self.expand_tiepoint_array(c_ali, lines, cols)
 
         a_track = s_t
-        a_scan = (s_s + s_s * (1 - s_s) * c_exp_full + s_t*(1 - s_t) * c_ali_full)
+        a_scan = (s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full)
 
         res = []
 
