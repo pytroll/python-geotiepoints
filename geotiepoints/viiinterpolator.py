@@ -25,7 +25,7 @@ It follows the description provided in document "EPS-SG VII Level 1B Product For
 """
 
 import xarray as xr
-import numpy as np
+import dask.array as da
 from itertools import chain
 
 # MEAN EARTH RADIUS AS DEFINED BY IUGG
@@ -69,11 +69,11 @@ def tie_points_interpolation(data_on_tie_points, scan_alt_tie_points, tie_points
     n_pixel_alt = (n_tie_alt - 1) * tie_points_factor
 
     # Create the grids used for interpolation across the track
-    tie_grid_act = np.arange(0, n_pixel_act + 1, tie_points_factor)
-    pixels_grid_act = np.arange(0, n_pixel_act)
+    tie_grid_act = da.arange(0, n_pixel_act + 1, tie_points_factor)
+    pixels_grid_act = da.arange(0, n_pixel_act)
 
     # Create the grids used for the interpolation along the track (must not include the spurious points between scans)
-    tie_grid_alt = np.arange(0, n_pixel_alt + 1, tie_points_factor)
+    tie_grid_alt = da.arange(0, n_pixel_alt + 1, tie_points_factor)
     n_pixel_alt_per_scan = (scan_alt_tie_points - 1) * tie_points_factor
     pixel_grid_alt = iter(())
     for j_scan in range(n_scans):
@@ -131,7 +131,7 @@ def tie_points_geo_interpolation(longitude, latitude,
         raise ValueError("The dimensions of longitude and latitude don't match")
 
     # Determine if the interpolation should be done in cartesian or geodetic coordinates
-    to_cart = np.max(np.abs(latitude)) > thr_cartesian or (np.max(longitude) - np.min(longitude)) > 180.
+    to_cart = da.max(da.fabs(latitude)) > thr_cartesian or (da.max(longitude) - da.min(longitude)) > 180.
 
     if to_cart:
 
@@ -163,11 +163,11 @@ def _lonlat2xyz(lons, lats):
         tuple of arrays containing the x, y, and z values in meters.
 
     """
-    lons_rad = np.deg2rad(lons)
-    lats_rad = np.deg2rad(lats)
-    x_coords = MEAN_EARTH_RADIUS * np.cos(lats_rad) * np.cos(lons_rad)
-    y_coords = MEAN_EARTH_RADIUS * np.cos(lats_rad) * np.sin(lons_rad)
-    z_coords = MEAN_EARTH_RADIUS * np.sin(lats_rad)
+    lons_rad = da.deg2rad(lons)
+    lats_rad = da.deg2rad(lats)
+    x_coords = MEAN_EARTH_RADIUS * da.cos(lats_rad) * da.cos(lons_rad)
+    y_coords = MEAN_EARTH_RADIUS * da.cos(lats_rad) * da.sin(lons_rad)
+    z_coords = MEAN_EARTH_RADIUS * da.sin(lats_rad)
     return x_coords, y_coords, z_coords
 
 
@@ -184,14 +184,13 @@ def _xyz2lonlat(x_coords, y_coords, z_coords, thr_use_xy):
         tuple of arrays containing the longitude and latitude values in degrees.
 
     """
-    r = np.sqrt(x_coords ** 2 + y_coords ** 2)
+    r = da.sqrt(x_coords ** 2 + y_coords ** 2)
     thr_z = thr_use_xy * MEAN_EARTH_RADIUS
-    lons = np.rad2deg(np.arccos(x_coords / r)) * np.sign(y_coords)
+    lons = da.rad2deg(da.arccos(x_coords / r)) * da.sign(y_coords)
     # Compute latitude from z at low z and from x and y at high z
-    # using xarray.where instead of np.where to allow for lazy computation
     lats = xr.where(
-        np.logical_and(np.less(z_coords, thr_z), np.greater(z_coords, -thr_z)),
-        90. - np.rad2deg(np.arccos(z_coords / MEAN_EARTH_RADIUS)),
-        np.sign(z_coords) * (90. - np.rad2deg(np.arcsin(r / MEAN_EARTH_RADIUS)))
+        da.logical_and(da.less(z_coords, thr_z), da.greater(z_coords, -thr_z)),
+        90. - da.rad2deg(da.arccos(z_coords / MEAN_EARTH_RADIUS)),
+        da.sign(z_coords) * (90. - da.rad2deg(da.arcsin(r / MEAN_EARTH_RADIUS)))
     )
     return lons, lats
