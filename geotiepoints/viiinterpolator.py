@@ -18,6 +18,12 @@
 
 """Interpolation of geographical tiepoints for the VII products.
 It follows the description provided in document "EPS-SG VII Level 1B Product Format Specification".
+Tiepoints are typically subsampled by a factor 8 with respect to the pixels, along and across the satellite track.
+Because of the bowtie effect, tiepoints at the scan edges are not continuous between neighbouring scans,
+therefore each scan has its own edge tiepoints in the along-track direction.
+Each scan typically extends on 3 tiepoints in the along-track direction.
+At the edges of a given scan (both along and across track) the tie points lie outside the original data point raster
+and are therefore excluded from the interpolation grid.
 The interpolation functions are implemented for xarray.DataArrays as input.
 """
 
