@@ -9,7 +9,7 @@ The following people have made contributions to this project:
 
 - [Amit Aronovitch (AmitAronovitch)](https://github.com/AmitAronovitch)
 - [Adam Dybbroe (adybbroe)](https://github.com/adybbroe)
-- [(HelgeDMI)](https://github.com/HelgeDMI)
+- [Rolf Helge Pfeiffer (HelgeDMI)](https://github.com/HelgeDMI)
 - [David Hoese (djhoese)](https://github.com/djhoese)
 - [Mikhail Itkin (mitkin)](https://github.com/mitkin)
 - [Sauli Joro (sjoro)](https://github.com/sjoro)
