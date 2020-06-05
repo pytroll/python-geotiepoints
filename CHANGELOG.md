@@ -1,4 +1,21 @@
-## Version v1.1.8 (2019/04/24)
+## Version 1.2.0 (2020/06/05)
+
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 19](https://github.com/pytroll/python-geotiepoints/pull/19) - Fix interpolation of symetrical tiepoints
+
+#### Features added
+
+* [PR 22](https://github.com/pytroll/python-geotiepoints/pull/22) - Add VII interpolator.
+* [PR 16](https://github.com/pytroll/python-geotiepoints/pull/16) - Add MODIS 5km to 500m and 250m interpolation
+
+In this release 3 pull requests were closed.
+
+
+## Version 1.1.8 (2019/04/24)
 
 ### Issues Closed
 
