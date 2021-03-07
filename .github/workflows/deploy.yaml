@@ -57,12 +57,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install -U -q pip Cython wheel setuptools twine numpy
+          python -m pip install -U -q pip Cython wheel setuptools twine numpy build
 
       - name: Build and install macOS/Windows wheel
         if: matrix.os != 'ubuntu-latest'
+        # see https://setuptools.readthedocs.io/en/latest/build_meta.html
         run: |
-          python setup.py -q bdist_wheel
+          python -m build
           pip install --find-links=./dist/ python-geotiepoints
 
       - name: Build Linux wheels inside docker
