@@ -32,8 +32,7 @@ import numpy as np
 from Cython.Build import cythonize
 
 requirements = ['numpy', 'scipy', 'pandas']
-# unittest2 is required by h5py 2.8.0rc:
-test_requires = ['h5py', 'unittest2', 'xarray', 'dask']
+test_requires = ['h5py', 'xarray', 'dask']
 
 if sys.platform.startswith("win"):
     extra_compile_args = []

@@ -14,5 +14,6 @@ dependencies:
   - coverage
   - codecov
   - scipy
+  - h5py
   - pytest
   - pytest-cov
