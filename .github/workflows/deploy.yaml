@@ -17,9 +17,7 @@ jobs:
 
       - name: Create sdist
         shell: bash -l {0}
-        run: |
-          export USE_CYTHON="1";
-          python setup.py sdist;
+        run: python setup.py sdist
 
       - name: Upload sdist to build artifacts
         uses: actions/upload-artifact@v2
@@ -30,8 +28,6 @@ jobs:
 
   build_wheels:
     runs-on: ${{ matrix.os }}
-    env:
-      USE_CYTHON: "1"
     strategy:
       fail-fast: false
       matrix:
