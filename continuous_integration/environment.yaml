@@ -10,8 +10,6 @@ dependencies:
   - sphinx
   - pillow
   - pyyaml
-  - pyproj
-  - pykdtree
   - coveralls
   - coverage
   - codecov

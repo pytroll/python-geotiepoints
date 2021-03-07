@@ -59,7 +59,7 @@ jobs:
       - name: Install geotiepoints
         shell: bash -l {0}
         run: |
-          pip install --no-deps -e .
+          pip install -e .
 
       - name: Run unit tests
         shell: bash -l {0}
