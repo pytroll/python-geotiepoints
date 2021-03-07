@@ -24,6 +24,7 @@ It follows the description provided in document "EPS-SG VII Level 1B Product For
 import unittest
 import numpy as np
 import xarray as xr
+import pytest
 from geotiepoints.viiinterpolator import tie_points_interpolation, tie_points_geo_interpolation
 
 
@@ -193,12 +194,10 @@ class TestViiInterpolator(unittest.TestCase):
         self.assertEqual(len(result_valid.coords), 0)
 
         # Test the interpolation routine with invalid input
-        with self.assertRaises(ValueError):
-            tie_points_interpolation(
-                [self.invalid_data_for_interpolation],
-                TEST_SCAN_ALT_TIE_POINTS,
-                TEST_TIE_POINTS_FACTOR
-            )[0]
+        pytest.raises(ValueError, tie_points_interpolation,
+                      [self.invalid_data_for_interpolation],
+                      TEST_SCAN_ALT_TIE_POINTS,
+                      TEST_TIE_POINTS_FACTOR)
 
     def test_tie_points_geo_interpolation(self):
         """# Test the coordinates interpolation routine with valid and invalid input."""
