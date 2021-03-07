@@ -30,7 +30,7 @@ from setuptools import Extension, setup
 import versioneer
 from Cython.Build import cythonize
 
-requirements = ['numpy', 'scipy', 'pandas'],
+requirements = ['numpy', 'scipy', 'pandas']
 # unittest2 is required by h5py 2.8.0rc:
 test_requires = ['h5py', 'unittest2', 'xarray', 'dask']
 
