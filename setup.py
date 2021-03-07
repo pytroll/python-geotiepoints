@@ -28,6 +28,7 @@ import sys
 
 from setuptools import Extension, setup
 import versioneer
+from Cython.Build import cythonize
 
 requirements = ['numpy', 'scipy', 'pandas'],
 # unittest2 is required by h5py 2.8.0rc:
@@ -54,7 +55,6 @@ EXTENSIONS = [
 
 ]
 
-from Cython.Build import cythonize
 cmdclass = versioneer.get_cmdclass()
 
 if __name__ == "__main__":
