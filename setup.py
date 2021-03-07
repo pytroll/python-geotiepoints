@@ -28,6 +28,7 @@ import sys
 
 from setuptools import Extension, setup
 import versioneer
+import numpy as np
 from Cython.Build import cythonize
 
 requirements = ['numpy', 'scipy', 'pandas']
@@ -43,16 +44,9 @@ EXTENSIONS = [
     Extension(
         'geotiepoints.multilinear_cython',
         sources=['geotiepoints/multilinear_cython.pyx'],
-        extra_compile_args=extra_compile_args
+        extra_compile_args=extra_compile_args,
+        include_dirs=[np.get_include()],
     ),
-    Extension(
-        'geotiepoints.multilinear_cython',
-        sources=['geotiepoints/multilinear_cython.pyx',
-                 'geotiepoints/multilinear_cython.c'],
-        language='c', extra_compile_args=extra_compile_args,
-        depends=[]
-    )
-
 ]
 
 cmdclass = versioneer.get_cmdclass()
