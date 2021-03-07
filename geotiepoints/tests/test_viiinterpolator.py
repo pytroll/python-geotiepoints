@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright (c) 2017-2020 Python-geotiepoints developers
+# Copyright (c) 2017-2021 Python-geotiepoints developers
 #
 # This file is part of python-geotiepoints.
 #
@@ -15,9 +15,10 @@
 #
 # You should have received a copy of the GNU General Public License along with
 # python-geotiepoints.  If not, see <http://www.gnu.org/licenses/>.
-
 """Test of the interpolation of geographical tiepoints for the VII products.
+
 It follows the description provided in document "EPS-SG VII Level 1B Product Format Specification".
+
 """
 
 import unittest
@@ -237,16 +238,3 @@ class TestViiInterpolator(unittest.TestCase):
                 TEST_SCAN_ALT_TIE_POINTS,
                 TEST_TIE_POINTS_FACTOR
             )
-
-
-def suite():
-    """The suite for VII interpolator"""
-    loader = unittest.TestLoader()
-    mysuite = unittest.TestSuite()
-    mysuite.addTest(loader.loadTestsFromTestCase(TestViiInterpolator))
-
-    return mysuite
-
-
-if __name__ == "__main__":
-    unittest.main()
