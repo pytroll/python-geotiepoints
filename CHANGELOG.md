@@ -1,3 +1,27 @@
+## Version 1.2.1 (2021/03/08)
+
+### Issues Closed
+
+* [Issue 29](https://github.com/pytroll/python-geotiepoints/issues/29) - C extension does not compile on py3.9 without re-cythonizing ([PR 30](https://github.com/pytroll/python-geotiepoints/pull/30))
+* [Issue 28](https://github.com/pytroll/python-geotiepoints/issues/28) - I'm trying to install pycups on mac os using the treminal, but I'm getting “building wheel for pycups (setup.py) … error”
+* [Issue 27](https://github.com/pytroll/python-geotiepoints/issues/27) - MNT: Stop using ci-helpers in appveyor.yml ([PR 30](https://github.com/pytroll/python-geotiepoints/pull/30))
+* [Issue 26](https://github.com/pytroll/python-geotiepoints/issues/26) - pip install pysbrl --no-binary=pysbrl gives error
+
+In this release 4 issues were closed.
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 30](https://github.com/pytroll/python-geotiepoints/pull/30) - Switch build system to require Cython and build extensions on install ([29](https://github.com/pytroll/python-geotiepoints/issues/29), [27](https://github.com/pytroll/python-geotiepoints/issues/27))
+
+#### Features added
+
+* [PR 30](https://github.com/pytroll/python-geotiepoints/pull/30) - Switch build system to require Cython and build extensions on install ([29](https://github.com/pytroll/python-geotiepoints/issues/29), [27](https://github.com/pytroll/python-geotiepoints/issues/27))
+
+In this release 2 pull requests were closed.
+
+
 ## Version 1.2.0 (2020/06/05)
 
 
