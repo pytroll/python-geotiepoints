@@ -1,8 +1,3 @@
-.. python-geotiepoints documentation master file, created by
-   sphinx-quickstart on Tue May 15 10:12:57 2012.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 Python-geotiepoints
 ===================
 
@@ -20,29 +15,33 @@ The source code of the module can be found on the github_ page.
 
 .. contents::
 
-Installation
-------------
+Installation - Pip
+------------------
 
-You can install the latest version of python-geotiepoints with easy_install::
+You can install the latest version of python-geotiepoints with pip::
 
-  $> easy_install python-geotiepoints
-
-or pip::
-
-  $> pip install python-geotiepoints
+   pip install python-geotiepoints
 
 Alternatively, you can download the source code from github_::
 
-  $> git clone git://github.com/adybbroe/python-geotiepoints.git
+   git clone git://github.com/adybbroe/python-geotiepoints.git
 
 and then run::
 
-  $> python setup.py install
+   pip install .
 
-or, if you want to hack the package::
+Alternatively, to install the package in a "development" mode when you
+want to edit the source code and see the effects::
 
-  $> python setup.py develop
+   pip install -e .
 
+Installation - Conda
+--------------------
+
+The python-geotiepoints package is also available on conda-forge. To install
+into an existing conda environment run::
+
+   conda install -c conda-forge python-geotiepoints
 
 Usage for longitude and latitude interpolation
 ----------------------------------------------

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright (c) 2017-2020 Python-geotiepoints developers
+# Copyright (c) 2017-2021 Python-geotiepoints developers
 #
 # This file is part of python-geotiepoints.
 #
@@ -15,14 +15,16 @@
 #
 # You should have received a copy of the GNU General Public License along with
 # python-geotiepoints.  If not, see <http://www.gnu.org/licenses/>.
-
 """Test of the interpolation of geographical tiepoints for the VII products.
+
 It follows the description provided in document "EPS-SG VII Level 1B Product Format Specification".
+
 """
 
 import unittest
 import numpy as np
 import xarray as xr
+import pytest
 from geotiepoints.viiinterpolator import tie_points_interpolation, tie_points_geo_interpolation
 
 
@@ -192,12 +194,10 @@ class TestViiInterpolator(unittest.TestCase):
         self.assertEqual(len(result_valid.coords), 0)
 
         # Test the interpolation routine with invalid input
-        with self.assertRaises(ValueError):
-            tie_points_interpolation(
-                [self.invalid_data_for_interpolation],
-                TEST_SCAN_ALT_TIE_POINTS,
-                TEST_TIE_POINTS_FACTOR
-            )[0]
+        pytest.raises(ValueError, tie_points_interpolation,
+                      [self.invalid_data_for_interpolation],
+                      TEST_SCAN_ALT_TIE_POINTS,
+                      TEST_TIE_POINTS_FACTOR)
 
     def test_tie_points_geo_interpolation(self):
         """# Test the coordinates interpolation routine with valid and invalid input."""
@@ -237,16 +237,3 @@ class TestViiInterpolator(unittest.TestCase):
                 TEST_SCAN_ALT_TIE_POINTS,
                 TEST_TIE_POINTS_FACTOR
             )
-
-
-def suite():
-    """The suite for VII interpolator"""
-    loader = unittest.TestLoader()
-    mysuite = unittest.TestSuite()
-    mysuite.addTest(loader.loadTestsFromTestCase(TestViiInterpolator))
-
-    return mysuite
-
-
-if __name__ == "__main__":
-    unittest.main()

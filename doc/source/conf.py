@@ -11,8 +11,9 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys, os
-from geotiepoints import __version__  # noqa
+import os
+import sys
+from geotiepoints import __version__
 from datetime import datetime
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -21,7 +22,6 @@ from datetime import datetime
 #sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('../../'))
 sys.path.insert(0, os.path.abspath('../../geotiepoints'))
-
 
 
 class Mock(object):
@@ -35,15 +35,14 @@ class Mock(object):
     def __getattr__(cls, name):
         if name in ('__file__', '__path__'):
             return '/dev/null'
-        elif name[0] == name[0].upper():
+        if name[0] == name[0].upper():
             mockType = type(name, (), {})
             mockType.__module__ = __name__
             return mockType
-        else:
-            return Mock()
+        return Mock()
 
 
-MOCK_MODULES = ['numpy', 'scipy.interpolate', 'scipy', 'pyresample',
+MOCK_MODULES = ['numpy', 'scipy.interpolate', 'scipy',
                 'pyhdf.SD', 'pyhdf.error']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = Mock()
@@ -75,7 +74,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'python-geotiepoints'
-copyright = u'2012-%d, Pytroll Team' % datetime.utcnow().year
+copyright = u'2012-%d, Pytroll Team' % datetime.utcnow().year  # noqa
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

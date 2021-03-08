@@ -24,16 +24,15 @@
 """Setting up the geo_interpolator project.
 """
 
-import os
 import sys
 
 from setuptools import Extension, setup
-from setuptools.command.build_ext import build_ext as _build_ext
 import versioneer
+import numpy as np
+from Cython.Build import cythonize
 
-requirements = ['numpy', 'scipy', 'pandas'],
-# unittest2 is required by h5py 2.8.0rc:
-test_requires = ['h5py', 'unittest2', 'xarray', 'dask']
+requirements = ['numpy', 'scipy', 'pandas']
+test_requires = ['h5py', 'xarray', 'dask']
 
 if sys.platform.startswith("win"):
     extra_compile_args = []
@@ -44,77 +43,14 @@ EXTENSIONS = [
     Extension(
         'geotiepoints.multilinear_cython',
         sources=['geotiepoints/multilinear_cython.pyx'],
-        extra_compile_args=extra_compile_args
+        extra_compile_args=extra_compile_args,
+        include_dirs=[np.get_include()],
     ),
-    Extension(
-        'geotiepoints.multilinear_cython',
-        sources=['geotiepoints/multilinear_cython.pyx',
-                 'geotiepoints/multilinear_cython.c'],
-        language='c', extra_compile_args=extra_compile_args,
-        depends=[]
-    )
-
 ]
 
-try:
-    from Cython.Build import cythonize
-except ImportError:
-    cythonize = None
-
-
-def set_builtin(name, value):
-    if isinstance(__builtins__, dict):
-        __builtins__[name] = value
-    else:
-        setattr(__builtins__, name, value)
-
-
 cmdclass = versioneer.get_cmdclass()
-versioneer_build_ext = cmdclass.get('build_ext', _build_ext)
-
-
-class build_ext(versioneer_build_ext):
-
-    """Work around to bootstrap numpy includes in to extensions.
-
-    Copied from:
-
-        http://stackoverflow.com/questions/19919905/how-to-bootstrap-numpy-installation-in-setup-py
-
-    """
-
-    def finalize_options(self):
-        versioneer_build_ext.finalize_options(self)
-        # Prevent numpy from thinking it is still in its setup process:
-        set_builtin('__NUMPY_SETUP__', False)
-        import numpy
-        self.include_dirs.append(numpy.get_include())
-
-
-cmdclass['build_ext'] = build_ext
 
 if __name__ == "__main__":
-    if not os.getenv("USE_CYTHON", False) or cythonize is None:
-        print(
-            "Cython will not be used. Use environment variable 'USE_CYTHON=True' to use it")
-
-        def cythonize(extensions, **dummy):
-            """Fake function to compile from C/C++ files instead of compiling .pyx files with cython.
-            """
-            for extension in extensions:
-                sources = []
-                for sfile in extension.sources:
-                    path, ext = os.path.splitext(sfile)
-                    if ext in ('.pyx', '.py'):
-                        if extension.language == 'c++':
-                            ext = '.cpp'
-                        else:
-                            ext = '.c'
-                        sfile = path + ext
-                    sources.append(sfile)
-                extension.sources[:] = sources
-            return extensions
-
     setup(name='python-geotiepoints',
           version=versioneer.get_version(),
           description='Interpolation of geographic tiepoints in Python',
@@ -130,13 +66,11 @@ if __name__ == "__main__":
           url="https://github.com/pytroll/python-geotiepoints",
           packages=['geotiepoints'],
           # packages=find_packages(),
-          setup_requires=['numpy'],
-          python_requires='>=3.4',
+          setup_requires=['numpy', 'cython'],
+          python_requires='>=3.6',
           cmdclass=cmdclass,
-
           install_requires=requirements,
           ext_modules=cythonize(EXTENSIONS),
-
           test_suite='geotiepoints.tests.suite',
           tests_require=test_requires,
           zip_safe=False
