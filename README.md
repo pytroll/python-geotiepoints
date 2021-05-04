@@ -1,9 +1,9 @@
 python-geotiepoints
 ===================
 
-[![Build Status](https://github.com/pytroll/python-geotiepoints/workflows/CI/badge.svg?branch=master)](https://github.com/pytroll/python-geotiepoints/actions?query=workflow%3A%22CI%22)
-[![Coverage Status](https://coveralls.io/repos/github/pytroll/python-geotiepoints/badge.svg?branch=master)](https://coveralls.io/github/pytroll/python-geotiepoints?branch=master)
-[![Code Health](https://landscape.io/github/pytroll/python-geotiepoints/master/landscape.svg?style=flat)](https://landscape.io/github/pytroll/python-geotiepoints/master)
+[![Build Status](https://travis-ci.org/pytroll/python-geotiepoints.svg?branch=main)](https://travis-ci.org/pytroll/python-geotiepoints)
+[![Coverage Status](https://coveralls.io/repos/github/pytroll/python-geotiepoints/badge.svg?branch=main)](https://coveralls.io/github/pytroll/python-geotiepoints?branch=main)
+[![Code Health](https://landscape.io/github/pytroll/python-geotiepoints/main/landscape.svg?style=flat)](https://landscape.io/github/pytroll/python-geotiepoints/main)
 
 
 Python-geotiepoints is a python module that interpolates (and extrapolates if
