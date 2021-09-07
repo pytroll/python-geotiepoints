@@ -32,9 +32,22 @@ in these files.
 
 """
 
+from functools import wraps
+
 import numpy as np
 from scipy.ndimage.interpolation import map_coordinates
 from .geointerpolator import get_lons_from_cartesian, get_lats_from_cartesian, EARTH_RADIUS
+
+try:
+    import dask.array as da
+except ImportError:
+    # if dask can't be imported then we aren't going to be given dask arrays
+    da = None
+
+try:
+    import xarray as xr
+except ImportError:
+    xr = None
 
 # MODIS has 10 rows of data in the array for every scan line
 ROWS_PER_SCAN = 10
@@ -49,10 +62,64 @@ def scanline_mapblocks(func):
     interpolation.
 
     """
-    return func
+    @wraps(func)
+    def _wrapper(lon_data, lat_data, res_factor=4):
+        if lon_data.ndim != 2 or lat_data.ndim != 2:
+            raise ValueError("Expected 2D lon/lat arrays.")
+        if hasattr(lon_data, "compute"):
+            # assume it is dask or xarray with dask, ensure proper chunk size
+            # if DataArray get just the dask array
+            lon_dask = lon_data.data if hasattr(lon_data, "dims") else lon_data
+            lat_dask = lat_data.data if hasattr(lat_data, "dims") else lat_data
+            lon_dask, lat_dask = _rechunk_lonlat_if_needed(lon_dask, lat_dask)
+            new_lons, new_lats = _call_map_blocks_interp(func, lon_dask, lat_dask, res_factor)
+            if hasattr(lon_data, "dims"):
+                # recreate DataArrays
+                new_lons = xr.DataArray(new_lons, dims=lon_data.dims)
+                new_lats = xr.DataArray(new_lats, dims=lon_data.dims)
+            return new_lons, new_lats
+
+        return func(lon_data, lat_data, res_factor=res_factor)
+
+    return _wrapper
 
 
-# TODO: Accept dask arrays or numpy arrays
+def _call_map_blocks_interp(func, lon_dask, lat_dask, res_factor):
+    new_row_chunks = tuple(x * res_factor for x in lon_dask.chunks[0])
+    new_col_chunks = tuple(x * res_factor for x in lon_dask.chunks[1])
+    wrapped_func = _map_blocks_handler(func)
+    res = da.map_blocks(wrapped_func, lon_dask, lat_dask, res_factor,
+                        new_axis=[0],
+                        chunks=(2, new_row_chunks, new_col_chunks),
+                        dtype=lon_dask.dtype,
+                        meta=np.empty((2, 2, 2), dtype=lon_dask.dtype))
+    return res[0], res[1]
+
+
+def _rechunk_lonlat_if_needed(lon_data, lat_data):
+    # take current chunk size and get a relatively similar chunk size
+    row_chunks = lon_data.chunks[0]
+    col_chunks = lon_data.chunks[1]
+    num_cols = lon_data.shape[-1]
+    good_row_chunks = all(x % ROWS_PER_SCAN == 0 for x in row_chunks)
+    good_col_chunks = len(col_chunks) == 1 and col_chunks[0] != num_cols
+    lonlat_same_chunks = lon_data.chunks == lat_data.chunks
+    if good_row_chunks and good_col_chunks and lonlat_same_chunks:
+        return lon_data, lat_data
+
+    new_row_chunks = (row_chunks[0] // ROWS_PER_SCAN) * ROWS_PER_SCAN
+    lon_data = lon_data.rechunk((new_row_chunks, -1))
+    lat_data = lat_data.rechunk((new_row_chunks, -1))
+    return lon_data, lat_data
+
+
+def _map_blocks_handler(func):
+    def _map_blocks_wrapper(lon_array, lat_array, res_factor):
+        lons, lats = func(lon_array, lat_array, res_factor=res_factor)
+        return np.concatenate((lons[np.newaxis], lats[np.newaxis]), axis=0)
+    return _map_blocks_wrapper
+
+
 @scanline_mapblocks
 def interpolate_geolocation_cartesian(lon_array, lat_array, res_factor=4):
     """Interpolate MODIS navigation from 1000m resolution to 250m.
@@ -60,13 +127,17 @@ def interpolate_geolocation_cartesian(lon_array, lat_array, res_factor=4):
     Python rewrite of the IDL function ``MODIS_GEO_INTERP_250`` but converts to cartesian (X, Y, Z) coordinates
     first to avoid problems with the anti-meridian/poles.
 
-    :param lon_array: MODIS 1km longitude array
-    :param lat_array: MODIS 1km latitude array
+    Arguments:
+        lon_array: Longitude data as a 2D numpy, dask, or xarray DataArray object.
+            The input data is expected to represent 1000m geolocation.
+        lat_array: Latitude data as a 2D numpy, dask, or xarray DataArray object.
+            The input data is expected to represent 1000m geolocation.
+        res_factor (int): Expansion factor for the function. Should be 2 for
+            500m output or 4 for 250m output.
 
-    :returns: MODIS 250m latitude array or 250m longitude array
+    Returns:
+        A two-element tuple (lon, lat).
 
-    If we are going from 1000m to 250m we have 4 times the size of the original
-    If we are going from 1000m to 250m we have 2 times the size of the original
     """
     num_rows, num_cols = lon_array.shape
     num_scans = int(num_rows / ROWS_PER_SCAN)
@@ -131,7 +202,7 @@ def interpolate_geolocation_cartesian(lon_array, lat_array, res_factor=4):
     new_lons = get_lons_from_cartesian(new_x, new_y)
     new_lats = get_lats_from_cartesian(new_x, new_y, new_z)
 
-    return new_lons.astype(lon_array.dtype), new_lats.astype(lat_array.dtype)
+    return new_lons.astype(lon_array.dtype), new_lats.astype(lon_array.dtype)
 
 
 # def interpolate_geolocation(nav_array):
