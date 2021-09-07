@@ -96,6 +96,7 @@ def test_basic_interp(input_func, exp_func, interp_func):
 
     if hasattr(lons, "compute"):
         lons, lats = da.compute(lons, lats)
+    # our "truth" values are from the modisinterpolator results
     atol = 0.038  # 1e-2
     rtol = 0
     np.testing.assert_allclose(lons_exp, lons, atol=atol, rtol=rtol)

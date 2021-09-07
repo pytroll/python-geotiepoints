@@ -79,11 +79,12 @@ def interpolate_geolocation_cartesian(lon_array, lat_array, res_factor=4):
     z_in = EARTH_RADIUS * np.sin(lats_rad)
 
     # Create an array of indexes that we want our result to have
-    x = np.arange(res_factor * num_cols, dtype=np.float32) * (1./res_factor)
+    x = np.arange(res_factor * num_cols, dtype=np.float32) * (1. / res_factor)
     # 0.375 for 250m, 0.25 for 500m
-    y = np.arange(res_factor * ROWS_PER_SCAN, dtype=np.float32) * (1./res_factor) - (res_factor * (1./16) + (1./8))
-    x,y = np.meshgrid(x,y)
-    coordinates = np.array([y,x]) # Used by map_coordinates, major optimization
+    y = np.arange(res_factor * ROWS_PER_SCAN, dtype=np.float32) * (1. / res_factor) - (
+                res_factor * (1. / 16) + (1. / 8))
+    x, y = np.meshgrid(x, y)
+    coordinates = np.array([y, x])  # Used by map_coordinates, major optimization
 
     new_x = np.empty((num_rows * res_factor, num_cols * res_factor), dtype=np.float64)
     new_y = new_x.copy()
@@ -100,31 +101,31 @@ def interpolate_geolocation_cartesian(lon_array, lat_array, res_factor=4):
 
         for nav_array, result_array in nav_arrays:
             # Use bilinear interpolation for all 250 meter pixels
-            map_coordinates(nav_array[ j0:j1, : ], coordinates, output=result_array[ k0:k1, : ], order=1, mode='nearest')
+            map_coordinates(nav_array[j0:j1, :], coordinates, output=result_array[k0:k1, :], order=1, mode='nearest')
 
             if res_factor == 4:
                 # Use linear extrapolation for the first two 250 meter pixels along track
-                m = (result_array[ k0 + 5, : ] - result_array[ k0 + 2, : ]) / (y[5,0] - y[2,0])
-                b = result_array[ k0 + 5, : ] - m * y[5,0]
-                result_array[ k0 + 0, : ] = m * y[0,0] + b
-                result_array[ k0 + 1, : ] = m * y[1,0] + b
+                m = (result_array[k0 + 5, :] - result_array[k0 + 2, :]) / (y[5, 0] - y[2, 0])
+                b = result_array[k0 + 5, :] - m * y[5, 0]
+                result_array[k0 + 0, :] = m * y[0, 0] + b
+                result_array[k0 + 1, :] = m * y[1, 0] + b
 
                 # Use linear extrapolation for the last  two 250 meter pixels along track
-                m = (result_array[ k0 + 37, : ] - result_array[ k0 + 34, : ]) / (y[37,0] - y[34,0])
-                b = result_array[ k0 + 37, : ] - m * y[37,0]
-                result_array[ k0 + 38, : ] = m * y[38,0] + b
-                result_array[ k0 + 39, : ] = m * y[39,0] + b
+                m = (result_array[k0 + 37, :] - result_array[k0 + 34, :]) / (y[37, 0] - y[34, 0])
+                b = result_array[k0 + 37, :] - m * y[37, 0]
+                result_array[k0 + 38, :] = m * y[38, 0] + b
+                result_array[k0 + 39, :] = m * y[39, 0] + b
             else:
                 # 500m
                 # Use linear extrapolation for the first two 250 meter pixels along track
-                m = (result_array[ k0 + 2, : ] - result_array[ k0 + 1, : ]) / (y[2,0] - y[1,0])
-                b = result_array[ k0 + 2, : ] - m * y[2,0]
-                result_array[ k0 + 0, : ] = m * y[0,0] + b
+                m = (result_array[k0 + 2, :] - result_array[k0 + 1, :]) / (y[2, 0] - y[1, 0])
+                b = result_array[k0 + 2, :] - m * y[2, 0]
+                result_array[k0 + 0, :] = m * y[0, 0] + b
 
                 # Use linear extrapolation for the last  two 250 meter pixels along track
-                m = (result_array[ k0 + 18, : ] - result_array[ k0 + 17, : ]) / (y[18,0] - y[17,0])
-                b = result_array[ k0 + 18, : ] - m * y[18,0]
-                result_array[ k0 + 19, : ] = m * y[19,0] + b
+                m = (result_array[k0 + 18, :] - result_array[k0 + 17, :]) / (y[18, 0] - y[17, 0])
+                b = result_array[k0 + 18, :] - m * y[18, 0]
+                result_array[k0 + 19, :] = m * y[19, 0] + b
 
     # Convert from cartesian to lat/lon space
     new_lons = get_lons_from_cartesian(new_x, new_y)
@@ -186,5 +187,3 @@ def modis_1km_to_250m(lon1, lat1):
 def modis_1km_to_500m(lon1, lat1):
     """Interpolate MODIS geolocation from 1km to 500m resolution."""
     return interpolate_geolocation_cartesian(lon1, lat1, res_factor=2)
-
-
