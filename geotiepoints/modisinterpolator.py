@@ -31,6 +31,8 @@ import dask.array as da
 import numpy as np
 import warnings
 
+from .geointerpolator import lonlat2xyz, xyz2lonlat
+
 R = 6371.
 # Aqua scan width and altitude in km
 scan_width = 10.00017
@@ -264,21 +266,3 @@ def modis_5km_to_250m(lon1, lat1, satz1):
                   "may result in poor quality")
     interp = ModisInterpolator(5000, 250, lon1.shape[1])
     return interp.interpolate(lon1, lat1, satz1)
-
-
-def lonlat2xyz(lons, lats):
-    """Convert lons and lats to cartesian coordinates."""
-    R = 6370997.0
-    x_coords = R * da.cos(da.deg2rad(lats)) * da.cos(da.deg2rad(lons))
-    y_coords = R * da.cos(da.deg2rad(lats)) * da.sin(da.deg2rad(lons))
-    z_coords = R * da.sin(da.deg2rad(lats))
-    return x_coords, y_coords, z_coords
-
-def xyz2lonlat(x__, y__, z__):
-    """Get longitudes from cartesian coordinates.
-    """
-    R = 6370997.0
-    lons = da.rad2deg(da.arccos(x__ / da.sqrt(x__ ** 2 + y__ ** 2))) * da.sign(y__)
-    lats = da.sign(z__) * (90 - da.rad2deg(da.arcsin(da.sqrt(x__ ** 2 + y__ ** 2) / R)))
-
-    return lons, lats

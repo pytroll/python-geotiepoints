@@ -36,7 +36,7 @@ from functools import wraps
 
 import numpy as np
 from scipy.ndimage.interpolation import map_coordinates
-from .geointerpolator import get_lons_from_cartesian, get_lats_from_cartesian, EARTH_RADIUS
+from .geointerpolator import lonlat2xyz, xyz2lonlat
 
 try:
     import dask.array as da
@@ -141,13 +141,7 @@ def interpolate_geolocation_cartesian(lon_array, lat_array, res_factor=4):
     """
     num_rows, num_cols = lon_array.shape
     num_scans = int(num_rows / ROWS_PER_SCAN)
-
-    # TODO: Extract equivalent existing logic from geointerpolator.py and use that
-    lons_rad = np.radians(lon_array)
-    lats_rad = np.radians(lat_array)
-    x_in = EARTH_RADIUS * np.cos(lats_rad) * np.cos(lons_rad)
-    y_in = EARTH_RADIUS * np.cos(lats_rad) * np.sin(lons_rad)
-    z_in = EARTH_RADIUS * np.sin(lats_rad)
+    x_in, y_in, z_in = lonlat2xyz(lon_array, lat_array)
 
     # Create an array of indexes that we want our result to have
     x = np.arange(res_factor * num_cols, dtype=np.float32) * (1. / res_factor)
@@ -198,10 +192,7 @@ def interpolate_geolocation_cartesian(lon_array, lat_array, res_factor=4):
                 b = result_array[k0 + 18, :] - m * y[18, 0]
                 result_array[k0 + 19, :] = m * y[19, 0] + b
 
-    # Convert from cartesian to lat/lon space
-    new_lons = get_lons_from_cartesian(new_x, new_y)
-    new_lats = get_lats_from_cartesian(new_x, new_y, new_z)
-
+    new_lons, new_lats = xyz2lonlat(new_x, new_y, new_z, low_lat_z=True)
     return new_lons.astype(lon_array.dtype), new_lats.astype(lon_array.dtype)
 
 

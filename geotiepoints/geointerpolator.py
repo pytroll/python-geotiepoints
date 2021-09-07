@@ -18,7 +18,6 @@
 """Geographical interpolation (lon/lats)."""
 
 import numpy as np
-from numpy import arccos, sign, rad2deg, sqrt, arcsin
 from geotiepoints.interpolator import Interpolator
 
 EARTH_RADIUS = 6370997.0
@@ -55,11 +54,7 @@ class GeoInterpolator(Interpolator):
             self.tie_data = [xyz[:, :, 0], xyz[:, :, 1], xyz[:, :, 2]]
         except AttributeError:
             self.set_tiepoints(lon_lat_data[0], lon_lat_data[1])
-            lons_rad = np.radians(self.lon_tiepoint)
-            lats_rad = np.radians(self.lat_tiepoint)
-            x__ = EARTH_RADIUS * np.cos(lats_rad) * np.cos(lons_rad)
-            y__ = EARTH_RADIUS * np.cos(lats_rad) * np.sin(lons_rad)
-            z__ = EARTH_RADIUS * np.sin(lats_rad)
+            x__, y__, z__ = lonlat2xyz(self.lon_tiepoint, self.lat_tiepoint)
             self.tie_data = [x__, y__, z__]
 
         self.new_data = [[]] * len(self.tie_data)
@@ -71,25 +66,33 @@ class GeoInterpolator(Interpolator):
 
     def interpolate(self):
         """Run the interpolation."""
-        newx, newy, newz = Interpolator.interpolate(self)
-        lon = get_lons_from_cartesian(newx, newy)
-        lat = get_lats_from_cartesian(newx, newy, newz)
+        newx, newy, newz = super().interpolate()
+        lon, lat = xyz2lonlat(newx, newy, newz, low_lat_z=True)
         return lon, lat
 
 
-def get_lons_from_cartesian(x__, y__):
+def lonlat2xyz(lons, lats, radius=EARTH_RADIUS):
+    """Convert lons and lats to cartesian coordinates."""
+    lons_rad = np.deg2rad(lons)
+    lats_rad = np.deg2rad(lats)
+    x_coords = radius * np.cos(lats_rad) * np.cos(lons_rad)
+    y_coords = radius * np.cos(lats_rad) * np.sin(lons_rad)
+    z_coords = radius * np.sin(lats_rad)
+    return x_coords, y_coords, z_coords
+
+
+def xyz2lonlat(x__, y__, z__, radius=EARTH_RADIUS, thr=0.8, low_lat_z=False):
     """Get longitudes from cartesian coordinates."""
-    return rad2deg(arccos(x__ / sqrt(x__ ** 2 + y__ ** 2))) * sign(y__)
+    lons = np.rad2deg(np.arccos(x__ / np.sqrt(x__ ** 2 + y__ ** 2))) * np.sign(y__)
+    lats = np.sign(z__) * (90 - np.rad2deg(np.arcsin(np.sqrt(x__ ** 2 + y__ ** 2) / radius)))
+    if low_lat_z:
+        # if we are at low latitudes - small z, then get the
+        # latitudes only from z. If we are at high latitudes (close to the poles)
+        # then derive the latitude using x and y:
+        lat_mask_cond = np.logical_and(
+            np.less(z__, thr * radius),
+            np.greater(z__, -1. * thr * radius))
+        lat_z_only = 90 - np.rad2deg(np.arccos(z__ / radius))
+        lats = np.where(lat_mask_cond, lat_z_only, lats)
 
-
-def get_lats_from_cartesian(x__, y__, z__, thr=0.8):
-    """Get latitudes from cartesian coordinates."""
-    # if we are at low latitudes - small z, then get the
-    # latitudes only from z. If we are at high latitudes (close to the poles)
-    # then derive the latitude using x and y:
-
-    lats = np.where(np.logical_and(np.less(z__, thr * EARTH_RADIUS),
-                                   np.greater(z__, -1. * thr * EARTH_RADIUS)),
-                    90 - rad2deg(arccos(z__ / EARTH_RADIUS)),
-                    sign(z__) * (90 - rad2deg(arcsin(sqrt(x__ ** 2 + y__ ** 2) / EARTH_RADIUS))))
-    return lats
+    return lons, lats
