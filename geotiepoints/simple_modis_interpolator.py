@@ -146,8 +146,8 @@ def interpolate_geolocation_cartesian(lon_array, lat_array, res_factor=4):
     # Create an array of indexes that we want our result to have
     x = np.arange(res_factor * num_cols, dtype=np.float32) * (1. / res_factor)
     # 0.375 for 250m, 0.25 for 500m
-    y = np.arange(res_factor * ROWS_PER_SCAN, dtype=np.float32) * (1. / res_factor) - (
-                res_factor * (1. / 16) + (1. / 8))
+    y = np.arange(res_factor * ROWS_PER_SCAN, dtype=np.float32) * \
+        (1. / res_factor) - (res_factor * (1. / 16) + (1. / 8))
     x, y = np.meshgrid(x, y)
     coordinates = np.array([y, x])  # Used by map_coordinates, major optimization
 
