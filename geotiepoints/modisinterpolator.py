@@ -201,16 +201,7 @@ class ModisInterpolator(object):
         a_scan = (s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full)
 
         res = []
-
-        sublat = lat1[::16, ::16]
-        sublon = lon1[::16, ::16]
-        to_cart = abs(sublat).max() > 60 or (sublon.max() - sublon.min()) > 180
-
-        if to_cart:
-            datasets = lonlat2xyz(lon1, lat1)
-        else:
-            datasets = [lon1, lat1]
-
+        datasets = lonlat2xyz(lon1, lat1)
         for data in datasets:
             data_attrs = data.attrs
             dims = data.dims
@@ -228,10 +219,7 @@ class ModisInterpolator(object):
 
             res.append(xr.DataArray(data, attrs=data_attrs, dims=dims))
 
-        if to_cart:
-            return xyz2lonlat(*res)
-        else:
-            return res
+        return xyz2lonlat(*res)
 
 
 def modis_1km_to_250m(lon1, lat1, satz1):
