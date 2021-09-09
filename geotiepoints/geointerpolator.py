@@ -44,25 +44,19 @@ class GeoInterpolator(Interpolator):
     """
 
     def __init__(self, lon_lat_data, *args, **kwargs):
-        super().__init__(None, *args, **kwargs)
-        self.lon_tiepoint = None
-        self.lat_tiepoint = None
         try:
             # Maybe it's a pyresample object ?
-            self.set_tiepoints(lon_lat_data.lons, lon_lat_data.lats)
+            self.lon_tiepoint = lon_lat_data.lons
+            self.lat_tiepoint = lon_lat_data.lats
             xyz = lon_lat_data.get_cartesian_coords()
-            self.tie_data = [xyz[:, :, 0], xyz[:, :, 1], xyz[:, :, 2]]
+            tie_data = [xyz[:, :, 0], xyz[:, :, 1], xyz[:, :, 2]]
         except AttributeError:
-            self.set_tiepoints(lon_lat_data[0], lon_lat_data[1])
+            self.lon_tiepoint = lon_lat_data[0]
+            self.lat_tiepoint = lon_lat_data[1]
             x__, y__, z__ = lonlat2xyz(self.lon_tiepoint, self.lat_tiepoint)
-            self.tie_data = [x__, y__, z__]
+            tie_data = [x__, y__, z__]
 
-        self.new_data = [[]] * len(self.tie_data)
-
-    def set_tiepoints(self, lon, lat):
-        """Define the lon,lat tie points."""
-        self.lon_tiepoint = lon
-        self.lat_tiepoint = lat
+        super().__init__(tie_data, *args, **kwargs)
 
     def interpolate(self):
         """Run the interpolation."""
