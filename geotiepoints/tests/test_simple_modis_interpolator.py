@@ -105,6 +105,15 @@ def test_basic_interp(input_func, exp_func, interp_func):
     assert not np.any(np.isnan(lats))
 
 
+def test_nonstandard_scan_size():
+    lon1, lat1 = _load_1km_lonlat_as_xarray_dask()
+    # remove 1 row from the end
+    lon1 = lon1[:-1]
+    lat1 = lat1[:-1]
+
+    pytest.raises(ValueError, modis_1km_to_250m, lon1, lat1)
+
+
 # def test_poles_datum(self):
 #     import xarray as xr
 #     h5f = h5py.File(FILENAME_DATA, 'r')

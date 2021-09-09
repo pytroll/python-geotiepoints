@@ -100,10 +100,14 @@ def _rechunk_lonlat_if_needed(lon_data, lat_data):
     # take current chunk size and get a relatively similar chunk size
     row_chunks = lon_data.chunks[0]
     col_chunks = lon_data.chunks[1]
+    num_rows = lon_data.shape[0]
     num_cols = lon_data.shape[-1]
     good_row_chunks = all(x % ROWS_PER_SCAN == 0 for x in row_chunks)
     good_col_chunks = len(col_chunks) == 1 and col_chunks[0] != num_cols
     lonlat_same_chunks = lon_data.chunks == lat_data.chunks
+    if num_rows % ROWS_PER_SCAN != 0:
+        raise ValueError("Input longitude/latitude data does not consist of "
+                         "whole scans (10 rows per scan).")
     if good_row_chunks and good_col_chunks and lonlat_same_chunks:
         return lon_data, lat_data
 
