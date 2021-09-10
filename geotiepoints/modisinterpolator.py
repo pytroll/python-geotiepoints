@@ -31,6 +31,8 @@ import dask.array as da
 import numpy as np
 import warnings
 
+from .geointerpolator import lonlat2xyz, xyz2lonlat
+
 R = 6371.
 # Aqua scan width and altitude in km
 scan_width = 10.00017
@@ -199,19 +201,8 @@ class ModisInterpolator(object):
         a_scan = (s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full)
 
         res = []
-
-        sublat = lat1[::16, ::16]
-        sublon = lon1[::16, ::16]
-        to_cart = abs(sublat).max() > 60 or (sublon.max() - sublon.min()) > 180
-
-        if to_cart:
-            datasets = lonlat2xyz(lon1, lat1)
-        else:
-            datasets = [lon1, lat1]
-
+        datasets = lonlat2xyz(lon1, lat1)
         for data in datasets:
-            data_attrs = data.attrs
-            dims = data.dims
             data = data.data
             data = data.reshape((-1, cscan_len, cscan_full_width))
             data_a, data_b, data_c, data_d = get_corners(data)
@@ -224,12 +215,9 @@ class ModisInterpolator(object):
             data_2 = (1 - a_scan) * data_d + a_scan * data_c
             data = (1 - a_track) * data_1 + a_track * data_2
 
-            res.append(xr.DataArray(data, attrs=data_attrs, dims=dims))
-
-        if to_cart:
-            return xyz2lonlat(*res)
-        else:
-            return res
+            res.append(data)
+        lon, lat = xyz2lonlat(*res)
+        return xr.DataArray(lon, dims=lon1.dims), xr.DataArray(lat, dims=lat1.dims)
 
 
 def modis_1km_to_250m(lon1, lat1, satz1):
@@ -264,21 +252,3 @@ def modis_5km_to_250m(lon1, lat1, satz1):
                   "may result in poor quality")
     interp = ModisInterpolator(5000, 250, lon1.shape[1])
     return interp.interpolate(lon1, lat1, satz1)
-
-
-def lonlat2xyz(lons, lats):
-    """Convert lons and lats to cartesian coordinates."""
-    R = 6370997.0
-    x_coords = R * da.cos(da.deg2rad(lats)) * da.cos(da.deg2rad(lons))
-    y_coords = R * da.cos(da.deg2rad(lats)) * da.sin(da.deg2rad(lons))
-    z_coords = R * da.sin(da.deg2rad(lats))
-    return x_coords, y_coords, z_coords
-
-def xyz2lonlat(x__, y__, z__):
-    """Get longitudes from cartesian coordinates.
-    """
-    R = 6370997.0
-    lons = da.rad2deg(da.arccos(x__ / da.sqrt(x__ ** 2 + y__ ** 2))) * da.sign(y__)
-    lats = da.sign(z__) * (90 - da.rad2deg(da.arcsin(da.sqrt(x__ ** 2 + y__ ** 2) / R)))
-
-    return lons, lats

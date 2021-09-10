@@ -32,7 +32,7 @@ import numpy as np
 from Cython.Build import cythonize
 
 requirements = ['numpy', 'scipy', 'pandas']
-test_requires = ['h5py', 'xarray', 'dask']
+test_requires = ['pytest', 'pytest-cov', 'h5py', 'xarray', 'dask']
 
 if sys.platform.startswith("win"):
     extra_compile_args = []
@@ -71,7 +71,6 @@ if __name__ == "__main__":
           cmdclass=cmdclass,
           install_requires=requirements,
           ext_modules=cythonize(EXTENSIONS),
-          test_suite='geotiepoints.tests.suite',
           tests_require=test_requires,
           zip_safe=False
           )

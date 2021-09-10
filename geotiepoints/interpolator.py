@@ -104,10 +104,7 @@ class Interpolator(object):
         else:
             self.tie_data = list(data)
 
-        self.new_data = []
-        for num in range(len(self.tie_data)):
-            self.new_data.append([])
-
+        self.new_data = [[] for _ in self.tie_data]
         self.kx_, self.ky_ = kx_, ky_
 
     def fill_borders(self, *args):
