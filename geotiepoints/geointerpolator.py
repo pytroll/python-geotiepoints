@@ -61,7 +61,7 @@ class GeoInterpolator(Interpolator):
     def interpolate(self):
         """Run the interpolation."""
         newx, newy, newz = super().interpolate()
-        lon, lat = xyz2lonlat(newx, newy, newz, low_lat_z=True)
+        lon, lat = xyz2lonlat(newx, newy, newz)
         return lon, lat
 
 
@@ -75,7 +75,7 @@ def lonlat2xyz(lons, lats, radius=EARTH_RADIUS):
     return x_coords, y_coords, z_coords
 
 
-def xyz2lonlat(x__, y__, z__, radius=EARTH_RADIUS, thr=0.8, low_lat_z=False):
+def xyz2lonlat(x__, y__, z__, radius=EARTH_RADIUS, thr=0.8, low_lat_z=True):
     """Get longitudes from cartesian coordinates."""
     lons = np.rad2deg(np.arccos(x__ / np.sqrt(x__ ** 2 + y__ ** 2))) * np.sign(y__)
     lats = np.sign(z__) * (90 - np.rad2deg(np.arcsin(np.sqrt(x__ ** 2 + y__ ** 2) / radius)))

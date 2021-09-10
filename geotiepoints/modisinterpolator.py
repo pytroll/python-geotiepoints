@@ -203,8 +203,6 @@ class ModisInterpolator(object):
         res = []
         datasets = lonlat2xyz(lon1, lat1)
         for data in datasets:
-            data_attrs = data.attrs
-            dims = data.dims
             data = data.data
             data = data.reshape((-1, cscan_len, cscan_full_width))
             data_a, data_b, data_c, data_d = get_corners(data)
@@ -217,9 +215,9 @@ class ModisInterpolator(object):
             data_2 = (1 - a_scan) * data_d + a_scan * data_c
             data = (1 - a_track) * data_1 + a_track * data_2
 
-            res.append(xr.DataArray(data, attrs=data_attrs, dims=dims))
-
-        return xyz2lonlat(*res)
+            res.append(data)
+        lon, lat = xyz2lonlat(*res)
+        return xr.DataArray(lon, dims=lon1.dims), xr.DataArray(lat, dims=lat1.dims)
 
 
 def modis_1km_to_250m(lon1, lat1, satz1):
