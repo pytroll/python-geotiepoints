@@ -199,13 +199,15 @@ def interpolate_geolocation_cartesian(lon_array, lat_array, res_factor=4):
 
 
 def _calc_slope_offset_250(result_array, y, start_idx, offset):
-    m = (result_array[start_idx + offset + 3, :] - result_array[start_idx + offset, :]) / (y[offset + 3, 0] - y[offset, 0])
+    m = (result_array[start_idx + offset + 3, :] - result_array[start_idx + offset, :]) / \
+        (y[offset + 3, 0] - y[offset, 0])
     b = result_array[start_idx + offset + 3, :] - m * y[offset + 3, 0]
     return m, b
 
 
 def _calc_slope_offset_500(result_array, y, start_idx, offset):
-    m = (result_array[start_idx + offset + 1, :] - result_array[start_idx + offset, :]) / (y[offset + 1, 0] - y[offset, 0])
+    m = (result_array[start_idx + offset + 1, :] - result_array[start_idx + offset, :]) / \
+        (y[offset + 1, 0] - y[offset, 0])
     b = result_array[start_idx + offset + 1, :] - m * y[offset + 1, 0]
     return m, b
 
