@@ -174,30 +174,40 @@ def interpolate_geolocation_cartesian(lon_array, lat_array, res_factor=4):
 
             if res_factor == 4:
                 # Use linear extrapolation for the first two 250 meter pixels along track
-                m = (result_array[k0 + 5, :] - result_array[k0 + 2, :]) / (y[5, 0] - y[2, 0])
-                b = result_array[k0 + 5, :] - m * y[5, 0]
+                m, b = _calc_slope_offset_250(result_array, y, k0, 2)
                 result_array[k0 + 0, :] = m * y[0, 0] + b
                 result_array[k0 + 1, :] = m * y[1, 0] + b
 
                 # Use linear extrapolation for the last  two 250 meter pixels along track
-                m = (result_array[k0 + 37, :] - result_array[k0 + 34, :]) / (y[37, 0] - y[34, 0])
-                b = result_array[k0 + 37, :] - m * y[37, 0]
+                # m = (result_array[k0 + 37, :] - result_array[k0 + 34, :]) / (y[37, 0] - y[34, 0])
+                # b = result_array[k0 + 37, :] - m * y[37, 0]
+                m, b = _calc_slope_offset_250(result_array, y, k0, 34)
                 result_array[k0 + 38, :] = m * y[38, 0] + b
                 result_array[k0 + 39, :] = m * y[39, 0] + b
             else:
                 # 500m
                 # Use linear extrapolation for the first two 250 meter pixels along track
-                m = (result_array[k0 + 2, :] - result_array[k0 + 1, :]) / (y[2, 0] - y[1, 0])
-                b = result_array[k0 + 2, :] - m * y[2, 0]
+                m, b = _calc_slope_offset_500(result_array, y, k0, 1)
                 result_array[k0 + 0, :] = m * y[0, 0] + b
 
-                # Use linear extrapolation for the last  two 250 meter pixels along track
-                m = (result_array[k0 + 18, :] - result_array[k0 + 17, :]) / (y[18, 0] - y[17, 0])
-                b = result_array[k0 + 18, :] - m * y[18, 0]
+                # Use linear extrapolation for the last two 250 meter pixels along track
+                m, b = _calc_slope_offset_500(result_array, y, k0, 17)
                 result_array[k0 + 19, :] = m * y[19, 0] + b
 
     new_lons, new_lats = xyz2lonlat(new_x, new_y, new_z, low_lat_z=True)
     return new_lons.astype(lon_array.dtype), new_lats.astype(lon_array.dtype)
+
+
+def _calc_slope_offset_250(result_array, y, start_idx, offset):
+    m = (result_array[start_idx + offset + 3, :] - result_array[start_idx + offset, :]) / (y[offset + 3, 0] - y[offset, 0])
+    b = result_array[start_idx + offset + 3, :] - m * y[offset + 3, 0]
+    return m, b
+
+
+def _calc_slope_offset_500(result_array, y, start_idx, offset):
+    m = (result_array[start_idx + offset + 1, :] - result_array[start_idx + offset, :]) / (y[offset + 1, 0] - y[offset, 0])
+    b = result_array[start_idx + offset + 1, :] - m * y[offset + 1, 0]
+    return m, b
 
 
 def modis_1km_to_250m(lon1, lat1):
