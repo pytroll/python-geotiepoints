@@ -1,3 +1,14 @@
+## Version 1.3.0 (2021/09/12)
+
+### Pull Requests Merged
+
+#### Features added
+
+* [PR 31](https://github.com/pytroll/python-geotiepoints/pull/31) - Add simple lon/lat based MODIS interpolation
+
+In this release 1 pull request was closed.
+
+
 ## Version 1.2.1 (2021/03/08)
 
 ### Issues Closed
