@@ -62,7 +62,7 @@ class MultilinearInterpolator:
     def __init__(self, smin, smax, orders, values=None, dtype=np.float64):
         self.smin = np.array(smin, dtype=dtype)
         self.smax = np.array(smax, dtype=dtype)
-        self.orders = np.array(orders, dtype=np.int64)
+        self.orders = np.array(orders, dtype=np.int_)
         self.d = len(orders)
         self.dtype = dtype
         if values is not None:
