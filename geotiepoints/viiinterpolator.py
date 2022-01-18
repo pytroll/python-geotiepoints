@@ -82,21 +82,21 @@ def tie_points_interpolation(data_on_tie_points, scan_alt_tie_points, tie_points
     for data in data_on_tie_points:
 
         # create an xarray to hold the data on pixel grid (note the coords get renamed later so keep the old names)
-        rads= da.zeros((n_pixel_alt, n_pixel_act))
-        pix_act=da.zeros(n_pixel_act)
-        pix_alt=da.zeros(n_pixel_alt)
+        rads = da.zeros((n_pixel_alt, n_pixel_act))
+        pix_act = da.zeros(n_pixel_act)
+        pix_alt = da.zeros(n_pixel_alt)
 
-        data_on_pixel_points_granule=xr.DataArray(rads, dims=['num_tie_points_alt', 'num_tie_points_act'],
-                            coords={'num_tie_points_alt': pix_alt, 'num_tie_points_act': pix_act})
+        data_on_pixel_points_granule = xr.DataArray(rads, dims=['num_tie_points_alt', 'num_tie_points_act'],
+                         coords={'num_tie_points_alt': pix_alt, 'num_tie_points_act': pix_act})
         data_on_pixel_points_granule.attrs = combine_metadata(data)
-
 
         # loop over scans
         for j_scan in range(n_scans):
             index_tie_points_start = j_scan * scan_alt_tie_points
             index_tie_points_end = (j_scan * scan_alt_tie_points)+scan_alt_tie_points
-            index_pixel_start = j_scan * (scan_alt_tie_points-1) * tie_points_factor
-            index_pixel_end = (j_scan * (scan_alt_tie_points-1) * tie_points_factor)+(scan_alt_tie_points-1) * tie_points_factor
+            index_pixel_start = j_scan * (scan_alt_tie_points - 1) * tie_points_factor
+            index_pixel_end = (j_scan * (scan_alt_tie_points - 1) * tie_points_factor) + \
+                              (scan_alt_tie_points - 1) * tie_points_factor
 
             data_on_tie_points_scan = data[index_tie_points_start:index_tie_points_end, :]
 
@@ -105,10 +105,8 @@ def tie_points_interpolation(data_on_tie_points, scan_alt_tie_points, tie_points
             data_pixel = data_on_tie_points_scan.interp({dim_alt: pixels_grid_alt_scan}, assume_sorted=True) \
                 .interp({dim_act: pixels_grid_act}, assume_sorted=True).drop_vars([dim_alt, dim_act])
 
-
             # put the interpolated data in the pixel resolution granule
-            data_on_pixel_points_granule[index_pixel_start:index_pixel_end,:] = data_pixel
-
+            data_on_pixel_points_granule[index_pixel_start:index_pixel_end, :] = data_pixel
 
         data_on_pixel_points.append(data_on_pixel_points_granule)
 
