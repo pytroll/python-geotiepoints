@@ -22,8 +22,9 @@ Tiepoints are typically subsampled by a factor 8 with respect to the pixels, alo
 Due to the bowtie effect, the pixel sampling pattern is discontinuous at the swath edge. As a result, each scan has
 the interpolation is more accurate when performed intra-scan and not inter-scan with discontinuous sampling regions.
 This version uses all tie points for individual scans which are then subsequently re-assembled into granules
-before return as per PFS. It is also modified to work with vii test data V2 to be released
-in Jan 2022 which has the data stored in alt, act (row,col) format instead of act,alt (col,row) """
+before return as per PFS (although at visual inspection level there appears to be little difference in the resulting
+images). It is also modified to work with vii test data V2 to be released Jan 2022 which has the data stored
+in alt, act (row,col) format instead of act,alt (col,row) """
 
 import xarray as xr
 import dask.array as da
@@ -84,11 +85,9 @@ def tie_points_interpolation(data_on_tie_points, scan_alt_tie_points, tie_points
         rads= da.zeros((n_pixel_alt, n_pixel_act))
         pix_act=da.zeros(n_pixel_act)
         pix_alt=da.zeros(n_pixel_alt)
-        #print('rads ', rads.flags)
 
         data_on_pixel_points_granule=xr.DataArray(rads, dims=['num_tie_points_alt', 'num_tie_points_act'],
                             coords={'num_tie_points_alt': pix_alt, 'num_tie_points_act': pix_act})
-                            #attrs=data.attrs
         data_on_pixel_points_granule.attrs = combine_metadata(data)
 
 
