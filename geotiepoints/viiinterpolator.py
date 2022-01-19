@@ -65,7 +65,7 @@ def tie_points_interpolation(data_on_tie_points, scan_alt_tie_points, tie_points
 
     # Compute the dimensions of the pixel points array across and along track
     n_pixel_act = (n_tie_act - 1) * tie_points_factor
-    n_pixel_alt=(scan_alt_tie_points-1) * tie_points_factor * n_scans
+    n_pixel_alt = (scan_alt_tie_points - 1) * tie_points_factor * n_scans
 
     # Create the grids used for interpolation across the track
     tie_grid_act = da.arange(0, n_pixel_act + 1, tie_points_factor)
@@ -87,13 +87,13 @@ def tie_points_interpolation(data_on_tie_points, scan_alt_tie_points, tie_points
         pix_alt = da.zeros(n_pixel_alt)
 
         data_on_pixel_points_granule = xr.DataArray(rads, dims=['num_tie_points_alt', 'num_tie_points_act'],
-                         coords={'num_tie_points_alt': pix_alt, 'num_tie_points_act': pix_act})
+                                            coords={'num_tie_points_alt': pix_alt, 'num_tie_points_act': pix_act})
         data_on_pixel_points_granule.attrs = combine_metadata(data)
 
         # loop over scans
         for j_scan in range(n_scans):
             index_tie_points_start = j_scan * scan_alt_tie_points
-            index_tie_points_end = (j_scan * scan_alt_tie_points)+scan_alt_tie_points
+            index_tie_points_end = (j_scan * scan_alt_tie_points) + scan_alt_tie_points
             index_pixel_start = j_scan * (scan_alt_tie_points - 1) * tie_points_factor
             index_pixel_end = (j_scan * (scan_alt_tie_points - 1) * tie_points_factor) + \
                               (scan_alt_tie_points - 1) * tie_points_factor
