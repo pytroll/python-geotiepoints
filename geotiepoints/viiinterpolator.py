@@ -86,8 +86,9 @@ def tie_points_interpolation(data_on_tie_points, scan_alt_tie_points, tie_points
         pix_act = da.zeros(n_pixel_act)
         pix_alt = da.zeros(n_pixel_alt)
 
-        data_on_pixel_points_granule = xr.DataArray(rads, dims=['num_tie_points_alt', 'num_tie_points_act'],
-                                            coords={'num_tie_points_alt': pix_alt, 'num_tie_points_act': pix_act})
+        data_on_pixel_points_granule = \
+            xr.DataArray(rads, dims=['num_tie_points_alt', 'num_tie_points_act'],
+                         coords={'num_tie_points_alt': pix_alt, 'num_tie_points_act': pix_act})
         data_on_pixel_points_granule.attrs = combine_metadata(data)
 
         # loop over scans
