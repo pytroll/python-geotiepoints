@@ -1,3 +1,18 @@
+## Version 1.3.1 (2022/02/04)
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 33](https://github.com/pytroll/python-geotiepoints/pull/33) - Fix deprecated use of np.int
+
+#### Features added
+
+* [PR 32](https://github.com/pytroll/python-geotiepoints/pull/32) - Change tested Python versions to 3.8, 3.9 and 3.10
+
+In this release 2 pull requests were closed.
+
+
 ## Version 1.3.0 (2021/09/12)
 
 ### Pull Requests Merged
