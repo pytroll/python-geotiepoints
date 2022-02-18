@@ -21,10 +21,12 @@ It follows the description provided in document "EPS-SG VII Level 1B Product For
 Tiepoints are typically subsampled by a factor 8 with respect to the pixels, along and across the satellite track.
 Because of the bowtie effect, tiepoints at the scan edges are not continuous between neighbouring scans,
 therefore each scan has its own edge tiepoints in the along-track direction.
-Each scan typically extends on 3 tiepoints in the along-track direction.
-At the edges of a given scan (both along and across track) the tie points lie outside the original data point raster
-and are therefore excluded from the interpolation grid.
+However, for computational efficiency, the edge tie points that lie outside the original data point raster
+are excluded from the interpolation grid which is then carried out per granule, rather than per scan
+at a (very) small geolocation accuracy cost at the swath edge (investigation to quantify this ongoing).
 The interpolation functions are implemented for xarray.DataArrays as input.
+This version works with vii test data V2 to be released Jan 2022 which has the data stored
+in alt, act (row,col) format instead of act,alt (col,row)
 """
 
 import xarray as xr
@@ -37,22 +39,18 @@ MEAN_EARTH_RADIUS = 6371008.7714  # [m]
 
 def tie_points_interpolation(data_on_tie_points, scan_alt_tie_points, tie_points_factor):
     """Interpolate the data from the tie points to the pixel points.
-
     The data are provided as a list of xarray DataArray objects, allowing to interpolate on several arrays
     at the same time; however the individual arrays must have exactly the same dimensions.
-
     Args:
         data_on_tie_points: list of xarray DataArray objects containing the values defined on the tie points.
         scan_alt_tie_points: number of tie points along the satellite track for each scan
         tie_points_factor: sub-sampling factor of tie points wrt pixel points
-
     Returns:
         list of xarray DataArray objects containing the interpolated values on the pixel points.
-
     """
     # Extract the dimensions of the tie points array across and along track
-    n_tie_act, n_tie_alt = data_on_tie_points[0].shape
-    dim_act, dim_alt = data_on_tie_points[0].dims
+    n_tie_alt, n_tie_act = data_on_tie_points[0].shape
+    dim_alt, dim_act = data_on_tie_points[0].dims
 
     # Check that the number of tie points along track is multiple of the number of tie points per scan
     if n_tie_alt % scan_alt_tie_points != 0:
@@ -68,12 +66,13 @@ def tie_points_interpolation(data_on_tie_points, scan_alt_tie_points, tie_points
 
     # Create the grids used for interpolation across the track
     tie_grid_act = da.arange(0, n_pixel_act + 1, tie_points_factor)
-    pixels_grid_act = da.arange(0, n_pixel_act)
+    pixel_grid_act = da.arange(0, n_pixel_act)
 
     # Create the grids used for the interpolation along the track (must not include the spurious points between scans)
     tie_grid_alt = da.arange(0, n_pixel_alt + 1, tie_points_factor)
     n_pixel_alt_per_scan = (scan_alt_tie_points - 1) * tie_points_factor
     pixel_grid_alt = []
+
     for j_scan in range(n_scans):
         start_index_scan = j_scan * scan_alt_tie_points * tie_points_factor
         pixel_grid_alt.append(da.arange(start_index_scan, start_index_scan + n_pixel_alt_per_scan))
@@ -83,18 +82,19 @@ def tie_points_interpolation(data_on_tie_points, scan_alt_tie_points, tie_points
     data_on_pixel_points = []
     for data in data_on_tie_points:
 
-        if data.shape != (n_tie_act, n_tie_alt) or data.dims != (dim_act, dim_alt):
+        if data.shape != (n_tie_alt, n_tie_act) or data.dims != (dim_alt, dim_act):
             raise ValueError("The dimensions of the arrays are not consistent")
 
         # Interpolate using the xarray interp function twice: first across, then along the scan
         # (much faster than interpolating directly in the two dimensions)
-        data = data.assign_coords({dim_act: tie_grid_act, dim_alt: tie_grid_alt})
-        data_pixel = data.interp({dim_act: pixels_grid_act}, assume_sorted=True) \
-                         .interp({dim_alt: pixel_grid_alt}, assume_sorted=True).drop_vars([dim_act, dim_alt])
+        data = data.assign_coords({dim_alt: tie_grid_alt, dim_act: tie_grid_act})
+        data_pixel = data.interp({dim_alt: pixel_grid_alt}, assume_sorted=True) \
+                         .interp({dim_act: pixel_grid_act}, assume_sorted=True).drop_vars([dim_alt, dim_act])
 
         data_on_pixel_points.append(data_pixel)
 
     return data_on_pixel_points
+
 
 
 def tie_points_geo_interpolation(longitude, latitude,

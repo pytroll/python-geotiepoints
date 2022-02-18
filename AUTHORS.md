@@ -14,4 +14,5 @@ The following people have made contributions to this project:
 - [Mikhail Itkin (mitkin)](https://github.com/mitkin)
 - [Sauli Joro (sjoro)](https://github.com/sjoro)
 - [Panu Lahtinen (pnuu)](https://github.com/pnuu)
+- [Pepe Phillips (pepephillips)](https://github.com/pepephillips)
 - [Martin Raspaud (mraspaud)](https://github.com/mraspaud)
