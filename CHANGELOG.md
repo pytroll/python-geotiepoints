@@ -1,3 +1,15 @@
+## Version 1.4.0 (2022/02/21)
+
+
+### Pull Requests Merged
+
+#### Features added
+
+* [PR 34](https://github.com/pytroll/python-geotiepoints/pull/34) - Updated interpolator for vii tie points for test data version V2 
+
+In this release 1 pull request was closed.
+
+
 ## Version 1.3.1 (2022/02/04)
 
 ### Pull Requests Merged
