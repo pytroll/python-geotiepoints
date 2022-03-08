@@ -40,30 +40,30 @@ scan_width = 10.00017
 H = 705.
 
 
-def compute_phi(zeta):
+def _compute_phi(zeta):
     return np.arcsin(R * np.sin(zeta) / (R + H))
 
 
-def compute_theta(zeta, phi):
+def _compute_theta(zeta, phi):
     return zeta - phi
 
 
-def compute_zeta(phi):
+def _compute_zeta(phi):
     return np.arcsin((R + H) * np.sin(phi) / R)
 
 
-def compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d):
+def _compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d):
     """All angles in radians."""
     zeta_a = satz_a
     zeta_b = satz_b
 
-    phi_a = compute_phi(zeta_a)
-    phi_b = compute_phi(zeta_b)
-    theta_a = compute_theta(zeta_a, phi_a)
-    theta_b = compute_theta(zeta_b, phi_b)
+    phi_a = _compute_phi(zeta_a)
+    phi_b = _compute_phi(zeta_b)
+    theta_a = _compute_theta(zeta_a, phi_a)
+    theta_b = _compute_theta(zeta_b, phi_b)
     phi = (phi_a + phi_b) / 2
-    zeta = compute_zeta(phi)
-    theta = compute_theta(zeta, phi)
+    zeta = _compute_zeta(phi)
+    theta = _compute_theta(zeta, phi)
     # Workaround for tiepoints symetrical about the subsatellite-track
     denominator = np.where(theta_a == theta_b, theta_a * 2, theta_a - theta_b)
 
@@ -79,7 +79,7 @@ def compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d):
     return c_expansion, c_alignment
 
 
-def get_corners(arr):
+def _get_corners(arr):
     arr_a = arr[:, :-1, :-1]
     arr_b = arr[:, :-1, 1:]
     arr_c = arr[:, 1:, 1:]
@@ -156,9 +156,9 @@ def _interpolate(
     scans = satz1.shape[0] // cscan_len
     satz1 = satz1.reshape((-1, cscan_len, cscan_full_width))
 
-    satz_a, satz_b, satz_c, satz_d = get_corners(np.deg2rad(satz1))
+    satz_a, satz_b, satz_c, satz_d = _get_corners(np.deg2rad(satz1))
 
-    c_exp, c_ali = compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d)
+    c_exp, c_ali = _compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d)
 
     x, y = get_coords(cscan_len, cscan_full_width, fscan_len, fscan_width, fscan_full_width, scans)
     i_rs, i_rt = np.meshgrid(x, y)
@@ -182,7 +182,7 @@ def _interpolate(
     datasets = lonlat2xyz(lon1, lat1)
     for data in datasets:
         data = data.reshape((-1, cscan_len, cscan_full_width))
-        data_a, data_b, data_c, data_d = get_corners(data)
+        data_a, data_b, data_c, data_d = _get_corners(data)
         data_a = expand_tiepoint_array(cscan_width, cscan_full_width, fscan_width, data_a, lines, cols)
         data_b = expand_tiepoint_array(cscan_width, cscan_full_width, fscan_width, data_b, lines, cols)
         data_c = expand_tiepoint_array(cscan_width, cscan_full_width, fscan_width, data_c, lines, cols)
