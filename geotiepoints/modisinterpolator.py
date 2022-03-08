@@ -101,6 +101,7 @@ class ModisInterpolator:
         self._course_pixels_per_1km = course_resolution // 1000
 
         self._course_resolution = course_resolution
+        self._fine_resolution = fine_resolution
         self._res_factor = course_resolution // fine_resolution
         fine_pixels_per_1km = {
             250: 4,
@@ -114,11 +115,6 @@ class ModisInterpolator:
         self.fine_scan_length = fine_pixels_per_1km * 10 // self.course_scan_length
 
     def interpolate(self, orig_lons, orig_lats, satz1):
-        course_scan_length = self.course_scan_length
-        course_scan_width = self.course_scan_width
-
-        fine_pixels_per_course_pixel = self.fine_pixels_per_course_pixel
-        fine_scan_length = self.fine_scan_length
         new_lons, new_lats = _interpolate(
             orig_lons,
             orig_lats,
@@ -127,6 +123,7 @@ class ModisInterpolator:
             self.course_scan_length,
             self._course_pixels_per_1km,
             self.course_scan_width,
+            self._fine_resolution,
             self.fine_scan_length,
             self.fine_pixels_per_course_pixel,
             self.fine_scan_width,
@@ -145,6 +142,7 @@ def _interpolate(
     course_scan_length,
     course_pixels_per_1km,
     course_scan_width,
+    fine_resolution,
     fine_scan_length,
     fine_pixels_per_course_pixel,
     fine_scan_width,
@@ -258,14 +256,16 @@ def _get_coords_1km(
     fine_scan_width,
     scans,
 ):
-    y = (np.arange((course_scan_length + 1) * fine_scan_length) % fscan_len) + 0.5
-    y = y[fine_scan_length // 2 : -(fscan_len // 2)]
-    y[: fine_scan_length // 2] = np.arange(-fscan_len / 2 + 0.5, 0)
-    y[-(fine_scan_length // 2) :] = np.arange(fscan_len + 0.5, fscan_len * 3 / 2)
+    y = (
+        np.arange((course_scan_length + 1) * fine_scan_length) % fine_scan_length
+    ) + 0.5
+    y = y[fine_scan_length // 2 : -(fine_scan_length // 2)]
+    y[: fine_scan_length // 2] = np.arange(-fine_scan_length / 2 + 0.5, 0)
+    y[-(fine_scan_length // 2) :] = np.arange(fine_scan_length + 0.5, fine_scan_length * 3 / 2)
     y = np.tile(y, scans)
 
     x = np.arange(fine_scan_width) % fine_pixels_per_course_pixel
-    x[-fine_pixels_per_course_pixel:] = np.arange(fscan_width, fscan_width * 2)
+    x[-fine_pixels_per_course_pixel:] = np.arange(fine_pixels_per_course_pixel, fine_pixels_per_course_pixel * 2)
     return x, y
 
 
@@ -302,7 +302,12 @@ def _get_coords_5km(
 
 
 def _expand_tiepoint_array_1km(
-    cscan_width, course_scan_width, fine_pixels_per_course_pixel, arr, lines, cols
+    course_pixels_per_1km,
+    course_scan_width,
+    fine_pixels_per_course_pixel,
+    arr,
+    lines,
+    cols,
 ):
     arr = np.repeat(arr, lines, axis=1)
     arr = np.concatenate(
@@ -313,11 +318,16 @@ def _expand_tiepoint_array_1km(
 
 
 def _expand_tiepoint_array_5km(
-    cscan_width, course_scan_width, fine_pixels_per_course_pixel, arr, lines, cols
+    course_pixels_per_1km,
+    course_scan_width,
+    fine_pixels_per_course_pixel,
+    arr,
+    lines,
+    cols,
 ):
     arr = np.repeat(arr, lines * 2, axis=1)
     arr = np.repeat(arr.reshape((-1, course_scan_width - 1)), cols, axis=1)
-    factor = fine_pixels_per_course_pixel // cscan_width
+    factor = fine_pixels_per_course_pixel // course_pixels_per_1km
     if course_scan_width == 271:
         return np.hstack((arr[:, : 2 * factor], arr, arr[:, -2 * factor :]))
     else:
