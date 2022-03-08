@@ -107,11 +107,6 @@ class ModisInterpolator:
             500: 2,
             1000: 1,
         }[fine_resolution]
-        # course == 5km, fine == 500 -> 2 * 5 = 10
-        # equivalent to course // fine?
-        # course == 5km, fine == 250 -> 4 * 5 = 20
-        # course == 1km, fine == 500 -> 2 * 1 = 2
-        # course == 1km, fine == 1km -> 1 * 1 = 1
         self.fine_pixels_per_course_pixel = (
             fine_pixels_per_1km * self._course_pixels_per_1km
         )
