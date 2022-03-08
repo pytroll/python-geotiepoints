@@ -32,6 +32,7 @@ import numpy as np
 import warnings
 
 from .geointerpolator import lonlat2xyz, xyz2lonlat
+from .simple_modis_interpolator import scanline_mapblocks
 
 R = 6371.
 # Aqua scan width and altitude in km
@@ -86,15 +87,13 @@ def get_corners(arr):
     return arr_a, arr_b, arr_c, arr_d
 
 
-class ModisInterpolator(object):
+class ModisInterpolator:
 
     def __init__(self, cres, fres, cscan_full_width=None):
         if cres == 1000:
             self.cscan_len = 10
             self.cscan_width = 1
             self.cscan_full_width = 1354
-            self.get_coords = self._get_coords_1km
-            self.expand_tiepoint_array = self._expand_tiepoint_array_1km
         elif cres == 5000:
             self.cscan_len = 2
             self.cscan_width = 5
@@ -102,122 +101,152 @@ class ModisInterpolator(object):
                 self.cscan_full_width = 271
             else:
                 self.cscan_full_width = cscan_full_width
-            self.expand_tiepoint_array = self._expand_tiepoint_array_5km
-            self.get_coords = self._get_coords_5km
 
-        if fres == 250:
-            self.fscan_width = 4 * self.cscan_width
-            self.fscan_full_width = 1354 * 4
-            self.fscan_len = 4 * 10 // self.cscan_len
-        elif fres == 500:
-            self.fscan_width = 2 * self.cscan_width
-            self.fscan_full_width = 1354 * 2
-            self.fscan_len = 2 * 10 // self.cscan_len
-        elif fres == 1000:
-            self.fscan_width = 1 * self.cscan_width
-            self.fscan_full_width = 1354
-            self.fscan_len = 1 * 10 // self.cscan_len
+        self._cres = cres
+        self._res_factor = cres // fres
+        f_factor = {
+            250: 4,
+            500: 2,
+            1000: 1,
+        }[fres]
+        self.fscan_width = f_factor * self.cscan_width
+        self.fscan_full_width = 1354 * f_factor
+        self.fscan_len = f_factor * 10 // self.cscan_len
 
-    def _expand_tiepoint_array_1km(self, arr, lines, cols):
-        arr = da.repeat(arr, lines, axis=1)
-        arr = da.concatenate((arr[:, :lines//2, :], arr, arr[:, -(lines//2):, :]), axis=1)
-        arr = da.repeat(arr.reshape((-1, self.cscan_full_width - 1)), cols, axis=1)
-        return da.hstack((arr, arr[:, -cols:]))
-
-    def _get_coords_1km(self, scans):
-        y = (np.arange((self.cscan_len + 1) * self.fscan_len) % self.fscan_len) + .5
-        y = y[self.fscan_len // 2:-(self.fscan_len // 2)]
-        y[:self.fscan_len//2] = np.arange(-self.fscan_len/2 + .5, 0)
-        y[-(self.fscan_len//2):] = np.arange(self.fscan_len + .5, self.fscan_len * 3 / 2)
-        y = np.tile(y, scans)
-
-        x = np.arange(self.fscan_full_width) % self.fscan_width
-        x[-self.fscan_width:] = np.arange(self.fscan_width, self.fscan_width * 2)
-        return x, y
-
-    def _expand_tiepoint_array_5km(self, arr, lines, cols):
-        arr = da.repeat(arr, lines * 2, axis=1)
-        arr = da.repeat(arr.reshape((-1, self.cscan_full_width - 1)), cols, axis=1)
-        factor = self.fscan_width // self.cscan_width
-        if self.cscan_full_width == 271:
-            return da.hstack((arr[:, :2 * factor], arr, arr[:, -2 * factor:]))
-        else:
-            return da.hstack((arr[:, :2 * factor], arr, arr[:, -self.fscan_width:], arr[:, -2 * factor:]))
-
-    def _get_coords_5km(self, scans):
-        y = np.arange(self.fscan_len * self.cscan_len) - 2
-        y = np.tile(y, scans)
-
-        x = (np.arange(self.fscan_full_width) - 2) % self.fscan_width
-        x[0] = -2
-        x[1] = -1
-        if self.cscan_full_width == 271:
-            x[-2] = 5
-            x[-1] = 6
-        elif self.cscan_full_width == 270:
-            x[-7] = 5
-            x[-6] = 6
-            x[-5] = 7
-            x[-4] = 8
-            x[-3] = 9
-            x[-2] = 10
-            x[-1] = 11
-        else:
-            raise NotImplementedError("Can't interpolate if 5km tiepoints have less than 270 columns.")
-        return x, y
-
-    def interpolate(self, lon1, lat1, satz1):
+    def interpolate(self, orig_lons, orig_lats, satz1):
         cscan_len = self.cscan_len
         cscan_full_width = self.cscan_full_width
 
         fscan_width = self.fscan_width
         fscan_len = self.fscan_len
+        new_lons, new_lats = _interpolate(
+            orig_lons,
+            orig_lats,
+            satz1,
+            self._cres,
+            self.cscan_len,
+            self.cscan_width,
+            self.cscan_full_width,
+            self.fscan_len,
+            self.fscan_width,
+            self.fscan_full_width,
+            res_factor=self._res_factor,
+            rows_per_scan=self.cscan_len,
+        )
+        return new_lons, new_lats
 
-        scans = satz1.shape[0] // cscan_len
-        satz1 = satz1.data
 
-        satz1 = satz1.reshape((-1, cscan_len, cscan_full_width))
+@scanline_mapblocks
+def _interpolate(
+        lon1,
+        lat1,
+        satz1,
+        cres,
+        cscan_len,
+        cscan_width,
+        cscan_full_width,
+        fscan_len,
+        fscan_width,
+        fscan_full_width,
+        res_factor,
+        rows_per_scan,
+):
+    get_coords = _get_coords_1km if cres == 1000 else _get_coords_5km
+    expand_tiepoint_array = _expand_tiepoint_array_1km if cres == 1000 else _expand_tiepoint_array_5km
+    scans = satz1.shape[0] // cscan_len
+    satz1 = satz1.reshape((-1, cscan_len, cscan_full_width))
 
-        satz_a, satz_b, satz_c, satz_d = get_corners(da.deg2rad(satz1))
+    satz_a, satz_b, satz_c, satz_d = get_corners(np.deg2rad(satz1))
 
-        c_exp, c_ali = compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d)
+    c_exp, c_ali = compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d)
 
-        x, y = self.get_coords(scans)
-        i_rs, i_rt = da.meshgrid(x, y)
+    x, y = get_coords(cscan_len, cscan_full_width, fscan_len, fscan_width, fscan_full_width, scans)
+    i_rs, i_rt = np.meshgrid(x, y)
 
-        p_os = 0
-        p_ot = 0
+    p_os = 0
+    p_ot = 0
 
-        s_s = (p_os + i_rs) * 1. / fscan_width
-        s_t = (p_ot + i_rt) * 1. / fscan_len
+    s_s = (p_os + i_rs) * 1. / fscan_width
+    s_t = (p_ot + i_rt) * 1. / fscan_len
 
-        cols = fscan_width
-        lines = fscan_len
+    cols = fscan_width
+    lines = fscan_len
 
-        c_exp_full = self.expand_tiepoint_array(c_exp, lines, cols)
-        c_ali_full = self.expand_tiepoint_array(c_ali, lines, cols)
+    c_exp_full = expand_tiepoint_array(cscan_width, cscan_full_width, fscan_width, c_exp, lines, cols)
+    c_ali_full = expand_tiepoint_array(cscan_width, cscan_full_width, fscan_width, c_ali, lines, cols)
 
-        a_track = s_t
-        a_scan = (s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full)
+    a_track = s_t
+    a_scan = (s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full)
 
-        res = []
-        datasets = lonlat2xyz(lon1, lat1)
-        for data in datasets:
-            data = data.data
-            data = data.reshape((-1, cscan_len, cscan_full_width))
-            data_a, data_b, data_c, data_d = get_corners(data)
-            data_a = self.expand_tiepoint_array(data_a, lines, cols)
-            data_b = self.expand_tiepoint_array(data_b, lines, cols)
-            data_c = self.expand_tiepoint_array(data_c, lines, cols)
-            data_d = self.expand_tiepoint_array(data_d, lines, cols)
+    res = []
+    datasets = lonlat2xyz(lon1, lat1)
+    for data in datasets:
+        data = data.reshape((-1, cscan_len, cscan_full_width))
+        data_a, data_b, data_c, data_d = get_corners(data)
+        data_a = expand_tiepoint_array(cscan_width, cscan_full_width, fscan_width, data_a, lines, cols)
+        data_b = expand_tiepoint_array(cscan_width, cscan_full_width, fscan_width, data_b, lines, cols)
+        data_c = expand_tiepoint_array(cscan_width, cscan_full_width, fscan_width, data_c, lines, cols)
+        data_d = expand_tiepoint_array(cscan_width, cscan_full_width, fscan_width, data_d, lines, cols)
 
-            data_1 = (1 - a_scan) * data_a + a_scan * data_b
-            data_2 = (1 - a_scan) * data_d + a_scan * data_c
-            data = (1 - a_track) * data_1 + a_track * data_2
+        data_1 = (1 - a_scan) * data_a + a_scan * data_b
+        data_2 = (1 - a_scan) * data_d + a_scan * data_c
+        data = (1 - a_track) * data_1 + a_track * data_2
 
-            res.append(data)
-        lon, lat = xyz2lonlat(*res)
-        return xr.DataArray(lon, dims=lon1.dims), xr.DataArray(lat, dims=lat1.dims)
+        res.append(data)
+    new_lons, new_lats = xyz2lonlat(*res)
+    return new_lons.astype(lon1.dtype), new_lats.astype(lat1.dtype)
+
+
+def _get_coords_1km(cscan_len, cscan_full_width, fscan_len, fscan_width, fscan_full_width, scans):
+    y = (np.arange((cscan_len + 1) * fscan_len) % fscan_len) + .5
+    y = y[fscan_len // 2:-(fscan_len // 2)]
+    y[:fscan_len//2] = np.arange(-fscan_len/2 + .5, 0)
+    y[-(fscan_len//2):] = np.arange(fscan_len + .5, fscan_len * 3 / 2)
+    y = np.tile(y, scans)
+
+    x = np.arange(fscan_full_width) % fscan_width
+    x[-fscan_width:] = np.arange(fscan_width, fscan_width * 2)
+    return x, y
+
+
+def _get_coords_5km(cscan_len, cscan_full_width, fscan_len, fscan_width, fscan_full_width, scans):
+    y = np.arange(fscan_len * cscan_len) - 2
+    y = np.tile(y, scans)
+
+    x = (np.arange(fscan_full_width) - 2) % fscan_width
+    x[0] = -2
+    x[1] = -1
+    if cscan_full_width == 271:
+        x[-2] = 5
+        x[-1] = 6
+    elif cscan_full_width == 270:
+        x[-7] = 5
+        x[-6] = 6
+        x[-5] = 7
+        x[-4] = 8
+        x[-3] = 9
+        x[-2] = 10
+        x[-1] = 11
+    else:
+        raise NotImplementedError("Can't interpolate if 5km tiepoints have less than 270 columns.")
+    return x, y
+
+
+def _expand_tiepoint_array_1km(cscan_width, cscan_full_width, fscan_width, arr, lines, cols):
+    arr = np.repeat(arr, lines, axis=1)
+    arr = np.concatenate((arr[:, :lines//2, :], arr, arr[:, -(lines//2):, :]), axis=1)
+    arr = np.repeat(arr.reshape((-1, cscan_full_width - 1)), cols, axis=1)
+    return np.hstack((arr, arr[:, -cols:]))
+
+
+def _expand_tiepoint_array_5km(cscan_width, cscan_full_width, fscan_width, arr, lines, cols):
+    arr = np.repeat(arr, lines * 2, axis=1)
+    arr = np.repeat(arr.reshape((-1, cscan_full_width - 1)), cols, axis=1)
+    factor = fscan_width // cscan_width
+    if cscan_full_width == 271:
+        return np.hstack((arr[:, :2 * factor], arr, arr[:, -2 * factor:]))
+    else:
+        return np.hstack((arr[:, :2 * factor], arr, arr[:, -fscan_width:], arr[:, -2 * factor:]))
 
 
 def modis_1km_to_250m(lon1, lat1, satz1):
