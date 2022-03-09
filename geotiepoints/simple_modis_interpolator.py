@@ -106,7 +106,6 @@ def _extract_dask_arrays_from_args(args):
     return [arr_obj.data if hasattr(arr_obj, "dims") else arr_obj for arr_obj in args]
 
 
-
 def _call_map_blocks_interp(func, coarse_resolution, fine_resolution, *args, **kwargs):
     first_arr = [arr for arr in args if hasattr(arr, "ndim")][0]
     res_factor = coarse_resolution // fine_resolution
