@@ -141,6 +141,7 @@ def _interpolate(
         else _expand_tiepoint_array_5km
     )
     scans = satz1.shape[0] // coarse_scan_length
+    # reshape to (num scans, rows per scan, columns per scan)
     satz1 = satz1.reshape((-1, coarse_scan_length, coarse_scan_width))
 
     satz_a, satz_b, satz_c, satz_d = _get_corners(np.deg2rad(satz1))
@@ -163,24 +164,19 @@ def _interpolate(
     s_s = (p_os + i_rs) * 1.0 / fine_pixels_per_coarse_pixel
     s_t = (p_ot + i_rt) * 1.0 / fine_scan_length
 
-    cols = fine_pixels_per_coarse_pixel
-    lines = fine_scan_length
-
     c_exp_full = expand_tiepoint_array(
         coarse_pixels_per_1km,
         coarse_scan_width,
         fine_pixels_per_coarse_pixel,
         c_exp,
-        lines,
-        cols,
+        fine_scan_length,
     )
     c_ali_full = expand_tiepoint_array(
         coarse_pixels_per_1km,
         coarse_scan_width,
         fine_pixels_per_coarse_pixel,
         c_ali,
-        lines,
-        cols,
+        fine_scan_length,
     )
 
     a_track = s_t
@@ -196,32 +192,28 @@ def _interpolate(
             coarse_scan_width,
             fine_pixels_per_coarse_pixel,
             data_a,
-            lines,
-            cols,
+            fine_scan_length,
         )
         data_b = expand_tiepoint_array(
             coarse_pixels_per_1km,
             coarse_scan_width,
             fine_pixels_per_coarse_pixel,
             data_b,
-            lines,
-            cols,
+            fine_scan_length,
         )
         data_c = expand_tiepoint_array(
             coarse_pixels_per_1km,
             coarse_scan_width,
             fine_pixels_per_coarse_pixel,
             data_c,
-            lines,
-            cols,
+            fine_scan_length,
         )
         data_d = expand_tiepoint_array(
             coarse_pixels_per_1km,
             coarse_scan_width,
             fine_pixels_per_coarse_pixel,
             data_d,
-            lines,
-            cols,
+            fine_scan_length,
         )
 
         data_1 = (1 - a_scan) * data_a + a_scan * data_b
@@ -291,15 +283,14 @@ def _expand_tiepoint_array_1km(
     coarse_scan_width,
     fine_pixels_per_coarse_pixel,
     arr,
-    lines,
-    cols,
+    find_scan_length,
 ):
-    arr = np.repeat(arr, lines, axis=1)
+    arr = np.repeat(arr, find_scan_length, axis=1)
     arr = np.concatenate(
-        (arr[:, : lines // 2, :], arr, arr[:, -(lines // 2) :, :]), axis=1
+        (arr[:, : find_scan_length // 2, :], arr, arr[:, -(find_scan_length // 2):, :]), axis=1
     )
-    arr = np.repeat(arr.reshape((-1, coarse_scan_width - 1)), cols, axis=1)
-    return np.hstack((arr, arr[:, -cols:]))
+    arr = np.repeat(arr.reshape((-1, coarse_scan_width - 1)), fine_pixels_per_coarse_pixel, axis=1)
+    return np.hstack((arr, arr[:, -fine_pixels_per_coarse_pixel:]))
 
 
 def _expand_tiepoint_array_5km(
@@ -307,11 +298,10 @@ def _expand_tiepoint_array_5km(
     coarse_scan_width,
     fine_pixels_per_coarse_pixel,
     arr,
-    lines,
-    cols,
+    fine_scan_length,
 ):
-    arr = np.repeat(arr, lines * 2, axis=1)
-    arr = np.repeat(arr.reshape((-1, coarse_scan_width - 1)), cols, axis=1)
+    arr = np.repeat(arr, fine_scan_length * 2, axis=1)
+    arr = np.repeat(arr.reshape((-1, coarse_scan_width - 1)), fine_pixels_per_coarse_pixel, axis=1)
     factor = fine_pixels_per_coarse_pixel // coarse_pixels_per_1km
     if coarse_scan_width == 271:
         return np.hstack((arr[:, : 2 * factor], arr, arr[:, -2 * factor :]))
