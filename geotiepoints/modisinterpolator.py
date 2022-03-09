@@ -160,7 +160,6 @@ def _interpolate(
 
     p_os = 0
     p_ot = 0
-
     s_s = (p_os + i_rs) * 1.0 / fine_pixels_per_coarse_pixel
     s_t = (p_ot + i_rt) * 1.0 / fine_scan_length
 
@@ -283,11 +282,11 @@ def _expand_tiepoint_array_1km(
     coarse_scan_width,
     fine_pixels_per_coarse_pixel,
     arr,
-    find_scan_length,
+    fine_scan_length,
 ):
-    arr = np.repeat(arr, find_scan_length, axis=1)
+    arr = np.repeat(arr, fine_scan_length, axis=1)
     arr = np.concatenate(
-        (arr[:, : find_scan_length // 2, :], arr, arr[:, -(find_scan_length // 2):, :]), axis=1
+        (arr[:, : fine_scan_length // 2, :], arr, arr[:, -(fine_scan_length // 2):, :]), axis=1
     )
     arr = np.repeat(arr.reshape((-1, coarse_scan_width - 1)), fine_pixels_per_coarse_pixel, axis=1)
     return np.hstack((arr, arr[:, -fine_pixels_per_coarse_pixel:]))
