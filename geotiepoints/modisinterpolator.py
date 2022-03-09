@@ -51,7 +51,7 @@ def _compute_zeta(phi):
     return np.arcsin((R + H) * np.sin(phi) / R)
 
 
-def _compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d):
+def _compute_expansion_alignment(satz_a, satz_b):
     """All angles in radians."""
     zeta_a = satz_a
     zeta_b = satz_b
@@ -125,9 +125,9 @@ def _interpolate(
     # reshape to (num scans, rows per scan, columns per scan)
     satz1 = satz1.reshape((-1, coarse_scan_length, coarse_scan_width))
 
-    satz_a, satz_b, satz_c, satz_d = _get_corners(np.deg2rad(satz1))
+    satz_a, satz_b = _get_corners(np.deg2rad(satz1))[:2]
 
-    c_exp, c_ali = _compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d)
+    c_exp, c_ali = _compute_expansion_alignment(satz_a, satz_b)
 
     x, y = get_coords(
         coarse_scan_length,
