@@ -19,15 +19,14 @@
 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""Interpolation of MODIS data using satellite zenith angle.
 
-"""Interpolation of geographical tiepoints using the second order interpolation
+Interpolation of geographical tiepoints using the second order interpolation
 scheme implemented in the CVIIRS software, as described here:
 Compact VIIRS SDR Product Format User Guide (V1J)
 http://www.eumetsat.int/website/wcm/idc/idcplg?IdcService=GET_FILE&dDocName=PDF_DMT_708025&RevisionSelectionMethod=LatestReleased&Rendition=Web
 """
 
-import xarray as xr
-import dask.array as da
 import numpy as np
 import warnings
 
@@ -87,24 +86,6 @@ def _get_corners(arr):
     return arr_a, arr_b, arr_c, arr_d
 
 
-class ModisInterpolator:
-    def __init__(self, coarse_resolution, fine_resolution, coarse_scan_width=None):
-        self._coarse_resolution = coarse_resolution
-        self._fine_resolution = fine_resolution
-        self._coarse_scan_width = coarse_scan_width
-
-    def interpolate(self, orig_lons, orig_lats, satz1):
-        new_lons, new_lats = _interpolate(
-            orig_lons,
-            orig_lats,
-            satz1,
-            coarse_resolution=self._coarse_resolution,
-            fine_resolution=self._fine_resolution,
-            coarse_scan_width=self._coarse_scan_width,
-        )
-        return new_lons, new_lats
-
-
 @scanline_mapblocks
 def _interpolate(
     lon1,
@@ -114,6 +95,7 @@ def _interpolate(
     fine_resolution=None,
     coarse_scan_width=None,
 ):
+    """Interpolate MODIS geolocation from 'coarse_resolution' to 'fine_resolution'."""
     if coarse_resolution == 1000:
         coarse_scan_length = 10
         coarse_scan_width = 1354
@@ -234,9 +216,9 @@ def _get_coords_1km(
     y = (
         np.arange((coarse_scan_length + 1) * fine_scan_length) % fine_scan_length
     ) + 0.5
-    y = y[fine_scan_length // 2 : -(fine_scan_length // 2)]
+    y = y[fine_scan_length // 2:-(fine_scan_length // 2)]
     y[: fine_scan_length // 2] = np.arange(-fine_scan_length / 2 + 0.5, 0)
-    y[-(fine_scan_length // 2) :] = np.arange(fine_scan_length + 0.5, fine_scan_length * 3 / 2)
+    y[-(fine_scan_length // 2):] = np.arange(fine_scan_length + 0.5, fine_scan_length * 3 / 2)
     y = np.tile(y, scans)
 
     x = np.arange(fine_scan_width) % fine_pixels_per_coarse_pixel
@@ -285,7 +267,7 @@ def _expand_tiepoint_array_1km(
 ):
     arr = np.repeat(arr, fine_scan_length, axis=1)
     arr = np.concatenate(
-        (arr[:, : fine_scan_length // 2, :], arr, arr[:, -(fine_scan_length // 2):, :]), axis=1
+        (arr[:, :fine_scan_length // 2, :], arr, arr[:, -(fine_scan_length // 2):, :]), axis=1
     )
     arr = np.repeat(arr.reshape((-1, coarse_scan_width - 1)), fine_pixels_per_coarse_pixel, axis=1)
     return np.hstack((arr, arr[:, -fine_pixels_per_coarse_pixel:]))
@@ -302,34 +284,38 @@ def _expand_tiepoint_array_5km(
     arr = np.repeat(arr.reshape((-1, coarse_scan_width - 1)), fine_pixels_per_coarse_pixel, axis=1)
     factor = fine_pixels_per_coarse_pixel // coarse_pixels_per_1km
     if coarse_scan_width == 271:
-        return np.hstack((arr[:, : 2 * factor], arr, arr[:, -2 * factor :]))
+        return np.hstack((arr[:, :2 * factor], arr, arr[:, -2 * factor:]))
     else:
         return np.hstack(
             (
-                arr[:, : 2 * factor],
+                arr[:, :2 * factor],
                 arr,
                 arr[:, -fine_pixels_per_coarse_pixel:],
-                arr[:, -2 * factor :],
+                arr[:, -2 * factor:],
             )
         )
 
 
 def modis_1km_to_250m(lon1, lat1, satz1):
     """Interpolate MODIS geolocation from 1km to 250m resolution."""
-    interp = ModisInterpolator(1000, 250)
-    return interp.interpolate(lon1, lat1, satz1)
+    return _interpolate(lon1, lat1, satz1,
+                        coarse_resolution=1000,
+                        fine_resolution=250)
 
 
 def modis_1km_to_500m(lon1, lat1, satz1):
     """Interpolate MODIS geolocation from 1km to 500m resolution."""
-    interp = ModisInterpolator(1000, 500)
-    return interp.interpolate(lon1, lat1, satz1)
+    return _interpolate(lon1, lat1, satz1,
+                        coarse_resolution=1000,
+                        fine_resolution=500)
 
 
 def modis_5km_to_1km(lon1, lat1, satz1):
     """Interpolate MODIS geolocation from 5km to 1km resolution."""
-    interp = ModisInterpolator(5000, 1000, lon1.shape[1])
-    return interp.interpolate(lon1, lat1, satz1)
+    return _interpolate(lon1, lat1, satz1,
+                        coarse_resolution=5000,
+                        fine_resolution=1000,
+                        coarse_scan_width=lon1.shape[1])
 
 
 def modis_5km_to_500m(lon1, lat1, satz1):
@@ -337,8 +323,10 @@ def modis_5km_to_500m(lon1, lat1, satz1):
     warnings.warn(
         "Interpolating 5km geolocation to 500m resolution " "may result in poor quality"
     )
-    interp = ModisInterpolator(5000, 500, lon1.shape[1])
-    return interp.interpolate(lon1, lat1, satz1)
+    return _interpolate(lon1, lat1, satz1,
+                        coarse_resolution=5000,
+                        fine_resolution=500,
+                        coarse_scan_width=lon1.shape[1])
 
 
 def modis_5km_to_250m(lon1, lat1, satz1):
@@ -346,5 +334,7 @@ def modis_5km_to_250m(lon1, lat1, satz1):
     warnings.warn(
         "Interpolating 5km geolocation to 250m resolution " "may result in poor quality"
     )
-    interp = ModisInterpolator(5000, 250, lon1.shape[1])
-    return interp.interpolate(lon1, lat1, satz1)
+    return _interpolate(lon1, lat1, satz1,
+                        coarse_resolution=5000,
+                        fine_resolution=250,
+                        coarse_scan_width=lon1.shape[1])
