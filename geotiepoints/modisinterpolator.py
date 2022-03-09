@@ -125,7 +125,6 @@ def _interpolate(
             coarse_scan_width = coarse_scan_width
     coarse_pixels_per_1km = coarse_resolution // 1000
 
-    res_factor = coarse_resolution // fine_resolution
     fine_pixels_per_1km = {
         250: 4,
         500: 2,
