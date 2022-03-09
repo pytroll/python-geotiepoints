@@ -49,8 +49,14 @@ try:
 except ImportError:
     xr = None
 
-# MODIS has 10 rows of data in the array for every scan line
-ROWS_PER_SCAN = 10
+
+def _rows_per_scan_for_resolution(res):
+    return {
+        5000: 2,
+        1000: 10,
+        500: 20,
+        250: 40,
+    }[res]
 
 
 def scanline_mapblocks(func):
@@ -63,50 +69,56 @@ def scanline_mapblocks(func):
 
     """
     @wraps(func)
-    def _wrapper(*args, res_factor=4, rows_per_scan=ROWS_PER_SCAN, **kwargs):
+    def _wrapper(*args, coarse_resolution=None, fine_resolution=None, **kwargs):
+        if coarse_resolution is None or fine_resolution is None:
+            raise ValueError("'coarse_resolution' and 'fine_resolution' are required keyword arguments.")
         first_arr = [arr for arr in args if hasattr(arr, "ndim")][0]
         if first_arr.ndim != 2 or first_arr.ndim != 2:
             raise ValueError("Expected 2D input arrays.")
         if hasattr(first_arr, "compute"):
             # assume it is dask or xarray with dask, ensure proper chunk size
             # if DataArray get just the dask array
-            dask_args = _extract_dask_arrays_from_args(*args)
-            rechunked_args = _rechunk_dask_arrays_if_needed(*dask_args, rows_per_scan=rows_per_scan)
+            dask_args = _extract_dask_arrays_from_args(args)
+            rows_per_scan = _rows_per_scan_for_resolution(coarse_resolution)
+            rechunked_args = _rechunk_dask_arrays_if_needed(dask_args, rows_per_scan)
             results = _call_map_blocks_interp(
                 func,
+                coarse_resolution,
+                fine_resolution,
                 *rechunked_args,
-                res_factor=res_factor,
-                rows_per_scan=rows_per_scan,
                 **kwargs
             )
             if hasattr(first_arr, "dims"):
                 # recreate DataArrays
                 results = _results_to_data_arrays(first_arr.dims, *results)
             return results
-        return func(*args, res_factor=res_factor, rows_per_scan=rows_per_scan, **kwargs)
+        return func(
+            *args,
+            coarse_resolution=coarse_resolution,
+            fine_resolution=fine_resolution,
+            **kwargs
+        )
 
     return _wrapper
 
 
-def _extract_dask_arrays_from_args(*args):
+def _extract_dask_arrays_from_args(args):
     return [arr_obj.data if hasattr(arr_obj, "dims") else arr_obj for arr_obj in args]
 
 
 
-def _call_map_blocks_interp(func, *args, res_factor=4, rows_per_scan=ROWS_PER_SCAN, **kwargs):
+def _call_map_blocks_interp(func, coarse_resolution, fine_resolution, *args, **kwargs):
     first_arr = [arr for arr in args if hasattr(arr, "ndim")][0]
+    res_factor = coarse_resolution // fine_resolution
     new_row_chunks = tuple(x * res_factor for x in first_arr.chunks[0])
-    if rows_per_scan == 2:
-        # 5km
-        new_cols = (first_arr.chunks[1][0] * res_factor) - (2 * res_factor // 10)
-        new_col_chunks = (new_cols,)
-        # new_col_chunks = tuple(x * res_factor for x in first_arr.chunks[1])
-    else:
-        new_col_chunks = tuple(x * res_factor for x in first_arr.chunks[1])
+    fine_pixels_per_1km = {250: 4, 500: 2, 1000: 1}[fine_resolution]
+    fine_scan_width = 1354 * fine_pixels_per_1km
+    new_col_chunks = (fine_scan_width,)
     wrapped_func = _map_blocks_handler(func)
-    res = da.map_blocks(wrapped_func, *args, **kwargs,
-                        res_factor=res_factor,
-                        rows_per_scan=rows_per_scan,
+    res = da.map_blocks(wrapped_func, *args,
+                        coarse_resolution=coarse_resolution,
+                        fine_resolution=fine_resolution,
+                        **kwargs,
                         new_axis=[0],
                         chunks=(2, new_row_chunks, new_col_chunks),
                         dtype=first_arr.dtype,
@@ -124,7 +136,7 @@ def _results_to_data_arrays(dims, *results):
     return new_results
 
 
-def _rechunk_dask_arrays_if_needed(*args, rows_per_scan=ROWS_PER_SCAN):
+def _rechunk_dask_arrays_if_needed(args, rows_per_scan: int):
     # take current chunk size and get a relatively similar chunk size
     first_arr = [arr for arr in args if hasattr(arr, "ndim")][0]
     row_chunks = first_arr.chunks[0]
@@ -161,7 +173,7 @@ def _map_blocks_handler(func):
 
 
 @scanline_mapblocks
-def interpolate_geolocation_cartesian(lon_array, lat_array, res_factor=4, rows_per_scan=ROWS_PER_SCAN):
+def interpolate_geolocation_cartesian(lon_array, lat_array, coarse_resolution, fine_resolution):
     """Interpolate MODIS navigation from 1000m resolution to 250m.
 
     Python rewrite of the IDL function ``MODIS_GEO_INTERP_250`` but converts to cartesian (X, Y, Z) coordinates
@@ -179,6 +191,8 @@ def interpolate_geolocation_cartesian(lon_array, lat_array, res_factor=4, rows_p
         A two-element tuple (lon, lat).
 
     """
+    rows_per_scan = _rows_per_scan_for_resolution(coarse_resolution)
+    res_factor = coarse_resolution // fine_resolution
     num_rows, num_cols = lon_array.shape
     num_scans = int(num_rows / rows_per_scan)
     x_in, y_in, z_in = lonlat2xyz(lon_array, lat_array)
@@ -250,9 +264,18 @@ def _calc_slope_offset_500(result_array, y, start_idx, offset):
 
 def modis_1km_to_250m(lon1, lat1):
     """Interpolate MODIS geolocation from 1km to 250m resolution."""
-    return interpolate_geolocation_cartesian(lon1, lat1, res_factor=4, rows_per_scan=ROWS_PER_SCAN)
+    return interpolate_geolocation_cartesian(
+        lon1,
+        lat1,
+        coarse_resolution=1000,
+        fine_resolution=250,
+    )
 
 
 def modis_1km_to_500m(lon1, lat1):
     """Interpolate MODIS geolocation from 1km to 500m resolution."""
-    return interpolate_geolocation_cartesian(lon1, lat1, res_factor=2, rows_per_scan=ROWS_PER_SCAN)
+    return interpolate_geolocation_cartesian(
+        lon1,
+        lat1,
+        coarse_resolution=1000,
+        fine_resolution=500)
