@@ -138,54 +138,31 @@ class _Interpolator:
         fine_resolution=None,
         coarse_scan_width=None,
     ):
-        """Interpolate MODIS geolocation from 'coarse_resolution' to 'fine_resolution'."""
-        coarse_scan_length = self._coarse_scan_length
-        coarse_scan_width = self._coarse_scan_width
-        coarse_pixels_per_1km = self._coarse_pixels_per_1km
-        fine_pixels_per_coarse_pixel = self._fine_pixels_per_coarse_pixel
-        get_coords = self._get_coords
-        expand_tiepoint_array = self._expand_tiepoint_array
-        coarse_resolution = self._coarse_resolution
-        fine_resolution = self._fine_resolution
-        fine_scan_length = self._fine_scan_length
-        fine_scan_width = self._fine_scan_width
+        """Interpolate MODIS geolocation from 'coarse_resolution' to 'fine_resolution'.
 
-        scans = satz1.shape[0] // coarse_scan_length
+        Note this method takes 3 keyword arguments that are unused. These
+        arguments are used by the :func:`scanline_mapblocks` decorator to
+        determine optimal chunking.
+
+        """
+        del coarse_resolution, fine_resolution, coarse_scan_width
+        scans = satz1.shape[0] // self._coarse_scan_length
         # reshape to (num scans, rows per scan, columns per scan)
-        satz1 = satz1.reshape((-1, coarse_scan_length, coarse_scan_width))
+        satz1 = satz1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
 
         satz_a, satz_b = _get_corners(np.deg2rad(satz1))[:2]
         c_exp, c_ali = _compute_expansion_alignment(satz_a, satz_b)
 
-        x, y = get_coords(
-            coarse_scan_length,
-            coarse_scan_width,
-            fine_scan_length,
-            fine_pixels_per_coarse_pixel,
-            fine_scan_width,
-            scans,
-        )
+        x, y = self._get_coords(scans)
         i_rs, i_rt = np.meshgrid(x, y)
 
         p_os = 0
         p_ot = 0
-        s_s = (p_os + i_rs) * 1.0 / fine_pixels_per_coarse_pixel
-        s_t = (p_ot + i_rt) * 1.0 / fine_scan_length
+        s_s = (p_os + i_rs) * 1.0 / self._fine_pixels_per_coarse_pixel
+        s_t = (p_ot + i_rt) * 1.0 / self._fine_scan_length
 
-        c_exp_full = expand_tiepoint_array(
-            coarse_pixels_per_1km,
-            coarse_scan_width,
-            fine_pixels_per_coarse_pixel,
-            c_exp,
-            fine_scan_length,
-        )
-        c_ali_full = expand_tiepoint_array(
-            coarse_pixels_per_1km,
-            coarse_scan_width,
-            fine_pixels_per_coarse_pixel,
-            c_ali,
-            fine_scan_length,
-        )
+        c_exp_full = self._expand_tiepoint_array(c_exp)
+        c_ali_full = self._expand_tiepoint_array(c_ali)
 
         a_track = s_t
         a_scan = s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full
@@ -193,36 +170,12 @@ class _Interpolator:
         res = []
         datasets = lonlat2xyz(lon1, lat1)
         for data in datasets:
-            data = data.reshape((-1, coarse_scan_length, coarse_scan_width))
+            data = data.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
             data_a, data_b, data_c, data_d = _get_corners(data)
-            data_a = expand_tiepoint_array(
-                coarse_pixels_per_1km,
-                coarse_scan_width,
-                fine_pixels_per_coarse_pixel,
-                data_a,
-                fine_scan_length,
-            )
-            data_b = expand_tiepoint_array(
-                coarse_pixels_per_1km,
-                coarse_scan_width,
-                fine_pixels_per_coarse_pixel,
-                data_b,
-                fine_scan_length,
-            )
-            data_c = expand_tiepoint_array(
-                coarse_pixels_per_1km,
-                coarse_scan_width,
-                fine_pixels_per_coarse_pixel,
-                data_c,
-                fine_scan_length,
-            )
-            data_d = expand_tiepoint_array(
-                coarse_pixels_per_1km,
-                coarse_scan_width,
-                fine_pixels_per_coarse_pixel,
-                data_d,
-                fine_scan_length,
-            )
+            data_a = self._expand_tiepoint_array(data_a)
+            data_b = self._expand_tiepoint_array(data_b)
+            data_c = self._expand_tiepoint_array(data_c)
+            data_d = self._expand_tiepoint_array(data_d)
 
             data_1 = (1 - a_scan) * data_a + a_scan * data_b
             data_2 = (1 - a_scan) * data_d + a_scan * data_c
@@ -232,48 +185,33 @@ class _Interpolator:
         new_lons, new_lats = xyz2lonlat(*res)
         return new_lons.astype(lon1.dtype), new_lats.astype(lat1.dtype)
 
-
-    def _get_coords_1km(
-            self,
-            coarse_scan_length,
-            coarse_scan_width,
-            fine_scan_length,
-            fine_pixels_per_coarse_pixel,
-            fine_scan_width,
-            scans,
-    ):
+    def _get_coords_1km(self, scans):
         y = (
-            np.arange((coarse_scan_length + 1) * fine_scan_length) % fine_scan_length
+            np.arange((self._coarse_scan_length + 1) * self._fine_scan_length) % self._fine_scan_length
         ) + 0.5
-        y = y[fine_scan_length // 2:-(fine_scan_length // 2)]
-        y[: fine_scan_length // 2] = np.arange(-fine_scan_length / 2 + 0.5, 0)
-        y[-(fine_scan_length // 2):] = np.arange(fine_scan_length + 0.5, fine_scan_length * 3 / 2)
+        half_scan_length = self._fine_scan_length // 2
+        y = y[half_scan_length:-half_scan_length]
+        y[:half_scan_length] = np.arange(-self._fine_scan_length / 2 + 0.5, 0)
+        y[-half_scan_length:] = np.arange(self._fine_scan_length + 0.5, self._fine_scan_length * 3 / 2)
         y = np.tile(y, scans)
 
-        x = np.arange(fine_scan_width) % fine_pixels_per_coarse_pixel
-        x[-fine_pixels_per_coarse_pixel:] = np.arange(fine_pixels_per_coarse_pixel, fine_pixels_per_coarse_pixel * 2)
+        x = np.arange(self._fine_scan_width) % self._fine_pixels_per_coarse_pixel
+        x[-self._fine_pixels_per_coarse_pixel:] = np.arange(
+            self._fine_pixels_per_coarse_pixel,
+            self._fine_pixels_per_coarse_pixel * 2)
         return x, y
 
-
-    def _get_coords_5km(
-            self,
-            coarse_scan_length,
-            coarse_scan_width,
-            fine_scan_length,
-            fine_pixels_per_coarse_pixel,
-            fine_scan_width,
-            scans,
-    ):
-        y = np.arange(fine_scan_length * coarse_scan_length) - 2
+    def _get_coords_5km(self, scans):
+        y = np.arange(self._fine_scan_length * self._coarse_scan_length) - 2
         y = np.tile(y, scans)
 
-        x = (np.arange(fine_scan_width) - 2) % fine_pixels_per_coarse_pixel
+        x = (np.arange(self._fine_scan_width) - 2) % self._fine_pixels_per_coarse_pixel
         x[0] = -2
         x[1] = -1
-        if coarse_scan_width == 271:
+        if self._coarse_scan_width == 271:
             x[-2] = 5
             x[-1] = 6
-        elif coarse_scan_width == 270:
+        elif self._coarse_scan_width == 270:
             x[-7] = 5
             x[-6] = 6
             x[-5] = 7
@@ -287,42 +225,26 @@ class _Interpolator:
             )
         return x, y
 
-
-    def _expand_tiepoint_array_1km(
-            self,
-            coarse_pixels_per_1km,
-            coarse_scan_width,
-            fine_pixels_per_coarse_pixel,
-            arr,
-            fine_scan_length,
-    ):
-        arr = np.repeat(arr, fine_scan_length, axis=1)
+    def _expand_tiepoint_array_1km(self, arr):
+        arr = np.repeat(arr, self._fine_scan_length, axis=1)
         arr = np.concatenate(
-            (arr[:, :fine_scan_length // 2, :], arr, arr[:, -(fine_scan_length // 2):, :]), axis=1
+            (arr[:, :self._fine_scan_length // 2, :], arr, arr[:, -(self._fine_scan_length // 2):, :]), axis=1
         )
-        arr = np.repeat(arr.reshape((-1, coarse_scan_width - 1)), fine_pixels_per_coarse_pixel, axis=1)
-        return np.hstack((arr, arr[:, -fine_pixels_per_coarse_pixel:]))
+        arr = np.repeat(arr.reshape((-1, self._coarse_scan_width - 1)), self._fine_pixels_per_coarse_pixel, axis=1)
+        return np.hstack((arr, arr[:, -self._fine_pixels_per_coarse_pixel:]))
 
-
-    def _expand_tiepoint_array_5km(
-            self,
-            coarse_pixels_per_1km,
-            coarse_scan_width,
-            fine_pixels_per_coarse_pixel,
-            arr,
-            fine_scan_length,
-    ):
-        arr = np.repeat(arr, fine_scan_length * 2, axis=1)
-        arr = np.repeat(arr.reshape((-1, coarse_scan_width - 1)), fine_pixels_per_coarse_pixel, axis=1)
-        factor = fine_pixels_per_coarse_pixel // coarse_pixels_per_1km
-        if coarse_scan_width == 271:
+    def _expand_tiepoint_array_5km(self, arr):
+        arr = np.repeat(arr, self._fine_scan_length * 2, axis=1)
+        arr = np.repeat(arr.reshape((-1, self._coarse_scan_width - 1)), self._fine_pixels_per_coarse_pixel, axis=1)
+        factor = self._fine_pixels_per_coarse_pixel // self._coarse_pixels_per_1km
+        if self._coarse_scan_width == 271:
             return np.hstack((arr[:, :2 * factor], arr, arr[:, -2 * factor:]))
         else:
             return np.hstack(
                 (
                     arr[:, :2 * factor],
                     arr,
-                    arr[:, -fine_pixels_per_coarse_pixel:],
+                    arr[:, -self._fine_pixels_per_coarse_pixel:],
                     arr[:, -2 * factor:],
                 )
             )
