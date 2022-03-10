@@ -86,123 +86,152 @@ def _get_corners(arr):
     return arr_a, arr_b, arr_c, arr_d
 
 
-@scanline_mapblocks
-def _interpolate(
-    lon1,
-    lat1,
-    satz1,
-    coarse_resolution=None,
-    fine_resolution=None,
-    coarse_scan_width=None,
-):
-    """Interpolate MODIS geolocation from 'coarse_resolution' to 'fine_resolution'."""
-    if coarse_resolution == 1000:
-        coarse_scan_length = 10
-        coarse_scan_width = 1354
-    elif coarse_resolution == 5000:
-        coarse_scan_length = 2
-        if coarse_scan_width is None:
-            coarse_scan_width = 271
-        else:
-            coarse_scan_width = coarse_scan_width
-    coarse_pixels_per_1km = coarse_resolution // 1000
+class _Interpolator:
+    """Helper class for MODIS interpolation.
 
-    fine_pixels_per_1km = {
-        250: 4,
-        500: 2,
-        1000: 1,
-    }[fine_resolution]
-    fine_pixels_per_coarse_pixel = fine_pixels_per_1km * coarse_pixels_per_1km
-    fine_scan_width = 1354 * fine_pixels_per_1km
-    fine_scan_length = fine_pixels_per_1km * 10 // coarse_scan_length
-    get_coords = _get_coords_1km if coarse_resolution == 1000 else _get_coords_5km
-    expand_tiepoint_array = (
-        _expand_tiepoint_array_1km
-        if coarse_resolution == 1000
-        else _expand_tiepoint_array_5km
-    )
-    scans = satz1.shape[0] // coarse_scan_length
-    # reshape to (num scans, rows per scan, columns per scan)
-    satz1 = satz1.reshape((-1, coarse_scan_length, coarse_scan_width))
+    Not intended for public use. Use ``modis_X_to_Y`` functions instead.
 
-    satz_a, satz_b = _get_corners(np.deg2rad(satz1))[:2]
+    """
+    def __init__(self, coarse_resolution, fine_resolution, coarse_scan_width=None):
+        if coarse_resolution == 1000:
+            coarse_scan_length = 10
+            coarse_scan_width = 1354
+        elif coarse_resolution == 5000:
+            coarse_scan_length = 2
+            if coarse_scan_width is None:
+                coarse_scan_width = 271
+            else:
+                coarse_scan_width = coarse_scan_width
+        self._coarse_scan_length = coarse_scan_length
+        self._coarse_scan_width = coarse_scan_width
+        self._coarse_pixels_per_1km = coarse_resolution // 1000
 
-    c_exp, c_ali = _compute_expansion_alignment(satz_a, satz_b)
+        fine_pixels_per_1km = {
+            250: 4,
+            500: 2,
+            1000: 1,
+        }[fine_resolution]
+        self._fine_pixels_per_coarse_pixel = fine_pixels_per_1km * self._coarse_pixels_per_1km
+        self._fine_scan_width = 1354 * fine_pixels_per_1km
+        self._fine_scan_length = fine_pixels_per_1km * 10 // coarse_scan_length
+        self._get_coords = _get_coords_1km if coarse_resolution == 1000 else _get_coords_5km
+        self._expand_tiepoint_array = (
+            _expand_tiepoint_array_1km
+            if coarse_resolution == 1000
+            else _expand_tiepoint_array_5km
+        )
 
-    x, y = get_coords(
-        coarse_scan_length,
-        coarse_scan_width,
-        fine_scan_length,
-        fine_pixels_per_coarse_pixel,
-        fine_scan_width,
-        scans,
-    )
-    i_rs, i_rt = np.meshgrid(x, y)
+        self._coarse_resolution = coarse_resolution
+        self._fine_resolution = fine_resolution
 
-    p_os = 0
-    p_ot = 0
-    s_s = (p_os + i_rs) * 1.0 / fine_pixels_per_coarse_pixel
-    s_t = (p_ot + i_rt) * 1.0 / fine_scan_length
+    def interpolate(self, lon1, lat1, satz1):
+        return self._interpolate(lon1, lat1, satz1,
+                                 coarse_resolution=self._coarse_resolution,
+                                 fine_resolution=self._fine_resolution,
+                                 coarse_scan_width=self._coarse_scan_width)
+    @scanline_mapblocks
+    def _interpolate(
+        self,
+        lon1,
+        lat1,
+        satz1,
+        coarse_resolution=None,
+        fine_resolution=None,
+        coarse_scan_width=None,
+    ):
+        """Interpolate MODIS geolocation from 'coarse_resolution' to 'fine_resolution'."""
+        coarse_scan_length = self._coarse_scan_length
+        coarse_scan_width = self._coarse_scan_width
+        coarse_pixels_per_1km = self._coarse_pixels_per_1km
+        fine_pixels_per_coarse_pixel = self._fine_pixels_per_coarse_pixel
+        get_coords = self._get_coords
+        expand_tiepoint_array = self._expand_tiepoint_array
+        coarse_resolution = self._coarse_resolution
+        fine_resolution = self._fine_resolution
+        fine_scan_length = self._fine_scan_length
+        fine_scan_width = self._fine_scan_width
 
-    c_exp_full = expand_tiepoint_array(
-        coarse_pixels_per_1km,
-        coarse_scan_width,
-        fine_pixels_per_coarse_pixel,
-        c_exp,
-        fine_scan_length,
-    )
-    c_ali_full = expand_tiepoint_array(
-        coarse_pixels_per_1km,
-        coarse_scan_width,
-        fine_pixels_per_coarse_pixel,
-        c_ali,
-        fine_scan_length,
-    )
+        scans = satz1.shape[0] // coarse_scan_length
+        # reshape to (num scans, rows per scan, columns per scan)
+        satz1 = satz1.reshape((-1, coarse_scan_length, coarse_scan_width))
 
-    a_track = s_t
-    a_scan = s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full
+        satz_a, satz_b = _get_corners(np.deg2rad(satz1))[:2]
+        c_exp, c_ali = _compute_expansion_alignment(satz_a, satz_b)
 
-    res = []
-    datasets = lonlat2xyz(lon1, lat1)
-    for data in datasets:
-        data = data.reshape((-1, coarse_scan_length, coarse_scan_width))
-        data_a, data_b, data_c, data_d = _get_corners(data)
-        data_a = expand_tiepoint_array(
+        x, y = get_coords(
+            coarse_scan_length,
+            coarse_scan_width,
+            fine_scan_length,
+            fine_pixels_per_coarse_pixel,
+            fine_scan_width,
+            scans,
+        )
+        i_rs, i_rt = np.meshgrid(x, y)
+
+        p_os = 0
+        p_ot = 0
+        s_s = (p_os + i_rs) * 1.0 / fine_pixels_per_coarse_pixel
+        s_t = (p_ot + i_rt) * 1.0 / fine_scan_length
+
+        c_exp_full = expand_tiepoint_array(
             coarse_pixels_per_1km,
             coarse_scan_width,
             fine_pixels_per_coarse_pixel,
-            data_a,
+            c_exp,
             fine_scan_length,
         )
-        data_b = expand_tiepoint_array(
+        c_ali_full = expand_tiepoint_array(
             coarse_pixels_per_1km,
             coarse_scan_width,
             fine_pixels_per_coarse_pixel,
-            data_b,
-            fine_scan_length,
-        )
-        data_c = expand_tiepoint_array(
-            coarse_pixels_per_1km,
-            coarse_scan_width,
-            fine_pixels_per_coarse_pixel,
-            data_c,
-            fine_scan_length,
-        )
-        data_d = expand_tiepoint_array(
-            coarse_pixels_per_1km,
-            coarse_scan_width,
-            fine_pixels_per_coarse_pixel,
-            data_d,
+            c_ali,
             fine_scan_length,
         )
 
-        data_1 = (1 - a_scan) * data_a + a_scan * data_b
-        data_2 = (1 - a_scan) * data_d + a_scan * data_c
-        data = (1 - a_track) * data_1 + a_track * data_2
+        a_track = s_t
+        a_scan = s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full
 
-        res.append(data)
-    new_lons, new_lats = xyz2lonlat(*res)
-    return new_lons.astype(lon1.dtype), new_lats.astype(lat1.dtype)
+        res = []
+        datasets = lonlat2xyz(lon1, lat1)
+        for data in datasets:
+            data = data.reshape((-1, coarse_scan_length, coarse_scan_width))
+            data_a, data_b, data_c, data_d = _get_corners(data)
+            data_a = expand_tiepoint_array(
+                coarse_pixels_per_1km,
+                coarse_scan_width,
+                fine_pixels_per_coarse_pixel,
+                data_a,
+                fine_scan_length,
+            )
+            data_b = expand_tiepoint_array(
+                coarse_pixels_per_1km,
+                coarse_scan_width,
+                fine_pixels_per_coarse_pixel,
+                data_b,
+                fine_scan_length,
+            )
+            data_c = expand_tiepoint_array(
+                coarse_pixels_per_1km,
+                coarse_scan_width,
+                fine_pixels_per_coarse_pixel,
+                data_c,
+                fine_scan_length,
+            )
+            data_d = expand_tiepoint_array(
+                coarse_pixels_per_1km,
+                coarse_scan_width,
+                fine_pixels_per_coarse_pixel,
+                data_d,
+                fine_scan_length,
+            )
+
+            data_1 = (1 - a_scan) * data_a + a_scan * data_b
+            data_2 = (1 - a_scan) * data_d + a_scan * data_c
+            data = (1 - a_track) * data_1 + a_track * data_2
+
+            res.append(data)
+        new_lons, new_lats = xyz2lonlat(*res)
+        return new_lons.astype(lon1.dtype), new_lats.astype(lat1.dtype)
 
 
 def _get_coords_1km(
@@ -298,24 +327,20 @@ def _expand_tiepoint_array_5km(
 
 def modis_1km_to_250m(lon1, lat1, satz1):
     """Interpolate MODIS geolocation from 1km to 250m resolution."""
-    return _interpolate(lon1, lat1, satz1,
-                        coarse_resolution=1000,
-                        fine_resolution=250)
+    interp = _Interpolator(1000, 250)
+    return interp.interpolate(lon1, lat1, satz1)
 
 
 def modis_1km_to_500m(lon1, lat1, satz1):
     """Interpolate MODIS geolocation from 1km to 500m resolution."""
-    return _interpolate(lon1, lat1, satz1,
-                        coarse_resolution=1000,
-                        fine_resolution=500)
+    interp = _Interpolator(1000, 500)
+    return interp.interpolate(lon1, lat1, satz1)
 
 
 def modis_5km_to_1km(lon1, lat1, satz1):
     """Interpolate MODIS geolocation from 5km to 1km resolution."""
-    return _interpolate(lon1, lat1, satz1,
-                        coarse_resolution=5000,
-                        fine_resolution=1000,
-                        coarse_scan_width=lon1.shape[1])
+    interp = _Interpolator(5000, 1000, coarse_scan_width=lon1.shape[1])
+    return interp.interpolate(lon1, lat1, satz1)
 
 
 def modis_5km_to_500m(lon1, lat1, satz1):
@@ -323,10 +348,8 @@ def modis_5km_to_500m(lon1, lat1, satz1):
     warnings.warn(
         "Interpolating 5km geolocation to 500m resolution " "may result in poor quality"
     )
-    return _interpolate(lon1, lat1, satz1,
-                        coarse_resolution=5000,
-                        fine_resolution=500,
-                        coarse_scan_width=lon1.shape[1])
+    interp = _Interpolator(5000, 500, coarse_scan_width=lon1.shape[1])
+    return interp.interpolate(lon1, lat1, satz1)
 
 
 def modis_5km_to_250m(lon1, lat1, satz1):
@@ -334,7 +357,5 @@ def modis_5km_to_250m(lon1, lat1, satz1):
     warnings.warn(
         "Interpolating 5km geolocation to 250m resolution " "may result in poor quality"
     )
-    return _interpolate(lon1, lat1, satz1,
-                        coarse_resolution=5000,
-                        fine_resolution=250,
-                        coarse_scan_width=lon1.shape[1])
+    interp = _Interpolator(5000, 250, coarse_scan_width=lon1.shape[1])
+    return interp.interpolate(lon1, lat1, satz1)
