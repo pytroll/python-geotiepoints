@@ -114,13 +114,12 @@ class _Interpolator:
         self._fine_pixels_per_coarse_pixel = fine_pixels_per_1km * self._coarse_pixels_per_1km
         self._fine_scan_width = 1354 * fine_pixels_per_1km
         self._fine_scan_length = fine_pixels_per_1km * 10 // coarse_scan_length
-        self._get_coords = _get_coords_1km if coarse_resolution == 1000 else _get_coords_5km
-        self._expand_tiepoint_array = (
-            _expand_tiepoint_array_1km
-            if coarse_resolution == 1000
-            else _expand_tiepoint_array_5km
-        )
-
+        if coarse_resolution == 1000:
+            self._get_coords = self._get_coords_1km
+            self._expand_tiepoint_array = self._expand_tiepoint_array_1km
+        else:
+            self._get_coords = self._get_coords_5km
+            self._expand_tiepoint_array = self._expand_tiepoint_array_5km
         self._coarse_resolution = coarse_resolution
         self._fine_resolution = fine_resolution
 
@@ -234,95 +233,99 @@ class _Interpolator:
         return new_lons.astype(lon1.dtype), new_lats.astype(lat1.dtype)
 
 
-def _get_coords_1km(
-    coarse_scan_length,
-    coarse_scan_width,
-    fine_scan_length,
-    fine_pixels_per_coarse_pixel,
-    fine_scan_width,
-    scans,
-):
-    y = (
-        np.arange((coarse_scan_length + 1) * fine_scan_length) % fine_scan_length
-    ) + 0.5
-    y = y[fine_scan_length // 2:-(fine_scan_length // 2)]
-    y[: fine_scan_length // 2] = np.arange(-fine_scan_length / 2 + 0.5, 0)
-    y[-(fine_scan_length // 2):] = np.arange(fine_scan_length + 0.5, fine_scan_length * 3 / 2)
-    y = np.tile(y, scans)
+    def _get_coords_1km(
+            self,
+            coarse_scan_length,
+            coarse_scan_width,
+            fine_scan_length,
+            fine_pixels_per_coarse_pixel,
+            fine_scan_width,
+            scans,
+    ):
+        y = (
+            np.arange((coarse_scan_length + 1) * fine_scan_length) % fine_scan_length
+        ) + 0.5
+        y = y[fine_scan_length // 2:-(fine_scan_length // 2)]
+        y[: fine_scan_length // 2] = np.arange(-fine_scan_length / 2 + 0.5, 0)
+        y[-(fine_scan_length // 2):] = np.arange(fine_scan_length + 0.5, fine_scan_length * 3 / 2)
+        y = np.tile(y, scans)
 
-    x = np.arange(fine_scan_width) % fine_pixels_per_coarse_pixel
-    x[-fine_pixels_per_coarse_pixel:] = np.arange(fine_pixels_per_coarse_pixel, fine_pixels_per_coarse_pixel * 2)
-    return x, y
-
-
-def _get_coords_5km(
-    coarse_scan_length,
-    coarse_scan_width,
-    fine_scan_length,
-    fine_pixels_per_coarse_pixel,
-    fine_scan_width,
-    scans,
-):
-    y = np.arange(fine_scan_length * coarse_scan_length) - 2
-    y = np.tile(y, scans)
-
-    x = (np.arange(fine_scan_width) - 2) % fine_pixels_per_coarse_pixel
-    x[0] = -2
-    x[1] = -1
-    if coarse_scan_width == 271:
-        x[-2] = 5
-        x[-1] = 6
-    elif coarse_scan_width == 270:
-        x[-7] = 5
-        x[-6] = 6
-        x[-5] = 7
-        x[-4] = 8
-        x[-3] = 9
-        x[-2] = 10
-        x[-1] = 11
-    else:
-        raise NotImplementedError(
-            "Can't interpolate if 5km tiepoints have less than 270 columns."
-        )
-    return x, y
+        x = np.arange(fine_scan_width) % fine_pixels_per_coarse_pixel
+        x[-fine_pixels_per_coarse_pixel:] = np.arange(fine_pixels_per_coarse_pixel, fine_pixels_per_coarse_pixel * 2)
+        return x, y
 
 
-def _expand_tiepoint_array_1km(
-    coarse_pixels_per_1km,
-    coarse_scan_width,
-    fine_pixels_per_coarse_pixel,
-    arr,
-    fine_scan_length,
-):
-    arr = np.repeat(arr, fine_scan_length, axis=1)
-    arr = np.concatenate(
-        (arr[:, :fine_scan_length // 2, :], arr, arr[:, -(fine_scan_length // 2):, :]), axis=1
-    )
-    arr = np.repeat(arr.reshape((-1, coarse_scan_width - 1)), fine_pixels_per_coarse_pixel, axis=1)
-    return np.hstack((arr, arr[:, -fine_pixels_per_coarse_pixel:]))
+    def _get_coords_5km(
+            self,
+            coarse_scan_length,
+            coarse_scan_width,
+            fine_scan_length,
+            fine_pixels_per_coarse_pixel,
+            fine_scan_width,
+            scans,
+    ):
+        y = np.arange(fine_scan_length * coarse_scan_length) - 2
+        y = np.tile(y, scans)
 
-
-def _expand_tiepoint_array_5km(
-    coarse_pixels_per_1km,
-    coarse_scan_width,
-    fine_pixels_per_coarse_pixel,
-    arr,
-    fine_scan_length,
-):
-    arr = np.repeat(arr, fine_scan_length * 2, axis=1)
-    arr = np.repeat(arr.reshape((-1, coarse_scan_width - 1)), fine_pixels_per_coarse_pixel, axis=1)
-    factor = fine_pixels_per_coarse_pixel // coarse_pixels_per_1km
-    if coarse_scan_width == 271:
-        return np.hstack((arr[:, :2 * factor], arr, arr[:, -2 * factor:]))
-    else:
-        return np.hstack(
-            (
-                arr[:, :2 * factor],
-                arr,
-                arr[:, -fine_pixels_per_coarse_pixel:],
-                arr[:, -2 * factor:],
+        x = (np.arange(fine_scan_width) - 2) % fine_pixels_per_coarse_pixel
+        x[0] = -2
+        x[1] = -1
+        if coarse_scan_width == 271:
+            x[-2] = 5
+            x[-1] = 6
+        elif coarse_scan_width == 270:
+            x[-7] = 5
+            x[-6] = 6
+            x[-5] = 7
+            x[-4] = 8
+            x[-3] = 9
+            x[-2] = 10
+            x[-1] = 11
+        else:
+            raise NotImplementedError(
+                "Can't interpolate if 5km tiepoints have less than 270 columns."
             )
+        return x, y
+
+
+    def _expand_tiepoint_array_1km(
+            self,
+            coarse_pixels_per_1km,
+            coarse_scan_width,
+            fine_pixels_per_coarse_pixel,
+            arr,
+            fine_scan_length,
+    ):
+        arr = np.repeat(arr, fine_scan_length, axis=1)
+        arr = np.concatenate(
+            (arr[:, :fine_scan_length // 2, :], arr, arr[:, -(fine_scan_length // 2):, :]), axis=1
         )
+        arr = np.repeat(arr.reshape((-1, coarse_scan_width - 1)), fine_pixels_per_coarse_pixel, axis=1)
+        return np.hstack((arr, arr[:, -fine_pixels_per_coarse_pixel:]))
+
+
+    def _expand_tiepoint_array_5km(
+            self,
+            coarse_pixels_per_1km,
+            coarse_scan_width,
+            fine_pixels_per_coarse_pixel,
+            arr,
+            fine_scan_length,
+    ):
+        arr = np.repeat(arr, fine_scan_length * 2, axis=1)
+        arr = np.repeat(arr.reshape((-1, coarse_scan_width - 1)), fine_pixels_per_coarse_pixel, axis=1)
+        factor = fine_pixels_per_coarse_pixel // coarse_pixels_per_1km
+        if coarse_scan_width == 271:
+            return np.hstack((arr[:, :2 * factor], arr, arr[:, -2 * factor:]))
+        else:
+            return np.hstack(
+                (
+                    arr[:, :2 * factor],
+                    arr,
+                    arr[:, -fine_pixels_per_coarse_pixel:],
+                    arr[:, -2 * factor:],
+                )
+            )
 
 
 def modis_1km_to_250m(lon1, lat1, satz1):
