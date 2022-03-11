@@ -96,8 +96,12 @@ class _Interpolator:
         if coarse_resolution == 1000:
             coarse_scan_length = 10
             coarse_scan_width = 1354
+            self._get_coords = self._get_coords_1km
+            self._expand_tiepoint_array = self._expand_tiepoint_array_1km
         elif coarse_resolution == 5000:
             coarse_scan_length = 2
+            self._get_coords = self._get_coords_5km
+            self._expand_tiepoint_array = self._expand_tiepoint_array_5km
             if coarse_scan_width is None:
                 coarse_scan_width = 271
             else:
@@ -114,12 +118,6 @@ class _Interpolator:
         self._fine_pixels_per_coarse_pixel = fine_pixels_per_1km * self._coarse_pixels_per_1km
         self._fine_scan_width = 1354 * fine_pixels_per_1km
         self._fine_scan_length = fine_pixels_per_1km * 10 // coarse_scan_length
-        if coarse_resolution == 1000:
-            self._get_coords = self._get_coords_1km
-            self._expand_tiepoint_array = self._expand_tiepoint_array_1km
-        else:
-            self._get_coords = self._get_coords_5km
-            self._expand_tiepoint_array = self._expand_tiepoint_array_5km
         self._coarse_resolution = coarse_resolution
         self._fine_resolution = fine_resolution
 
