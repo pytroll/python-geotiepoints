@@ -86,6 +86,26 @@ def _get_corners(arr):
     return arr_a, arr_b, arr_c, arr_d
 
 
+@scanline_mapblocks
+def _interpolate(
+        lon1,
+        lat1,
+        satz1,
+        coarse_resolution=None,
+        fine_resolution=None,
+        coarse_scan_width=None,
+):
+    """Helper function to interpolate scan-aligned arrays.
+
+    This function's decorator runs this function for each dask block/chunk of
+    scans. The arrays are scan-aligned meaning they are an even number of scans
+    (N rows per scan) and contain the entire scan width.
+
+    """
+    interp = _Interpolator(coarse_resolution, fine_resolution, coarse_scan_width=coarse_scan_width)
+    return interp.interpolate(lon1, lat1, satz1)
+
+
 class _Interpolator:
     """Helper class for MODIS interpolation.
 
@@ -122,28 +142,7 @@ class _Interpolator:
         self._fine_resolution = fine_resolution
 
     def interpolate(self, lon1, lat1, satz1):
-        return self._interpolate(lon1, lat1, satz1,
-                                 coarse_resolution=self._coarse_resolution,
-                                 fine_resolution=self._fine_resolution,
-                                 coarse_scan_width=self._coarse_scan_width)
-    @scanline_mapblocks
-    def _interpolate(
-        self,
-        lon1,
-        lat1,
-        satz1,
-        coarse_resolution=None,
-        fine_resolution=None,
-        coarse_scan_width=None,
-    ):
-        """Interpolate MODIS geolocation from 'coarse_resolution' to 'fine_resolution'.
-
-        Note this method takes 3 keyword arguments that are unused. These
-        arguments are used by the :func:`scanline_mapblocks` decorator to
-        determine optimal chunking.
-
-        """
-        del coarse_resolution, fine_resolution, coarse_scan_width
+        """Interpolate MODIS geolocation from 'coarse_resolution' to 'fine_resolution'."""
         scans = satz1.shape[0] // self._coarse_scan_length
         # reshape to (num scans, rows per scan, columns per scan)
         satz1 = satz1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
@@ -250,20 +249,24 @@ class _Interpolator:
 
 def modis_1km_to_250m(lon1, lat1, satz1):
     """Interpolate MODIS geolocation from 1km to 250m resolution."""
-    interp = _Interpolator(1000, 250)
-    return interp.interpolate(lon1, lat1, satz1)
+    return _interpolate(lon1, lat1, satz1,
+                        coarse_resolution=1000,
+                        fine_resolution=250)
 
 
 def modis_1km_to_500m(lon1, lat1, satz1):
     """Interpolate MODIS geolocation from 1km to 500m resolution."""
-    interp = _Interpolator(1000, 500)
-    return interp.interpolate(lon1, lat1, satz1)
+    return _interpolate(lon1, lat1, satz1,
+                        coarse_resolution=1000,
+                        fine_resolution=500)
 
 
 def modis_5km_to_1km(lon1, lat1, satz1):
     """Interpolate MODIS geolocation from 5km to 1km resolution."""
-    interp = _Interpolator(5000, 1000, coarse_scan_width=lon1.shape[1])
-    return interp.interpolate(lon1, lat1, satz1)
+    return _interpolate(lon1, lat1, satz1,
+                        coarse_resolution=5000,
+                        fine_resolution=1000,
+                        coarse_scan_width=lon1.shape[1])
 
 
 def modis_5km_to_500m(lon1, lat1, satz1):
@@ -271,8 +274,10 @@ def modis_5km_to_500m(lon1, lat1, satz1):
     warnings.warn(
         "Interpolating 5km geolocation to 500m resolution " "may result in poor quality"
     )
-    interp = _Interpolator(5000, 500, coarse_scan_width=lon1.shape[1])
-    return interp.interpolate(lon1, lat1, satz1)
+    return _interpolate(lon1, lat1, satz1,
+                        coarse_resolution=5000,
+                        fine_resolution=500,
+                        coarse_scan_width=lon1.shape[1])
 
 
 def modis_5km_to_250m(lon1, lat1, satz1):
@@ -280,5 +285,7 @@ def modis_5km_to_250m(lon1, lat1, satz1):
     warnings.warn(
         "Interpolating 5km geolocation to 250m resolution " "may result in poor quality"
     )
-    interp = _Interpolator(5000, 250, coarse_scan_width=lon1.shape[1])
-    return interp.interpolate(lon1, lat1, satz1)
+    return _interpolate(lon1, lat1, satz1,
+                        coarse_resolution=5000,
+                        fine_resolution=250,
+                        coarse_scan_width=lon1.shape[1])
