@@ -16,8 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Tests for MODIS interpolators."""
 
-import unittest
 import numpy as np
+import dask.array as da
+import xarray as xr
 import h5py
 import os
 from geotiepoints.modisinterpolator import (modis_1km_to_250m,
@@ -30,13 +31,10 @@ FILENAME_DATA = os.path.join(
 
 
 def to_da(arr):
-    import xarray as xr
-    import dask.array as da
-
     return xr.DataArray(da.from_array(arr, chunks=4096), dims=['y', 'x'])
 
 
-class TestModisInterpolator(unittest.TestCase):
+class TestModisInterpolator:
     def test_modis(self):
         h5f = h5py.File(FILENAME_DATA, 'r')
         lon1 = to_da(h5f['lon_1km'])
@@ -67,15 +65,15 @@ class TestModisInterpolator(unittest.TestCase):
 
         # 5km to 500m
         lons, lats = modis_5km_to_500m(lon5, lat5, satz5)
-        self.assertEqual(lon500.shape, lons.shape)
-        self.assertEqual(lat500.shape, lats.shape)
+        assert lon500.shape == lons.shape
+        assert lat500.shape == lats.shape
         # np.testing.assert_allclose(lon500, lons, atol=1e-2)
         # np.testing.assert_allclose(lat500, lats, atol=1e-2)
 
         # 5km to 250m
         lons, lats = modis_5km_to_250m(lon5, lat5, satz5)
-        self.assertEqual(lon250.shape, lons.shape)
-        self.assertEqual(lat250.shape, lats.shape)
+        assert lon250.shape == lons.shape
+        assert lat250.shape == lats.shape
         # np.testing.assert_allclose(lon250, lons, atol=1e-2)
         # np.testing.assert_allclose(lat250, lats, atol=1e-2)
 
@@ -91,11 +89,11 @@ class TestModisInterpolator(unittest.TestCase):
         # Test nans issue (#19)
         satz1 = to_da(abs(np.linspace(-65.4, 65.4, 1354, dtype=np.float32)).repeat(20).reshape(-1, 20).T)
         lons, lats = modis_1km_to_500m(lon1, lat1, satz1)
-        self.assertFalse(np.any(np.isnan(lons.compute())))
-        self.assertFalse(np.any(np.isnan(lats.compute())))
+        lons_np, lats_np = da.compute(lons, lats)
+        assert not np.any(np.isnan(lons_np))
+        assert not np.any(np.isnan(lats_np))
 
     def test_poles_datum(self):
-        import xarray as xr
         h5f = h5py.File(FILENAME_DATA, 'r')
         orig_lon = to_da(h5f['lon_1km'])
         lon1 = orig_lon + 180
