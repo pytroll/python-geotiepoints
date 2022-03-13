@@ -297,16 +297,16 @@ cdef class Interpolator:
 
     cdef np.ndarray[floating, ndim=2] _expand_tiepoint_array_5km(self, np.ndarray[floating, ndim=3] arr):
         arr = np.repeat(arr, self._fine_scan_length * 2, axis=1)
-        arr = np.repeat(arr.reshape((-1, self._coarse_scan_width - 1)), self._fine_pixels_per_coarse_pixel, axis=1)
+        cdef np.ndarray[floating, ndim=2] arr_2d = np.repeat(arr.reshape((-1, self._coarse_scan_width - 1)), self._fine_pixels_per_coarse_pixel, axis=1)
         factor = self._fine_pixels_per_coarse_pixel // self._coarse_pixels_per_1km
         if self._coarse_scan_width == 271:
-            return np.hstack((arr[:, :2 * factor], arr, arr[:, -2 * factor:]))
+            return np.hstack((arr_2d[:, :2 * factor], arr_2d, arr_2d[:, -2 * factor:]))
         else:
             return np.hstack(
                 (
-                    arr[:, :2 * factor],
-                    arr,
-                    arr[:, -self._fine_pixels_per_coarse_pixel:],
-                    arr[:, -2 * factor:],
+                    arr_2d[:, :2 * factor],
+                    arr_2d,
+                    arr_2d[:, -self._fine_pixels_per_coarse_pixel:],
+                    arr_2d[:, -2 * factor:],
                 )
             )
