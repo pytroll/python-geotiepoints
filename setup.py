@@ -46,6 +46,12 @@ EXTENSIONS = [
         extra_compile_args=extra_compile_args,
         include_dirs=[np.get_include()],
     ),
+    Extension(
+        'geotiepoints._modis_interpolator',
+        sources=['geotiepoints/_modis_interpolator.pyx'],
+        extra_compile_args=extra_compile_args,
+        include_dirs=[np.get_include()],
+    ),
 ]
 
 cmdclass = versioneer.get_cmdclass()
@@ -70,7 +76,7 @@ if __name__ == "__main__":
           python_requires='>=3.6',
           cmdclass=cmdclass,
           install_requires=requirements,
-          ext_modules=cythonize(EXTENSIONS),
+          ext_modules=cythonize(EXTENSIONS, compiler_directives={'language_level': '3'}),
           tests_require=test_requires,
           zip_safe=False
           )
