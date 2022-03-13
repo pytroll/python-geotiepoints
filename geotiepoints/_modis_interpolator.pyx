@@ -24,7 +24,7 @@ H = 705.0
 def lonlat2xyz(
         lons, lats,
         # floating[:, :] lons, floating[:, :] lats,
-        floating radius=EARTH_RADIUS):
+        radius=EARTH_RADIUS):
     """Convert lons and lats to cartesian coordinates."""
     lons_rad = np.deg2rad(lons)
     lats_rad = np.deg2rad(lats)
@@ -44,8 +44,8 @@ def xyz2lonlat(
         x__,
         y__,
         z__,
-        floating radius=EARTH_RADIUS,
-        floating thr=0.8,
+        radius=EARTH_RADIUS,
+        thr=0.8,
         bint low_lat_z=True):
     """Get longitudes from cartesian coordinates."""
     lons = np.rad2deg(np.arccos(x__ / np.sqrt(x__ ** 2 + y__ ** 2))) * np.sign(y__)
@@ -79,6 +79,10 @@ def interpolate(
     (N rows per scan) and contain the entire scan width.
 
     """
+    if coarse_resolution == 5000 and coarse_scan_width not in (0, 270, 271):
+        raise NotImplementedError(
+            "Can't interpolate if 5km tiepoints have less than 270 columns."
+        )
     interp = Interpolator(coarse_resolution, fine_resolution, coarse_scan_width=coarse_scan_width or 0)
     return interp.interpolate(lon1, lat1, satz1)
 
@@ -194,6 +198,7 @@ cdef class Interpolator:
         # reshape to (num scans, rows per scan, columns per scan)
         cdef np.ndarray[floating, ndim=3] satz1 = satz1_.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
         # cdef floating [:, :, :] satz1 = satz1_.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
+        print("Satz1 dtype: ", satz1.dtype, lon1.dtype, lat1.dtype, satz1_.dtype)
 
         # satz_a, satz_b = _get_corners(np.deg2rad(satz1))[:2]
         corners = _get_corners(np.deg2rad(satz1))
@@ -203,30 +208,38 @@ cdef class Interpolator:
         exp_alignments = _compute_expansion_alignment(satz_a, satz_b)
         cdef np.ndarray[floating, ndim=3] c_exp = exp_alignments[0]
         cdef np.ndarray[floating, ndim=3] c_ali = exp_alignments[1]
+        print("Corners: ", satz_a.dtype, c_exp.dtype)
 
         # x, y = self._get_coords(scans)
         coords_xy = self._get_coords(scans)
-        cdef np.ndarray[floating, ndim=1] x = coords_xy[0]
-        cdef np.ndarray[floating, ndim=1] y = coords_xy[1]
+        cdef np.ndarray[np.int32_t, ndim=1] x = coords_xy[0]
+        cdef np.ndarray[np.int32_t, ndim=1] y = coords_xy[1]
         i_rs, i_rt = np.meshgrid(x, y)
+        print("Coords: ", x.dtype, y.dtype, i_rs.dtype, i_rt.dtype)
 
         p_os = 0
         p_ot = 0
         s_s = (p_os + i_rs) * 1.0 / self._fine_pixels_per_coarse_pixel
         s_t = (p_ot + i_rt) * 1.0 / self._fine_scan_length
+        # s_s = (p_os + i_rs).astype(np.float32) / self._fine_pixels_per_coarse_pixel
+        # s_t = (p_ot + i_rt).astype(np.float32) / self._fine_scan_length
+        print("s_s/s_t: ", s_s.dtype, s_t.dtype)
 
         cdef np.ndarray[floating, ndim=2] c_exp_full = self._expand_tiepoint_array(c_exp)
         cdef np.ndarray[floating, ndim=2] c_ali_full = self._expand_tiepoint_array(c_ali)
 
         a_track = s_t
         a_scan = s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full
+        # a_track = a_track.astype(np.float32)
+        # a_scan = a_scan.astype(np.float32)
+        print("A track/scan: ", a_track.dtype, a_scan.dtype)
 
         res = []
         datasets = lonlat2xyz(lon1, lat1)
         cdef np.ndarray[floating, ndim=3] data
         cdef np.ndarray[floating, ndim=3] data_a, data_b, data_c, data_d
         cdef np.ndarray[floating, ndim=2] data_a_2d, data_b_2d, data_c_2d, data_d_2d
-        cdef np.ndarray[floating, ndim=2] comp_arr_2d
+        cdef np.ndarray[np.float64_t, ndim=2] comp_arr_2d
         for data_2d in datasets:
             data = data_2d.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
             # data_a, data_b, data_c, data_d = _get_corners(data)
@@ -242,13 +255,14 @@ cdef class Interpolator:
 
             data_1 = (1 - a_scan) * data_a_2d + a_scan * data_b_2d
             data_2 = (1 - a_scan) * data_d_2d + a_scan * data_c_2d
+            # comp_arr_2d = ((1 - a_track) * data_1 + a_track * data_2).astype(np.float32)
             comp_arr_2d = (1 - a_track) * data_1 + a_track * data_2
 
             res.append(comp_arr_2d)
         new_lons, new_lats = xyz2lonlat(*res)
         return new_lons.astype(lon1.dtype), new_lats.astype(lat1.dtype)
 
-    cdef _get_coords_1km(self, unsigned int scans):
+    cdef tuple _get_coords_1km(self, unsigned int scans):
         cdef np.ndarray[np.float32_t, ndim=1] y = (np.arange((self._coarse_scan_length + 1) * self._fine_scan_length, dtype=np.float32) % self._fine_scan_length) + 0.5
         cdef int half_scan_length = self._fine_scan_length // 2
         cdef np.ndarray[np.float32_t, ndim=1] y2 = y[half_scan_length:-half_scan_length]
@@ -260,20 +274,20 @@ cdef class Interpolator:
         x[-self._fine_pixels_per_coarse_pixel:] = np.arange(
             self._fine_pixels_per_coarse_pixel,
             self._fine_pixels_per_coarse_pixel * 2)
-        return x, y3
+        return x.astype(np.int32), y3.astype(np.int32)
 
-    # def _get_coords_5km(self, unsigned int scans):
-    cdef _get_coords_5km(self, unsigned int scans):
-        y = np.arange(self._fine_scan_length * self._coarse_scan_length) - 2
+    cdef tuple _get_coords_5km(self, unsigned int scans):
+        cdef np.ndarray[np.int32_t, ndim=1] y = np.arange(self._fine_scan_length * self._coarse_scan_length, dtype=np.int32) - 2
         y = np.tile(y, scans)
 
-        x = (np.arange(self._fine_scan_width) - 2) % self._fine_pixels_per_coarse_pixel
+        cdef np.ndarray[np.int32_t, ndim=1] x = (np.arange(self._fine_scan_width, dtype=np.int32) - 2) % self._fine_pixels_per_coarse_pixel
         x[0] = -2
         x[1] = -1
         if self._coarse_scan_width == 271:
             x[-2] = 5
             x[-1] = 6
-        elif self._coarse_scan_width == 270:
+        else:
+            # elif self._coarse_scan_width == 270:
             x[-7] = 5
             x[-6] = 6
             x[-5] = 7
@@ -281,10 +295,6 @@ cdef class Interpolator:
             x[-3] = 9
             x[-2] = 10
             x[-1] = 11
-        else:
-            raise NotImplementedError(
-                "Can't interpolate if 5km tiepoints have less than 270 columns."
-            )
         return x, y
 
     cdef np.ndarray[floating, ndim=2] _expand_tiepoint_array_1km(self, np.ndarray[floating, ndim=3] arr):
