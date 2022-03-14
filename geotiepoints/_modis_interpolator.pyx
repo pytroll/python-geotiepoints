@@ -260,30 +260,32 @@ cdef class Interpolator:
         new_lons, new_lats = xyz2lonlat(*res)
         return new_lons.astype(lon1.dtype), new_lats.astype(lat1.dtype)
 
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.wraparound(False)
     cdef tuple _get_coords_1km(self, unsigned int scans):
         cdef int half_scan_length = self._fine_scan_length // 2
-        cdef np.ndarray[np.float32_t, ndim=1] y = (np.arange((self._coarse_scan_length + 1) * self._fine_scan_length, dtype=np.float32) % self._fine_scan_length) + 0.5
-        cdef np.ndarray[np.float32_t, ndim=1] y2 = y[half_scan_length:-half_scan_length]
-        y2[:half_scan_length] = np.arange(-self._fine_scan_length / 2 + 0.5, 0)
-        y2[-half_scan_length:] = np.arange(self._fine_scan_length + 0.5, self._fine_scan_length * 3 / 2)
-        cdef np.ndarray[np.float32_t, ndim=1] y3 = np.tile(y2, scans)
-
-        # cdef np.ndarray[np.int32_t, ndim=1] y = np.empty((self._coarse_scan_length * self._fine_scan_length,), dtype=np.int32)
-        # cdef np.int32_t[::1] y_view = y
-        # cdef unsigned int scan_idx
-        # cdef int i
-        # cdef int relative_scan_i
-        # # XXX: assume memory locality is more important than loop optimization
-        # for scan_idx in range(scans):
-        #     for i in range(self._coarse_scan_length * self._fine_scan_length):
-        #         if i < half_scan_length:
-        #             y_view[i] = i + 0.5
+        cdef np.ndarray[np.float32_t, ndim=1] y = np.empty((scans * self._coarse_scan_length * self._fine_scan_length,), dtype=np.float32)
+        cdef np.float32_t[::1] y_view = y
+        cdef unsigned int scan_idx
+        cdef int i
+        cdef int fine_idx
+        cdef unsigned int fine_pixels_per_scan = self._coarse_scan_length * self._fine_scan_length
+        for scan_idx in range(scans):
+            for i in range(fine_pixels_per_scan):
+                fine_idx = scan_idx * fine_pixels_per_scan + i
+                if i < half_scan_length:
+                    y_view[fine_idx] = (-half_scan_length + 0.5) - i
+                elif i > fine_pixels_per_scan - half_scan_length:
+                    y_view[fine_idx] = (self._fine_scan_length + 0.5) + (fine_pixels_per_scan - i)
+                else:
+                    y_view[fine_idx] = (i % self._fine_scan_length) + 0.5
 
         cdef np.ndarray[np.float32_t, ndim=1] x = np.arange(self._fine_scan_width, dtype=np.float32) % self._fine_pixels_per_coarse_pixel
-        x[-self._fine_pixels_per_coarse_pixel:] = np.arange(
-            self._fine_pixels_per_coarse_pixel,
-            self._fine_pixels_per_coarse_pixel * 2)
-        return x, y3
+        cdef np.float32_t[::1] x_view = x
+        for i in range(self._fine_pixels_per_coarse_pixel):
+            x_view[(self._fine_scan_width - self._fine_pixels_per_coarse_pixel) + i] = self._fine_pixels_per_coarse_pixel + i
+        return x, y
 
     cdef tuple _get_coords_5km(self, unsigned int scans):
         cdef np.ndarray[np.float32_t, ndim=1] y = np.arange(self._fine_scan_length * self._coarse_scan_length, dtype=np.float32) - 2
