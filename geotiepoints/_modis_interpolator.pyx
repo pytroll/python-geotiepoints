@@ -4,6 +4,7 @@ from cython.parallel import prange,parallel
 from .simple_modis_interpolator import scanline_mapblocks
 
 cimport numpy as np
+from libc.math cimport asin, sin, cos, sqrt
 import numpy as np
 
 # ctypedef fused floating:
@@ -15,10 +16,14 @@ ctypedef fused floating:
     np.float64_t
 
 EARTH_RADIUS = 6370997.0
-R = 6371.0
+# cdef np.float32_t R = 6371.0
+# # Aqua scan width and altitude in km
+# cdef np.float32_t scan_width = 10.00017
+# cdef np.float32_t H = 705.0
+DEF R = 6371.0
 # Aqua scan width and altitude in km
-scan_width = 10.00017
-H = 705.0
+DEF scan_width = 10.00017
+DEF H = 705.0
 
 
 def lonlat2xyz(
@@ -87,46 +92,51 @@ def interpolate(
     return interp.interpolate(lon1, lat1, satz1)
 
 
-def _compute_phi(zeta):
-    return np.arcsin(R * np.sin(zeta) / (R + H))
+cdef floating _compute_phi(floating zeta):
+    return asin(R * sin(zeta) / (R + H))
 
 
-def _compute_theta(zeta, phi):
+cdef floating _compute_theta(floating zeta, floating phi):
     return zeta - phi
 
 
-def _compute_zeta(phi):
-    return np.arcsin((R + H) * np.sin(phi) / R)
+cdef floating _compute_zeta(floating phi):
+    return asin((R + H) * sin(phi) / R)
 
 
-def _compute_expansion_alignment(satz_a, satz_b):
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.wraparound(False)
+cdef tuple _compute_expansion_alignment(floating[:, :, :] satz_a, floating [:, :, :] satz_b):
     """All angles in radians."""
-    zeta_a = satz_a
-    zeta_b = satz_b
+    cdef np.ndarray[floating, ndim=3] c_expansion = np.empty((satz_a.shape[0], satz_a.shape[1], satz_b.shape[2]), dtype=np.float32)
+    cdef np.ndarray[floating, ndim=3] c_alignment = np.empty((satz_a.shape[0], satz_a.shape[1], satz_b.shape[2]), dtype=np.float32)
+    cdef Py_ssize_t i, j, k
+    cdef floating phi_a, phi_b, theta_a, theta_b, phi, zeta, theta, denominator, sin_beta_2, d, e
+    for i in range(satz_a.shape[0]):
+        for j in range(satz_a.shape[1]):
+            for k in range(satz_a.shape[2]):
+                phi_a = _compute_phi(satz_a[i, j, k])
+                phi_b = _compute_phi(satz_b[i, j, k])
+                theta_a = _compute_theta(satz_a[i, j, k], phi_a)
+                theta_b = _compute_theta(satz_b[i, j, k], phi_b)
+                phi = (phi_a + phi_b) / 2
+                zeta = _compute_zeta(phi)
+                theta = _compute_theta(zeta, phi)
+                # Workaround for tiepoints symmetrical about the subsatellite-track
+                denominator = theta_a * 2 if theta_a == theta_b else theta_a - theta_b
 
-    phi_a = _compute_phi(zeta_a)
-    phi_b = _compute_phi(zeta_b)
-    theta_a = _compute_theta(zeta_a, phi_a)
-    theta_b = _compute_theta(zeta_b, phi_b)
-    phi = (phi_a + phi_b) / 2
-    zeta = _compute_zeta(phi)
-    theta = _compute_theta(zeta, phi)
-    # Workaround for tiepoints symetrical about the subsatellite-track
-    denominator = np.where(theta_a == theta_b, theta_a * 2, theta_a - theta_b)
+                c_expansion[i, j, k] = 4 * (((theta_a + theta_b) / 2 - theta) / denominator)
 
-    c_expansion = 4 * (((theta_a + theta_b) / 2 - theta) / denominator)
+                sin_beta_2 = scan_width / (2 * H)
+                d = ((R + H) / R * cos(phi) - cos(zeta)) * sin_beta_2
+                e = cos(zeta) - sqrt(cos(zeta) ** 2 - d ** 2)
 
-    sin_beta_2 = scan_width / (2 * H)
-
-    d = ((R + H) / R * np.cos(phi) - np.cos(zeta)) * sin_beta_2
-    e = np.cos(zeta) - np.sqrt(np.cos(zeta) ** 2 - d ** 2)
-
-    c_alignment = 4 * e * np.sin(zeta) / denominator
-
+                c_alignment[i, j, k] = 4 * e * sin(zeta) / denominator
     return c_expansion, c_alignment
 
 
-def _get_corners(arr):
+cdef tuple _get_corners(np.ndarray[floating, ndim=3] arr):
     arr_a = arr[:, :-1, :-1]
     arr_b = arr[:, :-1, 1:]
     arr_c = arr[:, 1:, 1:]
@@ -201,15 +211,15 @@ cdef class Interpolator:
         # cdef floating [:, :, :] satz1 = satz1_.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
         print("Satz1 dtype: ", satz1.dtype, lon1.dtype, lat1.dtype, satz1_.dtype)
 
-        # satz_a, satz_b = _get_corners(np.deg2rad(satz1))[:2]
-        corners = _get_corners(np.deg2rad(satz1))
+        cdef np.ndarray[floating, ndim=3] satz1_rad = np.deg2rad(satz1)
+        corners = _get_corners(satz1_rad)
         cdef np.ndarray[floating, ndim=3] satz_a = corners[0]
         cdef np.ndarray[floating, ndim=3] satz_b = corners[1]
-        # c_exp, c_ali = _compute_expansion_alignment(satz_a, satz_b)
-        exp_alignments = _compute_expansion_alignment(satz_a, satz_b)
+        cdef floating[:, :, :] satz_a_view = satz_a
+        cdef floating[:, :, :] satz_b_view = satz_b
+        exp_alignments = _compute_expansion_alignment(satz_a_view, satz_b_view)
         cdef np.ndarray[floating, ndim=3] c_exp = exp_alignments[0]
         cdef np.ndarray[floating, ndim=3] c_ali = exp_alignments[1]
-        print("Corners: ", satz_a.dtype, c_exp.dtype)
 
         coords_xy = self._get_coords(scans)
         cdef np.ndarray[floating, ndim=1] x = coords_xy[0]
@@ -219,30 +229,25 @@ cdef class Interpolator:
 
         p_os = 0
         p_ot = 0
-        s_s = (p_os + i_rs) * 1.0 / self._fine_pixels_per_coarse_pixel
-        s_t = (p_ot + i_rt) * 1.0 / self._fine_scan_length
-        # s_s = (p_os + i_rs).astype(np.float32) / self._fine_pixels_per_coarse_pixel
-        # s_t = (p_ot + i_rt).astype(np.float32) / self._fine_scan_length
-        print("s_s/s_t: ", s_s.dtype, s_t.dtype)
+        cdef np.ndarray[floating, ndim=2] s_s = (p_os + i_rs) * 1.0 / self._fine_pixels_per_coarse_pixel
+        cdef np.ndarray[floating, ndim=2] s_t = (p_ot + i_rt) * 1.0 / self._fine_scan_length
 
         cdef np.ndarray[floating, ndim=2] c_exp_full = self._expand_tiepoint_array(c_exp)
         cdef np.ndarray[floating, ndim=2] c_ali_full = self._expand_tiepoint_array(c_ali)
 
-        a_track = s_t
-        # a_scan = (s_s + s_s * (1 - s_s) * c_exp_full.astype(np.float64) + s_t * (1 - s_t) * c_ali_full.astype(np.float64)).astype(np.float32)
-        a_scan = s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full
-        print("A track/scan: ", a_track.dtype, a_scan.dtype)
+        cdef np.ndarray[floating, ndim=2] a_track = s_t
+        cdef np.ndarray[floating, ndim=2] a_scan = s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full
 
         res = []
         datasets = lonlat2xyz(lon1, lat1)
         cdef np.ndarray[floating, ndim=3] data
+        cdef floating[:, :, :] data_view
         cdef np.ndarray[floating, ndim=3] data_a, data_b, data_c, data_d
         cdef np.ndarray[floating, ndim=2] data_a_2d, data_b_2d, data_c_2d, data_d_2d
         # cdef np.ndarray[np.float64_t, ndim=2] comp_arr_2d
         cdef np.ndarray[floating, ndim=2] comp_arr_2d
         for data_2d in datasets:
             data = data_2d.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
-            # data_a, data_b, data_c, data_d = _get_corners(data)
             corners = _get_corners(data)
             data_a = corners[0]
             data_b = corners[1]
@@ -321,15 +326,15 @@ cdef class Interpolator:
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
-    # cdef np.ndarray[floating, ndim=2] _expand_tiepoint_array_1km(self, floating[:, :, ::1] arr):
-    cdef np.ndarray[floating, ndim=2] _expand_tiepoint_array_1km(self, np.ndarray[floating, ndim=3] arr):
+    cdef np.ndarray[floating, ndim=2] _expand_tiepoint_array_1km(self, np.ndarray[floating, ndim=3] npy_arr):
         # TODO: Replace shape multiplication with self._fine_pixel_length and self._fine_pixel_width
+        cdef floating[:, :, :] arr = npy_arr
         cdef np.ndarray[floating, ndim=2] arr_2d = np.empty(
             (
                 arr.shape[0] * (arr.shape[1] + 1) * self._fine_pixels_per_coarse_pixel,
                 (arr.shape[2] + 1) * self._fine_pixels_per_coarse_pixel
             ),
-            dtype=arr.dtype)
+            dtype=npy_arr.dtype)
         cdef floating[:, ::1] arr_2d_view = arr_2d
         cdef floating tiepoint_value
         cdef Py_ssize_t scan_idx, row_idx, col_idx, length_repeat_cycle, width_repeat_cycle, half_scan_offset, scan_offset, row_offset, col_offset
