@@ -210,10 +210,9 @@ cdef class Interpolator:
         cdef np.ndarray[floating, ndim=3] c_ali = exp_alignments[1]
         print("Corners: ", satz_a.dtype, c_exp.dtype)
 
-        # x, y = self._get_coords(scans)
         coords_xy = self._get_coords(scans)
-        cdef np.ndarray[np.int32_t, ndim=1] x = coords_xy[0]
-        cdef np.ndarray[np.int32_t, ndim=1] y = coords_xy[1]
+        cdef np.ndarray[floating, ndim=1] x = coords_xy[0]
+        cdef np.ndarray[floating, ndim=1] y = coords_xy[1]
         i_rs, i_rt = np.meshgrid(x, y)
         print("Coords: ", x.dtype, y.dtype, i_rs.dtype, i_rt.dtype)
 
@@ -229,9 +228,8 @@ cdef class Interpolator:
         cdef np.ndarray[floating, ndim=2] c_ali_full = self._expand_tiepoint_array(c_ali)
 
         a_track = s_t
+        # a_scan = (s_s + s_s * (1 - s_s) * c_exp_full.astype(np.float64) + s_t * (1 - s_t) * c_ali_full.astype(np.float64)).astype(np.float32)
         a_scan = s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full
-        # a_track = a_track.astype(np.float32)
-        # a_scan = a_scan.astype(np.float32)
         print("A track/scan: ", a_track.dtype, a_scan.dtype)
 
         res = []
@@ -239,7 +237,8 @@ cdef class Interpolator:
         cdef np.ndarray[floating, ndim=3] data
         cdef np.ndarray[floating, ndim=3] data_a, data_b, data_c, data_d
         cdef np.ndarray[floating, ndim=2] data_a_2d, data_b_2d, data_c_2d, data_d_2d
-        cdef np.ndarray[np.float64_t, ndim=2] comp_arr_2d
+        # cdef np.ndarray[np.float64_t, ndim=2] comp_arr_2d
+        cdef np.ndarray[floating, ndim=2] comp_arr_2d
         for data_2d in datasets:
             data = data_2d.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
             # data_a, data_b, data_c, data_d = _get_corners(data)
@@ -255,32 +254,42 @@ cdef class Interpolator:
 
             data_1 = (1 - a_scan) * data_a_2d + a_scan * data_b_2d
             data_2 = (1 - a_scan) * data_d_2d + a_scan * data_c_2d
-            # comp_arr_2d = ((1 - a_track) * data_1 + a_track * data_2).astype(np.float32)
             comp_arr_2d = (1 - a_track) * data_1 + a_track * data_2
 
-            res.append(comp_arr_2d)
+            res.append(comp_arr_2d.astype(np.float64))
         new_lons, new_lats = xyz2lonlat(*res)
         return new_lons.astype(lon1.dtype), new_lats.astype(lat1.dtype)
 
     cdef tuple _get_coords_1km(self, unsigned int scans):
-        cdef np.ndarray[np.float32_t, ndim=1] y = (np.arange((self._coarse_scan_length + 1) * self._fine_scan_length, dtype=np.float32) % self._fine_scan_length) + 0.5
         cdef int half_scan_length = self._fine_scan_length // 2
+        cdef np.ndarray[np.float32_t, ndim=1] y = (np.arange((self._coarse_scan_length + 1) * self._fine_scan_length, dtype=np.float32) % self._fine_scan_length) + 0.5
         cdef np.ndarray[np.float32_t, ndim=1] y2 = y[half_scan_length:-half_scan_length]
         y2[:half_scan_length] = np.arange(-self._fine_scan_length / 2 + 0.5, 0)
         y2[-half_scan_length:] = np.arange(self._fine_scan_length + 0.5, self._fine_scan_length * 3 / 2)
         cdef np.ndarray[np.float32_t, ndim=1] y3 = np.tile(y2, scans)
 
+        # cdef np.ndarray[np.int32_t, ndim=1] y = np.empty((self._coarse_scan_length * self._fine_scan_length,), dtype=np.int32)
+        # cdef np.int32_t[::1] y_view = y
+        # cdef unsigned int scan_idx
+        # cdef int i
+        # cdef int relative_scan_i
+        # # XXX: assume memory locality is more important than loop optimization
+        # for scan_idx in range(scans):
+        #     for i in range(self._coarse_scan_length * self._fine_scan_length):
+        #         if i < half_scan_length:
+        #             y_view[i] = i + 0.5
+
         cdef np.ndarray[np.float32_t, ndim=1] x = np.arange(self._fine_scan_width, dtype=np.float32) % self._fine_pixels_per_coarse_pixel
         x[-self._fine_pixels_per_coarse_pixel:] = np.arange(
             self._fine_pixels_per_coarse_pixel,
             self._fine_pixels_per_coarse_pixel * 2)
-        return x.astype(np.int32), y3.astype(np.int32)
+        return x, y3
 
     cdef tuple _get_coords_5km(self, unsigned int scans):
-        cdef np.ndarray[np.int32_t, ndim=1] y = np.arange(self._fine_scan_length * self._coarse_scan_length, dtype=np.int32) - 2
+        cdef np.ndarray[np.float32_t, ndim=1] y = np.arange(self._fine_scan_length * self._coarse_scan_length, dtype=np.float32) - 2
         y = np.tile(y, scans)
 
-        cdef np.ndarray[np.int32_t, ndim=1] x = (np.arange(self._fine_scan_width, dtype=np.int32) - 2) % self._fine_pixels_per_coarse_pixel
+        cdef np.ndarray[np.float32_t, ndim=1] x = (np.arange(self._fine_scan_width, dtype=np.float32) - 2) % self._fine_pixels_per_coarse_pixel
         x[0] = -2
         x[1] = -1
         if self._coarse_scan_width == 271:
