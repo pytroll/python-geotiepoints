@@ -92,25 +92,24 @@ def interpolate(
     return interp.interpolate(lon1, lat1, satz1)
 
 
-cdef floating _compute_phi(floating zeta):
+cdef inline floating _compute_phi(floating zeta) nogil:
     return asin(R * sin(zeta) / (R + H))
 
 
-cdef floating _compute_theta(floating zeta, floating phi):
+cdef inline floating _compute_theta(floating zeta, floating phi) nogil:
     return zeta - phi
 
 
-cdef floating _compute_zeta(floating phi):
+cdef inline floating _compute_zeta(floating phi) nogil:
     return asin((R + H) * sin(phi) / R)
 
 
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
-cdef tuple _compute_expansion_alignment(floating[:, :, :] satz_a, floating [:, :, :] satz_b):
+cdef void _compute_expansion_alignment(floating[:, :, ::1] satz_a, floating [:, :, ::1] satz_b,
+                                       floating[:, :, ::1] c_expansion, floating[:, :, ::1] c_alignment) nogil:
     """All angles in radians."""
-    cdef np.ndarray[floating, ndim=3] c_expansion = np.empty((satz_a.shape[0], satz_a.shape[1], satz_b.shape[2]), dtype=np.float32)
-    cdef np.ndarray[floating, ndim=3] c_alignment = np.empty((satz_a.shape[0], satz_a.shape[1], satz_b.shape[2]), dtype=np.float32)
     cdef Py_ssize_t i, j, k
     cdef floating phi_a, phi_b, theta_a, theta_b, phi, zeta, theta, denominator, sin_beta_2, d, e
     for i in range(satz_a.shape[0]):
@@ -133,7 +132,6 @@ cdef tuple _compute_expansion_alignment(floating[:, :, :] satz_a, floating [:, :
                 e = cos(zeta) - sqrt(cos(zeta) ** 2 - d ** 2)
 
                 c_alignment[i, j, k] = 4 * e * sin(zeta) / denominator
-    return c_expansion, c_alignment
 
 
 cdef tuple _get_corners(np.ndarray[floating, ndim=3] arr):
@@ -203,23 +201,27 @@ cdef class Interpolator:
             self,
             np.ndarray[floating, ndim=2] lon1,
             np.ndarray[floating, ndim=2] lat1,
-            np.ndarray[floating, ndim=2] satz1_):
+            np.ndarray[floating, ndim=2] satz1):
         """Interpolate MODIS geolocation from 'coarse_resolution' to 'fine_resolution'."""
-        cdef unsigned int scans = satz1_.shape[0] // self._coarse_scan_length
-        # reshape to (num scans, rows per scan, columns per scan)
-        cdef np.ndarray[floating, ndim=3] satz1 = satz1_.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
-        # cdef floating [:, :, :] satz1 = satz1_.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
-        print("Satz1 dtype: ", satz1.dtype, lon1.dtype, lat1.dtype, satz1_.dtype)
+        lon1 = np.ascontiguousarray(lon1)
+        la11 = np.ascontiguousarray(lat1)
+        satz1 = np.ascontiguousarray(satz1)
 
-        cdef np.ndarray[floating, ndim=3] satz1_rad = np.deg2rad(satz1)
-        corners = _get_corners(satz1_rad)
-        cdef np.ndarray[floating, ndim=3] satz_a = corners[0]
-        cdef np.ndarray[floating, ndim=3] satz_b = corners[1]
-        cdef floating[:, :, :] satz_a_view = satz_a
-        cdef floating[:, :, :] satz_b_view = satz_b
-        exp_alignments = _compute_expansion_alignment(satz_a_view, satz_b_view)
-        cdef np.ndarray[floating, ndim=3] c_exp = exp_alignments[0]
-        cdef np.ndarray[floating, ndim=3] c_ali = exp_alignments[1]
+        cdef unsigned int scans = satz1.shape[0] // self._coarse_scan_length
+        # reshape to (num scans, rows per scan, columns per scan)
+        cdef np.ndarray[floating, ndim=3] satz1_3d = satz1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
+        print("Satz1 dtype: ", satz1.dtype, lon1.dtype, lat1.dtype, satz1_3d.dtype)
+
+        corners = _get_corners(satz1_3d)
+        cdef np.ndarray[floating, ndim=3] satz_a = np.deg2rad(np.ascontiguousarray(corners[0]))
+        cdef np.ndarray[floating, ndim=3] satz_b = np.deg2rad(np.ascontiguousarray(corners[1]))
+        cdef floating[:, :, ::1] satz_a_view = satz_a
+        cdef floating[:, :, ::1] satz_b_view = satz_b
+        cdef np.ndarray[floating, ndim=3] c_exp = np.empty((satz_a.shape[0], satz_a.shape[1], satz_b.shape[2]), dtype=satz_a.dtype)
+        cdef np.ndarray[floating, ndim=3] c_ali = np.empty((satz_a.shape[0], satz_a.shape[1], satz_b.shape[2]), dtype=satz_a.dtype)
+        cdef floating[:, :, ::1] c_exp_view = c_exp
+        cdef floating[:, :, ::1] c_ali_view = c_ali
+        _compute_expansion_alignment(satz_a_view, satz_b_view, c_exp_view, c_ali_view)
 
         coords_xy = self._get_coords(scans)
         cdef np.ndarray[floating, ndim=1] x = coords_xy[0]
