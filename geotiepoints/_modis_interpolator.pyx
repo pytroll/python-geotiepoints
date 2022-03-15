@@ -4,7 +4,7 @@ from cython.parallel import prange,parallel
 from .simple_modis_interpolator import scanline_mapblocks
 
 cimport numpy as np
-from libc.math cimport asin, sin, cos, sqrt
+from libc.math cimport asin, sin, cos, sqrt, acos, M_PI
 import numpy as np
 
 # ctypedef fused floating:
@@ -15,7 +15,7 @@ ctypedef fused floating:
     np.float32_t
     np.float64_t
 
-EARTH_RADIUS = 6370997.0
+DEF EARTH_RADIUS = 6370997.0
 # cdef np.float32_t R = 6371.0
 # # Aqua scan width and altitude in km
 # cdef np.float32_t scan_width = 10.00017
@@ -26,47 +26,56 @@ DEF scan_width = 10.00017
 DEF H = 705.0
 
 
-def lonlat2xyz(
-        lons, lats,
-        # floating[:, :] lons, floating[:, :] lats,
-        radius=EARTH_RADIUS):
+def lonlat2xyz(lons, lats):
     """Convert lons and lats to cartesian coordinates."""
     lons_rad = np.deg2rad(lons)
     lats_rad = np.deg2rad(lats)
-    x_coords = radius * np.cos(lats_rad) * np.cos(lons_rad)
-    y_coords = radius * np.cos(lats_rad) * np.sin(lons_rad)
-    z_coords = radius * np.sin(lats_rad)
+    x_coords = EARTH_RADIUS * np.cos(lats_rad) * np.cos(lons_rad)
+    y_coords = EARTH_RADIUS * np.cos(lats_rad) * np.sin(lons_rad)
+    z_coords = EARTH_RADIUS * np.sin(lats_rad)
     return x_coords, y_coords, z_coords
 
 
-def xyz2lonlat(
-        # floating[:, :] x__,
-        # floating[:, :] y__,
-        # floating[:, :] z__,
-        # np.ndarray[floating, ndim=2] x__,
-        # np.ndarray[floating, ndim=2] y__,
-        # np.ndarray[floating, ndim=2] z__,
-        x__,
-        y__,
-        z__,
-        radius=EARTH_RADIUS,
-        thr=0.8,
-        bint low_lat_z=True):
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.wraparound(False)
+cdef void xyz2lonlat(
+        floating[:, ::1] x__,
+        floating[:, ::1] y__,
+        floating[:, ::1] z__,
+        floating[:, ::1] lons,
+        floating[:, ::1] lats,
+        floating thr=0.8,
+        bint low_lat_z=True) nogil:
     """Get longitudes from cartesian coordinates."""
-    lons = np.rad2deg(np.arccos(x__ / np.sqrt(x__ ** 2 + y__ ** 2))) * np.sign(y__)
-    lats = np.sign(z__) * (90 - np.rad2deg(np.arcsin(np.sqrt(x__ ** 2 + y__ ** 2) / radius)))
-    if low_lat_z:
-        # if we are at low latitudes - small z, then get the
-        # latitudes only from z. If we are at high latitudes (close to the poles)
-        # then derive the latitude using x and y:
-        lat_mask_cond = np.logical_and(
-            np.less(z__, thr * radius),
-            np.greater(z__, -1. * thr * radius))
-        lat_z_only = 90 - np.rad2deg(np.arccos(z__ / radius))
-        lats = np.where(lat_mask_cond, lat_z_only, lats)
+    cdef Py_ssize_t i, j
+    cdef np.float64_t x, y, z
+    for i in range(x__.shape[0]):
+        for j in range(x__.shape[1]):
+            # 64-bit precision matters apparently
+            x = <np.float64_t>x__[i, j]
+            y = <np.float64_t>y__[i, j]
+            z = <np.float64_t>z__[i, j]
+            lons[i, j] = _rad2deg64(acos(x / sqrt(x ** 2 + y ** 2))) * _sign(y)
+            # if we are at low latitudes - small z, then get the
+            # latitudes only from z. If we are at high latitudes (close to the poles)
+            # then derive the latitude using x and y:
+            if low_lat_z and (z < thr * EARTH_RADIUS) and (z > -1.0 * thr * EARTH_RADIUS):
+                lats[i, j] = 90 - _rad2deg64(acos(z / EARTH_RADIUS))
+            else:
+                lats[i, j] = _sign(z) * (90 - _rad2deg64(asin(sqrt(x ** 2 + y ** 2) / EARTH_RADIUS)))
 
-    return lons, lats
 
+cdef inline int _sign(floating x) nogil:
+    return 1 if x > 0 else (-1 if x < 0 else 0)
+
+
+cdef inline floating _rad2deg(floating x) nogil:
+    return x * (180.0 / M_PI)
+
+
+cdef inline np.float64_t _rad2deg64(np.float64_t x) nogil:
+    return x * (180.0 / M_PI)
 
 @scanline_mapblocks
 def interpolate(
@@ -221,7 +230,6 @@ cdef class Interpolator:
         cdef unsigned int scans = satz1.shape[0] // self._coarse_scan_length
         # reshape to (num scans, rows per scan, columns per scan)
         cdef np.ndarray[floating, ndim=3] satz1_3d = satz1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
-        print("Satz1 dtype: ", satz1.dtype, lon1.dtype, lat1.dtype, satz1_3d.dtype)
 
         corners = _get_corners(satz1_3d)
         cdef np.ndarray[floating, ndim=3] satz_a = np.deg2rad(np.ascontiguousarray(corners[0]))
@@ -238,7 +246,6 @@ cdef class Interpolator:
         cdef np.ndarray[floating, ndim=1] x = coords_xy[0]
         cdef np.ndarray[floating, ndim=1] y = coords_xy[1]
         i_rs, i_rt = np.meshgrid(x, y)
-        print("Coords: ", x.dtype, y.dtype, i_rs.dtype, i_rt.dtype)
 
         p_os = 0
         p_ot = 0
@@ -275,9 +282,12 @@ cdef class Interpolator:
         cdef floating[:, :, :] data_view
         cdef np.ndarray[floating, ndim=3] data_a, data_b, data_c, data_d
         cdef np.ndarray[floating, ndim=2] data_a_2d, data_b_2d, data_c_2d, data_d_2d
-        # cdef np.ndarray[np.float64_t, ndim=2] comp_arr_2d
         cdef np.ndarray[floating, ndim=2] comp_arr_2d
         cdef np.ndarray[floating, ndim=3] xyz_comp_a, xyz_comp_b, xyz_comp_c, xyz_comp_d
+        cdef np.ndarray[floating, ndim=2] new_lons = np.empty((a_scan.shape[0], a_scan.shape[1]), dtype=lon1.dtype)
+        cdef np.ndarray[floating, ndim=2] new_lats = np.empty((a_scan.shape[0], a_scan.shape[1]), dtype=lon1.dtype)
+        cdef floating[:, ::1] new_lons_view = new_lons
+        cdef floating[:, ::1] new_lats_view = new_lats
         for xyz_comp_a, xyz_comp_b, xyz_comp_c, xyz_comp_d  in zip(xyz_a, xyz_b, xyz_c, xyz_d):
             data_a_2d = self._expand_tiepoint_array(xyz_comp_a)
             data_b_2d = self._expand_tiepoint_array(xyz_comp_b)
@@ -288,9 +298,13 @@ cdef class Interpolator:
             data_2 = (1 - a_scan) * data_d_2d + a_scan * data_c_2d
             comp_arr_2d = (1 - a_track) * data_1 + a_track * data_2
 
-            res.append(comp_arr_2d.astype(np.float64))
-        new_lons, new_lats = xyz2lonlat(*res)
-        return new_lons.astype(lon1.dtype), new_lats.astype(lat1.dtype)
+            res.append(comp_arr_2d)
+        cdef floating[:, ::1] x__, y__, z__
+        x__ = res[0]
+        y__ = res[1]
+        z__ = res[2]
+        xyz2lonlat(x__, y__, z__, new_lons_view, new_lats_view)
+        return new_lons, new_lats
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
