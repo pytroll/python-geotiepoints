@@ -227,6 +227,12 @@ cdef class Interpolator:
         la11 = np.ascontiguousarray(lat1)
         satz1 = np.ascontiguousarray(satz1)
 
+        cdef np.ndarray[floating, ndim=2] a_track, a_scan, new_lons, new_lats
+        a_track, a_scan = self._get_atrack_ascan(satz1)
+        new_lons, new_lats = self._interpolate_lons_lats(lon1, lat1, a_track, a_scan)
+        return new_lons, new_lats
+
+    cdef tuple _get_atrack_ascan(self, np.ndarray[floating, ndim=2] satz1):
         cdef unsigned int scans = satz1.shape[0] // self._coarse_scan_length
         # reshape to (num scans, rows per scan, columns per scan)
         cdef np.ndarray[floating, ndim=3] satz1_3d = satz1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
@@ -257,7 +263,13 @@ cdef class Interpolator:
 
         cdef np.ndarray[floating, ndim=2] a_track = s_t
         cdef np.ndarray[floating, ndim=2] a_scan = s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full
+        return a_track, a_scan
 
+    cdef tuple _interpolate_lons_lats(self,
+                                      np.ndarray[floating, ndim=2] lon1,
+                                      np.ndarray[floating, ndim=2] lat1,
+                                      np.ndarray[floating, ndim=2] a_track,
+                                      np.ndarray[floating, ndim=2] a_scan):
         res = []
         cdef np.ndarray[floating, ndim=3] lon1_3d, lat1_3d
         lon1_3d = lon1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
