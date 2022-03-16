@@ -1,15 +1,10 @@
 from libc.math cimport fmin, fmax, floor
 cimport cython
-from cython.parallel import prange,parallel
 from .simple_modis_interpolator import scanline_mapblocks
 
 cimport numpy as np
 from libc.math cimport asin, sin, cos, sqrt, acos, M_PI
 import numpy as np
-
-# ctypedef fused floating:
-#     float
-#     double
 
 ctypedef fused floating:
     np.float32_t
@@ -26,23 +21,32 @@ DEF scan_width = 10.00017
 DEF H = 705.0
 
 
-def lonlat2xyz(lons, lats):
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.wraparound(False)
+cdef void lonlat2xyz(
+        floating[:, :, ::1] lons,
+        floating[:, :, ::1] lats,
+        floating[:, :, :, ::1] xyz,
+) nogil:
     """Convert lons and lats to cartesian coordinates."""
-    lons_rad = np.deg2rad(lons)
-    lats_rad = np.deg2rad(lats)
-    x_coords = EARTH_RADIUS * np.cos(lats_rad) * np.cos(lons_rad)
-    y_coords = EARTH_RADIUS * np.cos(lats_rad) * np.sin(lons_rad)
-    z_coords = EARTH_RADIUS * np.sin(lats_rad)
-    return x_coords, y_coords, z_coords
+    cdef Py_ssize_t i, j, k
+    cdef floating lon_rad, lat_rad
+    for i in range(lons.shape[0]):
+        for j in range(lons.shape[1]):
+            for k in range(lons.shape[2]):
+                lon_rad = _deg2rad64(lons[i, j, k])
+                lat_rad = _deg2rad64(lats[i, j, k])
+                xyz[i, j, k, 0] = EARTH_RADIUS * cos(lat_rad) * cos(lon_rad)
+                xyz[i, j, k, 1] = EARTH_RADIUS * cos(lat_rad) * sin(lon_rad)
+                xyz[i, j, k, 2] = EARTH_RADIUS * sin(lat_rad)
 
 
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
 cdef void xyz2lonlat(
-        floating[:, ::1] x__,
-        floating[:, ::1] y__,
-        floating[:, ::1] z__,
+        floating[:, :, ::1] xyz,
         floating[:, ::1] lons,
         floating[:, ::1] lats,
         floating thr=0.8,
@@ -50,12 +54,12 @@ cdef void xyz2lonlat(
     """Get longitudes from cartesian coordinates."""
     cdef Py_ssize_t i, j
     cdef np.float64_t x, y, z
-    for i in range(x__.shape[0]):
-        for j in range(x__.shape[1]):
+    for i in range(xyz.shape[0]):
+        for j in range(xyz.shape[1]):
             # 64-bit precision matters apparently
-            x = <np.float64_t>x__[i, j]
-            y = <np.float64_t>y__[i, j]
-            z = <np.float64_t>z__[i, j]
+            x = <np.float64_t>xyz[i, j, 0]
+            y = <np.float64_t>xyz[i, j, 1]
+            z = <np.float64_t>xyz[i, j, 2]
             lons[i, j] = _rad2deg64(acos(x / sqrt(x ** 2 + y ** 2))) * _sign(y)
             # if we are at low latitudes - small z, then get the
             # latitudes only from z. If we are at high latitudes (close to the poles)
@@ -74,8 +78,17 @@ cdef inline floating _rad2deg(floating x) nogil:
     return x * (180.0 / M_PI)
 
 
+cdef inline floating _deg2rad(floating x) nogil:
+    return x * (M_PI / 180.0)
+
+
 cdef inline np.float64_t _rad2deg64(np.float64_t x) nogil:
     return x * (180.0 / M_PI)
+
+
+cdef inline np.float64_t _deg2rad64(np.float64_t x) nogil:
+    return x * (M_PI / 180.0)
+
 
 @scanline_mapblocks
 def interpolate(
@@ -118,16 +131,22 @@ cdef inline floating _compute_zeta(floating phi) nogil:
 @cython.wraparound(False)
 cdef void _compute_expansion_alignment(floating[:, :, ::1] satz_a, floating [:, :, ::1] satz_b,
                                        floating[:, :, ::1] c_expansion, floating[:, :, ::1] c_alignment) nogil:
-    """All angles in radians."""
+    """Fill in expansion and alignment.
+    
+    Input angles should be in degrees and will be converted to radians.
+    
+    """
     cdef Py_ssize_t i, j, k
-    cdef floating phi_a, phi_b, theta_a, theta_b, phi, zeta, theta, denominator, sin_beta_2, d, e
+    cdef floating satz_a_rad, satz_b_rad, phi_a, phi_b, theta_a, theta_b, phi, zeta, theta, denominator, sin_beta_2, d, e
     for i in range(satz_a.shape[0]):
         for j in range(satz_a.shape[1]):
             for k in range(satz_a.shape[2]):
-                phi_a = _compute_phi(satz_a[i, j, k])
-                phi_b = _compute_phi(satz_b[i, j, k])
-                theta_a = _compute_theta(satz_a[i, j, k], phi_a)
-                theta_b = _compute_theta(satz_b[i, j, k], phi_b)
+                satz_a_rad = _deg2rad(satz_a[i, j, k])
+                satz_b_rad = _deg2rad(satz_b[i, j, k])
+                phi_a = _compute_phi(satz_a_rad)
+                phi_b = _compute_phi(satz_b_rad)
+                theta_a = _compute_theta(satz_a_rad, phi_a)
+                theta_b = _compute_theta(satz_b_rad, phi_b)
                 phi = (phi_a + phi_b) / 2
                 zeta = _compute_zeta(phi)
                 theta = _compute_theta(zeta, phi)
@@ -143,12 +162,24 @@ cdef void _compute_expansion_alignment(floating[:, :, ::1] satz_a, floating [:, 
                 c_alignment[i, j, k] = 4 * e * sin(zeta) / denominator
 
 
-cdef tuple _get_corners(np.ndarray[floating, ndim=3] arr):
-    arr_a = arr[:, :-1, :-1]
-    arr_b = arr[:, :-1, 1:]
-    arr_c = arr[:, 1:, 1:]
-    arr_d = arr[:, 1:, :-1]
-    return arr_a, arr_b, arr_c, arr_d
+cdef floating[:, :, ::1] _get_upper_left_corner(floating[:, :, ::1] arr):
+    cdef floating[:, :, ::1] ret = arr[:, :-1, :-1].copy()
+    return ret
+
+
+cdef floating[:, :, ::1] _get_upper_right_corner(floating[:, :, ::1] arr):
+    cdef floating[:, :, ::1] ret = arr[:, :-1, 1:].copy()
+    return ret
+
+
+cdef floating[:, :, ::1] _get_lower_right_corner(floating[:, :, ::1] arr):
+    cdef floating[:, :, ::1] ret = arr[:, 1:, 1:].copy()
+    return ret
+
+
+cdef floating[:, :, ::1] _get_lower_left_corner(floating[:, :, ::1] arr):
+    cdef floating[:, :, ::1] ret = arr[:, 1:, :-1].copy()
+    return ret
 
 
 cdef class Interpolator:
@@ -201,7 +232,8 @@ cdef class Interpolator:
     cdef np.ndarray[floating, ndim=2] _expand_tiepoint_array(self, np.ndarray[floating, ndim=3] arr):
         cdef np.ndarray[floating, ndim=2] expanded_arr
         cdef floating[:, ::1] expanded_arr_view
-        cdef floating[:, :, ::1] input_arr_view = arr
+        # contiguous in the sensor zenith case, every 3rd in the lon/lat/xyz case
+        cdef floating[:, :, :] input_arr_view = arr
         if self._coarse_scan_length == 10:
             expanded_arr = np.empty(
                 (
@@ -214,9 +246,6 @@ cdef class Interpolator:
             return expanded_arr
         return self._expand_tiepoint_array_5km(arr)
 
-    @cython.boundscheck(False)
-    @cython.cdivision(True)
-    @cython.wraparound(False)
     cdef interpolate(
             self,
             np.ndarray[floating, ndim=2] lon1,
@@ -235,36 +264,37 @@ cdef class Interpolator:
     cdef tuple _get_atrack_ascan(self, np.ndarray[floating, ndim=2] satz1):
         cdef unsigned int scans = satz1.shape[0] // self._coarse_scan_length
         # reshape to (num scans, rows per scan, columns per scan)
-        cdef np.ndarray[floating, ndim=3] satz1_3d = satz1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
+        cdef floating[:, :, ::1] satz1_3d = satz1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
 
-        corners = _get_corners(satz1_3d)
-        cdef np.ndarray[floating, ndim=3] satz_a = np.deg2rad(np.ascontiguousarray(corners[0]))
-        cdef np.ndarray[floating, ndim=3] satz_b = np.deg2rad(np.ascontiguousarray(corners[1]))
-        cdef floating[:, :, ::1] satz_a_view = satz_a
-        cdef floating[:, :, ::1] satz_b_view = satz_b
-        cdef np.ndarray[floating, ndim=3] c_exp = np.empty((satz_a.shape[0], satz_a.shape[1], satz_b.shape[2]), dtype=satz_a.dtype)
-        cdef np.ndarray[floating, ndim=3] c_ali = np.empty((satz_a.shape[0], satz_a.shape[1], satz_b.shape[2]), dtype=satz_a.dtype)
+        cdef floating[:, :, ::1] satz_a_view = _get_upper_left_corner(satz1_3d)
+        cdef floating[:, :, ::1] satz_b_view = _get_upper_right_corner(satz1_3d)
+        cdef np.ndarray[floating, ndim=3] c_exp = np.empty(
+            (satz_a_view.shape[0], satz_a_view.shape[1], satz_a_view.shape[2]),
+            dtype=satz1.dtype)
+        cdef np.ndarray[floating, ndim=3] c_ali = np.empty(
+            (satz_a_view.shape[0], satz_a_view.shape[1], satz_a_view.shape[2]),
+            dtype=satz1.dtype)
         cdef floating[:, :, ::1] c_exp_view = c_exp
         cdef floating[:, :, ::1] c_ali_view = c_ali
         _compute_expansion_alignment(satz_a_view, satz_b_view, c_exp_view, c_ali_view)
+
+        cdef np.ndarray[floating, ndim=2] c_exp_full = self._expand_tiepoint_array(c_exp)
+        cdef np.ndarray[floating, ndim=2] c_ali_full = self._expand_tiepoint_array(c_ali)
 
         coords_xy = self._get_coords(scans)
         cdef np.ndarray[floating, ndim=1] x = coords_xy[0]
         cdef np.ndarray[floating, ndim=1] y = coords_xy[1]
         i_rs, i_rt = np.meshgrid(x, y)
-
-        p_os = 0
-        p_ot = 0
-        cdef np.ndarray[floating, ndim=2] s_s = (p_os + i_rs) * 1.0 / self._fine_pixels_per_coarse_pixel
-        cdef np.ndarray[floating, ndim=2] s_t = (p_ot + i_rt) * 1.0 / self._fine_scan_length
-
-        cdef np.ndarray[floating, ndim=2] c_exp_full = self._expand_tiepoint_array(c_exp)
-        cdef np.ndarray[floating, ndim=2] c_ali_full = self._expand_tiepoint_array(c_ali)
+        cdef np.ndarray[floating, ndim=2] s_s = i_rs / self._fine_pixels_per_coarse_pixel
+        cdef np.ndarray[floating, ndim=2] s_t = i_rt / self._fine_scan_length
 
         cdef np.ndarray[floating, ndim=2] a_track = s_t
         cdef np.ndarray[floating, ndim=2] a_scan = s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full
         return a_track, a_scan
 
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.wraparound(False)
     cdef tuple _interpolate_lons_lats(self,
                                       np.ndarray[floating, ndim=2] lon1,
                                       np.ndarray[floating, ndim=2] lat1,
@@ -274,48 +304,87 @@ cdef class Interpolator:
         cdef np.ndarray[floating, ndim=3] lon1_3d, lat1_3d
         lon1_3d = lon1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
         lat1_3d = lat1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
-        lon_corners = _get_corners(lon1_3d)
-        lat_corners = _get_corners(lat1_3d)
-        cdef np.ndarray[floating, ndim=3] lon1_a, lon1_b, lon1_c, lon1_d, lat1_a, lat1_b, lat1_c, lat1_d
-        lon1_a = np.ascontiguousarray(lon_corners[0])
-        lon1_b = np.ascontiguousarray(lon_corners[1])
-        lon1_c = np.ascontiguousarray(lon_corners[2])
-        lon1_d = np.ascontiguousarray(lon_corners[3])
-        lat1_a = np.ascontiguousarray(lat_corners[0])
-        lat1_b = np.ascontiguousarray(lat_corners[1])
-        lat1_c = np.ascontiguousarray(lat_corners[2])
-        lat1_d = np.ascontiguousarray(lat_corners[3])
-        xyz_a = lonlat2xyz(lon1_a, lat1_a)
-        xyz_b = lonlat2xyz(lon1_b, lat1_b)
-        xyz_c = lonlat2xyz(lon1_c, lat1_c)
-        xyz_d = lonlat2xyz(lon1_d, lat1_d)
-        datasets = lonlat2xyz(lon1, lat1)
+        cdef floating[:, :, ::1] lon1_3d_view, lat1_3d_view
+        lon1_3d_view = lon1_3d
+        lat1_3d_view = lat1_3d
+        # cdef np.ndarray[floating, ndim=3] lon1_a, lon1_b, lon1_c, lon1_d, lat1_a, lat1_b, lat1_c, lat1_d
+        cdef floating[:, :, ::1] lon1_a, lon1_b, lon1_c, lon1_d, lat1_a, lat1_b, lat1_c, lat1_d
+        lon1_a = _get_upper_left_corner(lon1_3d_view)
+        lon1_b = _get_upper_right_corner(lon1_3d_view)
+        lon1_c = _get_lower_right_corner(lon1_3d_view)
+        lon1_d = _get_lower_left_corner(lon1_3d_view)
+        lat1_a = _get_upper_left_corner(lat1_3d_view)
+        lat1_b = _get_upper_right_corner(lat1_3d_view)
+        lat1_c = _get_lower_right_corner(lat1_3d_view)
+        lat1_d = _get_lower_left_corner(lat1_3d_view)
+        cdef np.ndarray[floating, ndim=4] xyz_a = np.empty((lon1_a.shape[0], lon1_a.shape[1], lon1_a.shape[2], 3), dtype=lon1.dtype)
+        cdef np.ndarray[floating, ndim=4] xyz_b = np.empty((lon1_b.shape[0], lon1_b.shape[1], lon1_b.shape[2], 3), dtype=lon1.dtype)
+        cdef np.ndarray[floating, ndim=4] xyz_c = np.empty((lon1_c.shape[0], lon1_c.shape[1], lon1_c.shape[2], 3), dtype=lon1.dtype)
+        cdef np.ndarray[floating, ndim=4] xyz_d = np.empty((lon1_d.shape[0], lon1_d.shape[1], lon1_d.shape[2], 3), dtype=lon1.dtype)
+        cdef floating[:, :, :, ::1] xyz_a_view, xyz_b_view, xyz_c_view, xyz_d_view
+        xyz_a_view = xyz_a
+        xyz_b_view = xyz_b
+        xyz_c_view = xyz_c
+        xyz_d_view = xyz_d
+        lonlat2xyz(lon1_a, lat1_a, xyz_a_view)
+        lonlat2xyz(lon1_b, lat1_b, xyz_b_view)
+        lonlat2xyz(lon1_c, lat1_c, xyz_c_view)
+        lonlat2xyz(lon1_d, lat1_d, xyz_d_view)
+
         cdef np.ndarray[floating, ndim=3] data
-        cdef floating[:, :, :] data_view
-        cdef np.ndarray[floating, ndim=3] data_a, data_b, data_c, data_d
+        # cdef np.ndarray[floating, ndim=3] data_a, data_b, data_c, data_d
         cdef np.ndarray[floating, ndim=2] data_a_2d, data_b_2d, data_c_2d, data_d_2d
-        cdef np.ndarray[floating, ndim=2] comp_arr_2d
-        cdef np.ndarray[floating, ndim=3] xyz_comp_a, xyz_comp_b, xyz_comp_c, xyz_comp_d
+        cdef np.ndarray[floating, ndim=3] comp_arr_2d = np.empty((a_scan.shape[0], a_scan.shape[1], 3), dtype=lon1.dtype)
+        cdef floating[:, :, ::1] xyz_comp_view = comp_arr_2d
+        # cdef np.ndarray[floating, ndim=3] xyz_comp_a, xyz_comp_b, xyz_comp_c, xyz_comp_d
+        cdef Py_ssize_t i, j, k
+        cdef floating scan1_tmp, scan2_tmp, atrack1, ascan1
+        cdef floating[:, ::1] data_a_2d_view, data_b_2d_view, data_c_2d_view, data_d_2d_view
+        cdef np.ndarray[floating, ndim=3] comp_a, comp_b, comp_c, comp_d
+        print(a_scan.shape[0], a_scan.shape[1], a_track.shape[0], a_track.shape[1], comp_arr_2d.shape[0], comp_arr_2d.shape[1], comp_arr_2d.shape[2])
+        print(xyz_a.shape[0], xyz_a.shape[1], xyz_a.shape[2], xyz_a.shape[3])
+        for k in range(3):  # xyz
+            # data_a_2d = self._expand_tiepoint_array(xyz_a[:, :, :, k])
+            # data_b_2d = self._expand_tiepoint_array(xyz_b[:, :, :, k])
+            # data_c_2d = self._expand_tiepoint_array(xyz_c[:, :, :, k])
+            # data_d_2d = self._expand_tiepoint_array(xyz_d[:, :, :, k])
+            comp_a = xyz_a[:, :, :, k]
+            comp_b = xyz_b[:, :, :, k]
+            comp_c = xyz_c[:, :, :, k]
+            comp_d = xyz_d[:, :, :, k]
+            data_a_2d = self._expand_tiepoint_array(comp_a)
+            data_b_2d = self._expand_tiepoint_array(comp_b)
+            data_c_2d = self._expand_tiepoint_array(comp_c)
+            data_d_2d = self._expand_tiepoint_array(comp_d)
+            data_a_2d_view = data_a_2d
+            data_b_2d_view = data_b_2d
+            data_c_2d_view = data_c_2d
+            data_d_2d_view = data_d_2d
+            print(data_a_2d.shape[0], data_a_2d.shape[1], data_b_2d.shape[0], data_b_2d.shape[1])
+            # TODO: assign views
+            for i in range(a_scan.shape[0]):
+                for j in range(a_scan.shape[1]):
+                    atrack1 = a_track[i, j]
+                    ascan1 = a_scan[i, j]
+                    scan1_tmp = (1 - ascan1) * data_a_2d_view[i, j] + ascan1 * data_b_2d_view[i, j]
+                    scan2_tmp = (1 - ascan1) * data_d_2d_view[i, j] + ascan1 * data_c_2d_view[i, j]
+                    xyz_comp_view[i, j, k] = (1 - atrack1) * scan1_tmp + atrack1 * scan2_tmp
+
+        # for xyz_comp_a, xyz_comp_b, xyz_comp_c, xyz_comp_d  in zip(xyz_a, xyz_b, xyz_c, xyz_d):
+        #     data_a_2d = self._expand_tiepoint_array(xyz_comp_a)
+        #     data_b_2d = self._expand_tiepoint_array(xyz_comp_b)
+        #     data_c_2d = self._expand_tiepoint_array(xyz_comp_c)
+        #     data_d_2d = self._expand_tiepoint_array(xyz_comp_d)
+        #
+        #     data_1 = (1 - a_scan) * data_a_2d + a_scan * data_b_2d
+        #     data_2 = (1 - a_scan) * data_d_2d + a_scan * data_c_2d
+        #     comp_arr_2d = (1 - a_track) * data_1 + a_track * data_2
+        #     res.append(comp_arr_2d)
         cdef np.ndarray[floating, ndim=2] new_lons = np.empty((a_scan.shape[0], a_scan.shape[1]), dtype=lon1.dtype)
         cdef np.ndarray[floating, ndim=2] new_lats = np.empty((a_scan.shape[0], a_scan.shape[1]), dtype=lon1.dtype)
         cdef floating[:, ::1] new_lons_view = new_lons
         cdef floating[:, ::1] new_lats_view = new_lats
-        for xyz_comp_a, xyz_comp_b, xyz_comp_c, xyz_comp_d  in zip(xyz_a, xyz_b, xyz_c, xyz_d):
-            data_a_2d = self._expand_tiepoint_array(xyz_comp_a)
-            data_b_2d = self._expand_tiepoint_array(xyz_comp_b)
-            data_c_2d = self._expand_tiepoint_array(xyz_comp_c)
-            data_d_2d = self._expand_tiepoint_array(xyz_comp_d)
-
-            data_1 = (1 - a_scan) * data_a_2d + a_scan * data_b_2d
-            data_2 = (1 - a_scan) * data_d_2d + a_scan * data_c_2d
-            comp_arr_2d = (1 - a_track) * data_1 + a_track * data_2
-
-            res.append(comp_arr_2d)
-        cdef floating[:, ::1] x__, y__, z__
-        x__ = res[0]
-        y__ = res[1]
-        z__ = res[2]
-        xyz2lonlat(x__, y__, z__, new_lons_view, new_lats_view)
+        xyz2lonlat(xyz_comp_view, new_lons_view, new_lats_view)
         return new_lons, new_lats
 
     @cython.boundscheck(False)
@@ -378,7 +447,7 @@ cdef class Interpolator:
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
-    cdef void _expand_tiepoint_array_1km(self, floating[:, :, ::1] arr, floating[:, ::1] arr_2d_view) nogil:
+    cdef void _expand_tiepoint_array_1km(self, floating[:, :, :] arr, floating[:, ::1] arr_2d_view) nogil:
         # TODO: Replace shape multiplication with self._fine_pixel_length and self._fine_pixel_width
         cdef floating tiepoint_value
         cdef Py_ssize_t scan_idx, row_idx, col_idx, length_repeat_cycle, width_repeat_cycle, half_scan_offset, scan_offset, row_offset, col_offset
