@@ -35,8 +35,8 @@ cdef void lonlat2xyz(
     for i in range(lons.shape[0]):
         for j in range(lons.shape[1]):
             for k in range(lons.shape[2]):
-                lon_rad = _deg2rad64(lons[i, j, k])
-                lat_rad = _deg2rad64(lats[i, j, k])
+                lon_rad = _deg2rad(lons[i, j, k])
+                lat_rad = _deg2rad(lats[i, j, k])
                 xyz[i, j, k, 0] = EARTH_RADIUS * cos(lat_rad) * cos(lon_rad)
                 xyz[i, j, k, 1] = EARTH_RADIUS * cos(lat_rad) * sin(lon_rad)
                 xyz[i, j, k, 2] = EARTH_RADIUS * sin(lat_rad)
@@ -60,14 +60,14 @@ cdef void xyz2lonlat(
             x = <np.float64_t>xyz[i, j, 0]
             y = <np.float64_t>xyz[i, j, 1]
             z = <np.float64_t>xyz[i, j, 2]
-            lons[i, j] = _rad2deg64(acos(x / sqrt(x ** 2 + y ** 2))) * _sign(y)
+            lons[i, j] = _rad2deg(acos(x / sqrt(x ** 2 + y ** 2))) * _sign(y)
             # if we are at low latitudes - small z, then get the
             # latitudes only from z. If we are at high latitudes (close to the poles)
             # then derive the latitude using x and y:
             if low_lat_z and (z < thr * EARTH_RADIUS) and (z > -1.0 * thr * EARTH_RADIUS):
-                lats[i, j] = 90 - _rad2deg64(acos(z / EARTH_RADIUS))
+                lats[i, j] = 90 - _rad2deg(acos(z / EARTH_RADIUS))
             else:
-                lats[i, j] = _sign(z) * (90 - _rad2deg64(asin(sqrt(x ** 2 + y ** 2) / EARTH_RADIUS)))
+                lats[i, j] = _sign(z) * (90 - _rad2deg(asin(sqrt(x ** 2 + y ** 2) / EARTH_RADIUS)))
 
 
 cdef inline int _sign(floating x) nogil:
@@ -79,14 +79,6 @@ cdef inline floating _rad2deg(floating x) nogil:
 
 
 cdef inline floating _deg2rad(floating x) nogil:
-    return x * (M_PI / 180.0)
-
-
-cdef inline np.float64_t _rad2deg64(np.float64_t x) nogil:
-    return x * (180.0 / M_PI)
-
-
-cdef inline np.float64_t _deg2rad64(np.float64_t x) nogil:
     return x * (M_PI / 180.0)
 
 
