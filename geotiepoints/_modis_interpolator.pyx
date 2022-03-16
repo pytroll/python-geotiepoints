@@ -331,8 +331,6 @@ cdef class Interpolator:
         lonlat2xyz(lon1_c, lat1_c, xyz_c_view)
         lonlat2xyz(lon1_d, lat1_d, xyz_d_view)
 
-        cdef np.ndarray[floating, ndim=3] data
-        # cdef np.ndarray[floating, ndim=3] data_a, data_b, data_c, data_d
         cdef np.ndarray[floating, ndim=2] data_a_2d, data_b_2d, data_c_2d, data_d_2d
         cdef np.ndarray[floating, ndim=3] comp_arr_2d = np.empty((a_scan.shape[0], a_scan.shape[1], 3), dtype=lon1.dtype)
         cdef floating[:, :, ::1] xyz_comp_view = comp_arr_2d
@@ -341,8 +339,8 @@ cdef class Interpolator:
         cdef floating scan1_tmp, scan2_tmp, atrack1, ascan1
         cdef floating[:, ::1] data_a_2d_view, data_b_2d_view, data_c_2d_view, data_d_2d_view
         cdef np.ndarray[floating, ndim=3] comp_a, comp_b, comp_c, comp_d
-        print(a_scan.shape[0], a_scan.shape[1], a_track.shape[0], a_track.shape[1], comp_arr_2d.shape[0], comp_arr_2d.shape[1], comp_arr_2d.shape[2])
-        print(xyz_a.shape[0], xyz_a.shape[1], xyz_a.shape[2], xyz_a.shape[3])
+        cdef floating[:, ::1] a_track_view = a_track
+        cdef floating[:, ::1] a_scan_view = a_scan
         for k in range(3):  # xyz
             # data_a_2d = self._expand_tiepoint_array(xyz_a[:, :, :, k])
             # data_b_2d = self._expand_tiepoint_array(xyz_b[:, :, :, k])
@@ -360,26 +358,14 @@ cdef class Interpolator:
             data_b_2d_view = data_b_2d
             data_c_2d_view = data_c_2d
             data_d_2d_view = data_d_2d
-            print(data_a_2d.shape[0], data_a_2d.shape[1], data_b_2d.shape[0], data_b_2d.shape[1])
-            # TODO: assign views
             for i in range(a_scan.shape[0]):
                 for j in range(a_scan.shape[1]):
-                    atrack1 = a_track[i, j]
-                    ascan1 = a_scan[i, j]
+                    atrack1 = a_track_view[i, j]
+                    ascan1 = a_scan_view[i, j]
                     scan1_tmp = (1 - ascan1) * data_a_2d_view[i, j] + ascan1 * data_b_2d_view[i, j]
                     scan2_tmp = (1 - ascan1) * data_d_2d_view[i, j] + ascan1 * data_c_2d_view[i, j]
                     xyz_comp_view[i, j, k] = (1 - atrack1) * scan1_tmp + atrack1 * scan2_tmp
 
-        # for xyz_comp_a, xyz_comp_b, xyz_comp_c, xyz_comp_d  in zip(xyz_a, xyz_b, xyz_c, xyz_d):
-        #     data_a_2d = self._expand_tiepoint_array(xyz_comp_a)
-        #     data_b_2d = self._expand_tiepoint_array(xyz_comp_b)
-        #     data_c_2d = self._expand_tiepoint_array(xyz_comp_c)
-        #     data_d_2d = self._expand_tiepoint_array(xyz_comp_d)
-        #
-        #     data_1 = (1 - a_scan) * data_a_2d + a_scan * data_b_2d
-        #     data_2 = (1 - a_scan) * data_d_2d + a_scan * data_c_2d
-        #     comp_arr_2d = (1 - a_track) * data_1 + a_track * data_2
-        #     res.append(comp_arr_2d)
         cdef np.ndarray[floating, ndim=2] new_lons = np.empty((a_scan.shape[0], a_scan.shape[1]), dtype=lon1.dtype)
         cdef np.ndarray[floating, ndim=2] new_lats = np.empty((a_scan.shape[0], a_scan.shape[1]), dtype=lon1.dtype)
         cdef floating[:, ::1] new_lons_view = new_lons
