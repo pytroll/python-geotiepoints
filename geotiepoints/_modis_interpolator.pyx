@@ -307,7 +307,6 @@ cdef class Interpolator:
         cdef floating[:, :, ::1] lon1_3d_view, lat1_3d_view
         lon1_3d_view = lon1_3d
         lat1_3d_view = lat1_3d
-        # cdef np.ndarray[floating, ndim=3] lon1_a, lon1_b, lon1_c, lon1_d, lat1_a, lat1_b, lat1_c, lat1_d
         cdef floating[:, :, ::1] lon1_a, lon1_b, lon1_c, lon1_d, lat1_a, lat1_b, lat1_c, lat1_d
         lon1_a = _get_upper_left_corner(lon1_3d_view)
         lon1_b = _get_upper_right_corner(lon1_3d_view)
@@ -331,16 +330,36 @@ cdef class Interpolator:
         lonlat2xyz(lon1_c, lat1_c, xyz_c_view)
         lonlat2xyz(lon1_d, lat1_d, xyz_d_view)
 
-        cdef np.ndarray[floating, ndim=2] data_a_2d, data_b_2d, data_c_2d, data_d_2d
-        cdef np.ndarray[floating, ndim=3] comp_arr_2d = np.empty((a_scan.shape[0], a_scan.shape[1], 3), dtype=lon1.dtype)
-        cdef floating[:, :, ::1] xyz_comp_view = comp_arr_2d
-        # cdef np.ndarray[floating, ndim=3] xyz_comp_a, xyz_comp_b, xyz_comp_c, xyz_comp_d
-        cdef Py_ssize_t i, j, k
-        cdef floating scan1_tmp, scan2_tmp, atrack1, ascan1
-        cdef floating[:, ::1] data_a_2d_view, data_b_2d_view, data_c_2d_view, data_d_2d_view
-        cdef np.ndarray[floating, ndim=3] comp_a, comp_b, comp_c, comp_d
         cdef floating[:, ::1] a_track_view = a_track
         cdef floating[:, ::1] a_scan_view = a_scan
+        cdef np.ndarray[floating, ndim=3] comp_arr_2d = np.empty((a_scan.shape[0], a_scan.shape[1], 3), dtype=lon1.dtype)
+        cdef floating[:, :, ::1] xyz_comp_view = comp_arr_2d
+        self._compute_fine_xyz(a_track_view, a_scan_view, xyz_a, xyz_b, xyz_c, xyz_d, xyz_comp_view)
+
+        cdef np.ndarray[floating, ndim=2] new_lons = np.empty((a_scan.shape[0], a_scan.shape[1]), dtype=lon1.dtype)
+        cdef np.ndarray[floating, ndim=2] new_lats = np.empty((a_scan.shape[0], a_scan.shape[1]), dtype=lon1.dtype)
+        cdef floating[:, ::1] new_lons_view = new_lons
+        cdef floating[:, ::1] new_lats_view = new_lats
+        xyz2lonlat(xyz_comp_view, new_lons_view, new_lats_view)
+        return new_lons, new_lats
+
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.wraparound(False)
+    cdef void _compute_fine_xyz(
+            self,
+            floating[:, ::1] a_track_view,
+            floating[:, ::1] a_scan_view,
+            np.ndarray[floating, ndim=4] xyz_a,
+            np.ndarray[floating, ndim=4] xyz_b,
+            np.ndarray[floating, ndim=4] xyz_c,
+            np.ndarray[floating, ndim=4] xyz_d,
+            floating[:, :, ::1] xyz_comp_view,
+    ):
+        cdef Py_ssize_t k
+        cdef np.ndarray[floating, ndim=3] comp_a, comp_b, comp_c, comp_d
+        cdef np.ndarray[floating, ndim=2] data_a_2d, data_b_2d, data_c_2d, data_d_2d
+        cdef floating[:, ::1] data_a_2d_view, data_b_2d_view, data_c_2d_view, data_d_2d_view
         for k in range(3):  # xyz
             # data_a_2d = self._expand_tiepoint_array(xyz_a[:, :, :, k])
             # data_b_2d = self._expand_tiepoint_array(xyz_b[:, :, :, k])
@@ -358,20 +377,40 @@ cdef class Interpolator:
             data_b_2d_view = data_b_2d
             data_c_2d_view = data_c_2d
             data_d_2d_view = data_d_2d
-            for i in range(a_scan.shape[0]):
-                for j in range(a_scan.shape[1]):
-                    atrack1 = a_track_view[i, j]
-                    ascan1 = a_scan_view[i, j]
-                    scan1_tmp = (1 - ascan1) * data_a_2d_view[i, j] + ascan1 * data_b_2d_view[i, j]
-                    scan2_tmp = (1 - ascan1) * data_d_2d_view[i, j] + ascan1 * data_c_2d_view[i, j]
-                    xyz_comp_view[i, j, k] = (1 - atrack1) * scan1_tmp + atrack1 * scan2_tmp
+            self._compute_fine_xyz_component(
+                a_track_view,
+                a_scan_view,
+                data_a_2d_view,
+                data_b_2d_view,
+                data_c_2d_view,
+                data_d_2d_view,
+                xyz_comp_view,
+                k,
+            )
 
-        cdef np.ndarray[floating, ndim=2] new_lons = np.empty((a_scan.shape[0], a_scan.shape[1]), dtype=lon1.dtype)
-        cdef np.ndarray[floating, ndim=2] new_lats = np.empty((a_scan.shape[0], a_scan.shape[1]), dtype=lon1.dtype)
-        cdef floating[:, ::1] new_lons_view = new_lons
-        cdef floating[:, ::1] new_lats_view = new_lats
-        xyz2lonlat(xyz_comp_view, new_lons_view, new_lats_view)
-        return new_lons, new_lats
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.wraparound(False)
+    cdef void _compute_fine_xyz_component(
+            self,
+            floating[:, ::1] a_track_view,
+            floating[:, ::1] a_scan_view,
+            floating[:, ::1] data_a_2d_view,
+            floating[:, ::1] data_b_2d_view,
+            floating[:, ::1] data_c_2d_view,
+            floating[:, ::1] data_d_2d_view,
+            floating[:, :, ::1] xyz_comp_view,
+            Py_ssize_t k,
+    ) nogil:
+        cdef Py_ssize_t i, j
+        cdef floating scan1_tmp, scan2_tmp, atrack1, ascan1
+        for i in range(a_scan_view.shape[0]):
+            for j in range(a_scan_view.shape[1]):
+                atrack1 = a_track_view[i, j]
+                ascan1 = a_scan_view[i, j]
+                scan1_tmp = (1 - ascan1) * data_a_2d_view[i, j] + ascan1 * data_b_2d_view[i, j]
+                scan2_tmp = (1 - ascan1) * data_d_2d_view[i, j] + ascan1 * data_c_2d_view[i, j]
+                xyz_comp_view[i, j, k] = (1 - atrack1) * scan1_tmp + atrack1 * scan2_tmp
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
