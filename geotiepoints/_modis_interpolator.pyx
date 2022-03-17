@@ -1,6 +1,3 @@
-# cython: profile=True
-# cython: linetrace=True
-# cython: binding=True
 cimport cython
 from .simple_modis_interpolator import scanline_mapblocks
 
@@ -17,6 +14,30 @@ DEF R = 6371.0
 # Aqua scan width and altitude in km
 DEF scan_width = 10.00017
 DEF H = 705.0
+
+
+@scanline_mapblocks
+def interpolate(
+        np.ndarray[floating, ndim=2] lon1,
+        np.ndarray[floating, ndim=2] lat1,
+        np.ndarray[floating, ndim=2] satz1,
+        unsigned int coarse_resolution=0,
+        unsigned int fine_resolution=0,
+        unsigned int coarse_scan_width=0,
+):
+    """Helper function to interpolate scan-aligned arrays.
+
+    This function's decorator runs this function for each dask block/chunk of
+    scans. The arrays are scan-aligned meaning they are an even number of scans
+    (N rows per scan) and contain the entire scan width.
+
+    """
+    if coarse_resolution == 5000 and coarse_scan_width not in (0, 270, 271):
+        raise NotImplementedError(
+            "Can't interpolate if 5km tiepoints have less than 270 columns."
+        )
+    interp = Interpolator(coarse_resolution, fine_resolution, coarse_scan_width=coarse_scan_width or 0)
+    return interp.interpolate(lon1, lat1, satz1)
 
 
 @cython.boundscheck(False)
@@ -80,42 +101,6 @@ cdef inline floating _deg2rad(floating x) nogil:
     return x * (M_PI / 180.0)
 
 
-@scanline_mapblocks
-def interpolate(
-        np.ndarray[floating, ndim=2] lon1,
-        np.ndarray[floating, ndim=2] lat1,
-        np.ndarray[floating, ndim=2] satz1,
-        unsigned int coarse_resolution=0,
-        unsigned int fine_resolution=0,
-        unsigned int coarse_scan_width=0,
-):
-    """Helper function to interpolate scan-aligned arrays.
-
-    This function's decorator runs this function for each dask block/chunk of
-    scans. The arrays are scan-aligned meaning they are an even number of scans
-    (N rows per scan) and contain the entire scan width.
-
-    """
-    if coarse_resolution == 5000 and coarse_scan_width not in (0, 270, 271):
-        raise NotImplementedError(
-            "Can't interpolate if 5km tiepoints have less than 270 columns."
-        )
-    interp = Interpolator(coarse_resolution, fine_resolution, coarse_scan_width=coarse_scan_width or 0)
-    return interp.interpolate(lon1, lat1, satz1)
-
-
-cdef inline floating _compute_phi(floating zeta) nogil:
-    return asin(R * sin(zeta) / (R + H))
-
-
-cdef inline floating _compute_theta(floating zeta, floating phi) nogil:
-    return zeta - phi
-
-
-cdef inline floating _compute_zeta(floating phi) nogil:
-    return asin((R + H) * sin(phi) / R)
-
-
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
@@ -150,6 +135,18 @@ cdef void _compute_expansion_alignment(floating[:, :, ::1] satz_a, floating [:, 
                 e = cos(zeta) - sqrt(cos(zeta) ** 2 - d ** 2)
 
                 c_alignment[i, j, k] = 4 * e * sin(zeta) / denominator
+
+
+cdef inline floating _compute_phi(floating zeta) nogil:
+    return asin(R * sin(zeta) / (R + H))
+
+
+cdef inline floating _compute_theta(floating zeta, floating phi) nogil:
+    return zeta - phi
+
+
+cdef inline floating _compute_zeta(floating phi) nogil:
+    return asin((R + H) * sin(phi) / R)
 
 
 cdef floating[:, :, ::1] _get_upper_left_corner(floating[:, :, ::1] arr):
@@ -229,6 +226,7 @@ cdef class Interpolator:
         cdef unsigned int scans = satz1.shape[0] // self._coarse_scan_length
         # reshape to (num scans, rows per scan, columns per scan)
         cdef floating[:, :, ::1] satz1_3d = satz1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
+        # TODO: What's performance like if we remove the copy in the corner functions?
         cdef floating[:, :, ::1] satz_a_view = _get_upper_left_corner(satz1_3d)
         cdef floating[:, :, ::1] satz_b_view = _get_upper_right_corner(satz1_3d)
         cdef np.ndarray[floating, ndim=3] c_exp = np.empty(
