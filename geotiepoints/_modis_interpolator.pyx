@@ -252,13 +252,38 @@ cdef class Interpolator:
         coords_xy = self._get_coords(scans)
         cdef np.ndarray[floating, ndim=1] x = coords_xy[0]
         cdef np.ndarray[floating, ndim=1] y = coords_xy[1]
-        i_rs, i_rt = np.meshgrid(x, y)
-        cdef np.ndarray[floating, ndim=2] s_s = i_rs / self._fine_pixels_per_coarse_pixel
-        cdef np.ndarray[floating, ndim=2] s_t = i_rt / self._fine_scan_length
-
-        cdef np.ndarray[floating, ndim=2] a_track = s_t
-        cdef np.ndarray[floating, ndim=2] a_scan = s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full
+        cdef floating[::1] x_view = x
+        cdef floating[::1] y_view = y
+        cdef np.ndarray[floating, ndim=2] a_track = np.empty((y.shape[0], x.shape[0]), dtype=satz1.dtype)
+        cdef np.ndarray[floating, ndim=2] a_scan = np.empty((y.shape[0], x.shape[0]), dtype=satz1.dtype)
+        cdef floating[:, ::1] a_track_view = a_track
+        cdef floating[:, ::1] a_scan_view = a_scan
+        self._calculate_atrack_ascan(
+            x_view, y_view,
+            c_exp_full_view, c_ali_full_view,
+            a_track_view, a_scan_view)
         return a_track, a_scan
+
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.wraparound(False)
+    cdef void _calculate_atrack_ascan(
+            self,
+            floating[::1] coords_x,
+            floating[::1] coords_y,
+            floating[:, ::1] c_exp_full,
+            floating[:, ::1] c_ali_full,
+            floating[:, ::1] a_track,
+            floating[:, ::1] a_scan,
+    ) nogil:
+        cdef Py_ssize_t i, j
+        cdef floating s_s, s_t
+        for j in range(coords_y.shape[0]):
+            for i in range(coords_x.shape[0]):
+                s_s = coords_x[i] / self._fine_pixels_per_coarse_pixel
+                s_t = coords_y[j] / self._fine_scan_length
+                a_track[j, i] = s_t
+                a_scan[j, i] = s_s + s_s * (1 - s_s) * c_exp_full[j, i] + s_t * (1 - s_t) * c_ali_full[j, i]
 
     cdef tuple _get_coords(self, unsigned int scans):
         if self._coarse_scan_length == 10:
