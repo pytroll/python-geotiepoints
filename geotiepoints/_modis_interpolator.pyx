@@ -1,4 +1,6 @@
-from libc.math cimport fmin, fmax, floor
+# cython: profile=True
+# cython: linetrace=True
+# cython: binding=True
 cimport cython
 from .simple_modis_interpolator import scanline_mapblocks
 
@@ -286,18 +288,28 @@ cdef class Interpolator:
                 a_scan[j, i] = s_s + s_s * (1 - s_s) * c_exp_full[j, i] + s_t * (1 - s_t) * c_ali_full[j, i]
 
     cdef tuple _get_coords(self, unsigned int scans):
+        cdef np.ndarray[np.float32_t, ndim=1] x, y
+        cdef np.float32_t[::1] x_view, y_view
         if self._coarse_scan_length == 10:
-            return self._get_coords_1km(scans)
-        return self._get_coords_5km(scans)
+            x = np.arange(self._fine_scan_width, dtype=np.float32) % self._fine_pixels_per_coarse_pixel
+            y = np.empty((scans * self._coarse_scan_length * self._fine_scan_length,), dtype=np.float32)
+            x_view = x
+            y_view = y
+            self._get_coords_1km(scans, x_view, y_view)
+        else:
+            x, y = self._get_coords_5km(scans)
+        return x, y
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
-    cdef tuple _get_coords_1km(self, unsigned int scans):
-        # TODO: nogil this and the 5km version...if possible
+    cdef void _get_coords_1km(
+            self,
+            unsigned int scans,
+            floating[::1] x_view,
+            floating[::1] y_view,
+    ) nogil:
         cdef int half_scan_length = self._fine_scan_length // 2
-        cdef np.ndarray[np.float32_t, ndim=1] y = np.empty((scans * self._coarse_scan_length * self._fine_scan_length,), dtype=np.float32)
-        cdef np.float32_t[::1] y_view = y
         cdef unsigned int scan_idx
         cdef int i
         cdef int fine_idx
@@ -312,11 +324,8 @@ cdef class Interpolator:
                 else:
                     y_view[fine_idx] = (i % self._fine_scan_length) + 0.5
 
-        cdef np.ndarray[np.float32_t, ndim=1] x = np.arange(self._fine_scan_width, dtype=np.float32) % self._fine_pixels_per_coarse_pixel
-        cdef np.float32_t[::1] x_view = x
         for i in range(self._fine_pixels_per_coarse_pixel):
             x_view[(self._fine_scan_width - self._fine_pixels_per_coarse_pixel) + i] = self._fine_pixels_per_coarse_pixel + i
-        return x, y
 
     cdef tuple _get_coords_5km(self, unsigned int scans):
         cdef np.ndarray[np.float32_t, ndim=1] y = np.arange(self._fine_scan_length * self._coarse_scan_length, dtype=np.float32) - 2
