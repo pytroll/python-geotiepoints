@@ -200,7 +200,6 @@ cdef class Interpolator:
                 self._coarse_scan_width = coarse_scan_width
         self._coarse_pixels_per_1km = coarse_resolution // 1000
 
-
         cdef int fine_pixels_per_1km = 1000 // fine_resolution
         self._fine_pixels_per_coarse_pixel = fine_pixels_per_1km * self._coarse_pixels_per_1km
         self._fine_scan_width = 1354 * fine_pixels_per_1km
@@ -208,48 +207,6 @@ cdef class Interpolator:
         self._fine_scan_length = fine_pixels_per_1km * 10 // self._coarse_scan_length
         self._coarse_resolution = coarse_resolution
         self._fine_resolution = fine_resolution
-
-    cdef tuple _get_coords(self, unsigned int scans):
-        if self._coarse_scan_length == 10:
-            return self._get_coords_1km(scans)
-        return self._get_coords_5km(scans)
-
-    cdef np.ndarray[floating, ndim=2] _create_expanded_output_array(
-            self,
-            floating[:, :, :] like_arr,
-    ):
-        cdef unsigned int num_scans = like_arr.shape[0]
-        cdef unsigned int num_rows = like_arr.shape[1]
-        cdef unsigned int num_cols = like_arr.shape[2]
-        if floating is np.float32_t:
-            dtype = np.float32
-        else:
-            dtype = np.float64
-        if self._coarse_scan_length == 10:
-            return np.empty(
-                (
-                    num_scans * (num_rows + 1) * self._fine_pixels_per_coarse_pixel,
-                    (num_cols + 1) * self._fine_pixels_per_coarse_pixel
-                ),
-                dtype=dtype)
-        # 5km
-        num_rows = num_scans * (num_rows + 1) * self._fine_pixels_per_coarse_pixel
-        factor = self._fine_pixels_per_coarse_pixel // self._coarse_pixels_per_1km
-        if self._coarse_scan_width == 271:
-            num_cols = num_cols * self._fine_pixels_per_coarse_pixel + 4 * factor
-        else:
-            num_cols = (num_cols + 1) * self._fine_pixels_per_coarse_pixel + 4 * factor
-        return np.empty((num_rows, num_cols), dtype=dtype)
-
-    cdef void _expand_tiepoint_array(
-            self,
-            floating[:, :, :] input_arr,
-            floating[:, ::1] output_arr,
-    ):
-        if self._coarse_scan_length == 10:
-            self._expand_tiepoint_array_1km(input_arr, output_arr)
-        else:
-            self._expand_tiepoint_array_5km(input_arr, output_arr)
 
     cdef interpolate(
             self,
@@ -302,6 +259,60 @@ cdef class Interpolator:
         cdef np.ndarray[floating, ndim=2] a_track = s_t
         cdef np.ndarray[floating, ndim=2] a_scan = s_s + s_s * (1 - s_s) * c_exp_full + s_t * (1 - s_t) * c_ali_full
         return a_track, a_scan
+
+    cdef tuple _get_coords(self, unsigned int scans):
+        if self._coarse_scan_length == 10:
+            return self._get_coords_1km(scans)
+        return self._get_coords_5km(scans)
+
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.wraparound(False)
+    cdef tuple _get_coords_1km(self, unsigned int scans):
+        # TODO: nogil this and the 5km version...if possible
+        cdef int half_scan_length = self._fine_scan_length // 2
+        cdef np.ndarray[np.float32_t, ndim=1] y = np.empty((scans * self._coarse_scan_length * self._fine_scan_length,), dtype=np.float32)
+        cdef np.float32_t[::1] y_view = y
+        cdef unsigned int scan_idx
+        cdef int i
+        cdef int fine_idx
+        cdef unsigned int fine_pixels_per_scan = self._coarse_scan_length * self._fine_scan_length
+        for scan_idx in range(scans):
+            for i in range(fine_pixels_per_scan):
+                fine_idx = scan_idx * fine_pixels_per_scan + i
+                if i < half_scan_length:
+                    y_view[fine_idx] = (-half_scan_length + 0.5) - i
+                elif i > fine_pixels_per_scan - half_scan_length:
+                    y_view[fine_idx] = (self._fine_scan_length + 0.5) + (fine_pixels_per_scan - i)
+                else:
+                    y_view[fine_idx] = (i % self._fine_scan_length) + 0.5
+
+        cdef np.ndarray[np.float32_t, ndim=1] x = np.arange(self._fine_scan_width, dtype=np.float32) % self._fine_pixels_per_coarse_pixel
+        cdef np.float32_t[::1] x_view = x
+        for i in range(self._fine_pixels_per_coarse_pixel):
+            x_view[(self._fine_scan_width - self._fine_pixels_per_coarse_pixel) + i] = self._fine_pixels_per_coarse_pixel + i
+        return x, y
+
+    cdef tuple _get_coords_5km(self, unsigned int scans):
+        cdef np.ndarray[np.float32_t, ndim=1] y = np.arange(self._fine_scan_length * self._coarse_scan_length, dtype=np.float32) - 2
+        y = np.tile(y, scans)
+
+        cdef np.ndarray[np.float32_t, ndim=1] x = (np.arange(self._fine_scan_width, dtype=np.float32) - 2) % self._fine_pixels_per_coarse_pixel
+        x[0] = -2
+        x[1] = -1
+        if self._coarse_scan_width == 271:
+            x[-2] = 5
+            x[-1] = 6
+        else:
+            # elif self._coarse_scan_width == 270:
+            x[-7] = 5
+            x[-6] = 6
+            x[-5] = 7
+            x[-4] = 8
+            x[-3] = 9
+            x[-2] = 10
+            x[-1] = 11
+        return x, y
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
@@ -420,63 +431,42 @@ cdef class Interpolator:
                 scan2_tmp = (1 - ascan1) * data_d_2d_view[i, j] + ascan1 * data_c_2d_view[i, j]
                 xyz_comp_view[i, j, k] = (1 - atrack1) * scan1_tmp + atrack1 * scan2_tmp
 
-    @cython.boundscheck(False)
-    @cython.cdivision(True)
-    @cython.wraparound(False)
-    cdef tuple _get_coords_1km(self, unsigned int scans):
-        # TODO: nogil this and the 5km version...if possible
-        cdef int half_scan_length = self._fine_scan_length // 2
-        cdef np.ndarray[np.float32_t, ndim=1] y = np.empty((scans * self._coarse_scan_length * self._fine_scan_length,), dtype=np.float32)
-        cdef np.float32_t[::1] y_view = y
-        cdef unsigned int scan_idx
-        cdef int i
-        cdef int fine_idx
-        cdef unsigned int fine_pixels_per_scan = self._coarse_scan_length * self._fine_scan_length
-        for scan_idx in range(scans):
-            for i in range(fine_pixels_per_scan):
-                fine_idx = scan_idx * fine_pixels_per_scan + i
-                if i < half_scan_length:
-                    y_view[fine_idx] = (-half_scan_length + 0.5) - i
-                elif i > fine_pixels_per_scan - half_scan_length:
-                    y_view[fine_idx] = (self._fine_scan_length + 0.5) + (fine_pixels_per_scan - i)
-                else:
-                    y_view[fine_idx] = (i % self._fine_scan_length) + 0.5
-
-        cdef np.ndarray[np.float32_t, ndim=1] x = np.arange(self._fine_scan_width, dtype=np.float32) % self._fine_pixels_per_coarse_pixel
-        cdef np.float32_t[::1] x_view = x
-        for i in range(self._fine_pixels_per_coarse_pixel):
-            x_view[(self._fine_scan_width - self._fine_pixels_per_coarse_pixel) + i] = self._fine_pixels_per_coarse_pixel + i
-        return x, y
-
-    cdef tuple _get_coords_5km(self, unsigned int scans):
-        cdef np.ndarray[np.float32_t, ndim=1] y = np.arange(self._fine_scan_length * self._coarse_scan_length, dtype=np.float32) - 2
-        y = np.tile(y, scans)
-
-        cdef np.ndarray[np.float32_t, ndim=1] x = (np.arange(self._fine_scan_width, dtype=np.float32) - 2) % self._fine_pixels_per_coarse_pixel
-        x[0] = -2
-        x[1] = -1
-        if self._coarse_scan_width == 271:
-            x[-2] = 5
-            x[-1] = 6
+    cdef np.ndarray[floating, ndim=2] _create_expanded_output_array(
+            self,
+            floating[:, :, :] like_arr,
+    ):
+        cdef unsigned int num_scans = like_arr.shape[0]
+        cdef unsigned int num_rows = like_arr.shape[1]
+        cdef unsigned int num_cols = like_arr.shape[2]
+        if floating is np.float32_t:
+            dtype = np.float32
         else:
-            # elif self._coarse_scan_width == 270:
-            x[-7] = 5
-            x[-6] = 6
-            x[-5] = 7
-            x[-4] = 8
-            x[-3] = 9
-            x[-2] = 10
-            x[-1] = 11
-        return x, y
+            dtype = np.float64
+        if self._coarse_scan_length == 10:
+            return np.empty(
+                (
+                    num_scans * (num_rows + 1) * self._fine_pixels_per_coarse_pixel,
+                    (num_cols + 1) * self._fine_pixels_per_coarse_pixel
+                ),
+                dtype=dtype)
+        # 5km
+        num_rows = num_scans * (num_rows + 1) * self._fine_pixels_per_coarse_pixel
+        factor = self._fine_pixels_per_coarse_pixel // self._coarse_pixels_per_1km
+        if self._coarse_scan_width == 271:
+            num_cols = num_cols * self._fine_pixels_per_coarse_pixel + 4 * factor
+        else:
+            num_cols = (num_cols + 1) * self._fine_pixels_per_coarse_pixel + 4 * factor
+        return np.empty((num_rows, num_cols), dtype=dtype)
 
-    cdef np.ndarray[floating, ndim=2] _expand_tiepoint_array_1km_orig(self, np.ndarray[floating, ndim=3] arr):
-        arr = np.repeat(arr, self._fine_scan_length, axis=1)
-        arr = np.concatenate(
-            (arr[:, :self._fine_scan_length // 2, :], arr, arr[:, -(self._fine_scan_length // 2):, :]), axis=1
-        )
-        cdef np.ndarray[floating, ndim=2] arr_2d = np.repeat(arr.reshape((-1, self._coarse_scan_width - 1)), self._fine_pixels_per_coarse_pixel, axis=1)
-        return np.hstack((arr_2d, arr_2d[:, -self._fine_pixels_per_coarse_pixel:]))
-
+    cdef void _expand_tiepoint_array(
+            self,
+            floating[:, :, :] input_arr,
+            floating[:, ::1] output_arr,
+    ):
+        if self._coarse_scan_length == 10:
+            self._expand_tiepoint_array_1km(input_arr, output_arr)
+        else:
+            self._expand_tiepoint_array_5km(input_arr, output_arr)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
