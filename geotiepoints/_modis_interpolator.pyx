@@ -11,10 +11,6 @@ ctypedef fused floating:
     np.float64_t
 
 DEF EARTH_RADIUS = 6370997.0
-# cdef np.float32_t R = 6371.0
-# # Aqua scan width and altitude in km
-# cdef np.float32_t scan_width = 10.00017
-# cdef np.float32_t H = 705.0
 DEF R = 6371.0
 # Aqua scan width and altitude in km
 DEF scan_width = 10.00017
@@ -274,7 +270,6 @@ cdef class Interpolator:
         cdef unsigned int scans = satz1.shape[0] // self._coarse_scan_length
         # reshape to (num scans, rows per scan, columns per scan)
         cdef floating[:, :, ::1] satz1_3d = satz1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
-
         cdef floating[:, :, ::1] satz_a_view = _get_upper_left_corner(satz1_3d)
         cdef floating[:, :, ::1] satz_b_view = _get_upper_right_corner(satz1_3d)
         cdef np.ndarray[floating, ndim=3] c_exp = np.empty(
@@ -316,13 +311,9 @@ cdef class Interpolator:
                                       np.ndarray[floating, ndim=2] lat1,
                                       np.ndarray[floating, ndim=2] a_track,
                                       np.ndarray[floating, ndim=2] a_scan):
-        res = []
-        cdef np.ndarray[floating, ndim=3] lon1_3d, lat1_3d
-        lon1_3d = lon1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
-        lat1_3d = lat1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
         cdef floating[:, :, ::1] lon1_3d_view, lat1_3d_view
-        lon1_3d_view = lon1_3d
-        lat1_3d_view = lat1_3d
+        lon1_3d_view = lon1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
+        lat1_3d_view = lat1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
         cdef floating[:, :, ::1] lon1_a, lon1_b, lon1_c, lon1_d, lat1_a, lat1_b, lat1_c, lat1_d
         lon1_a = _get_upper_left_corner(lon1_3d_view)
         lon1_b = _get_upper_right_corner(lon1_3d_view)
