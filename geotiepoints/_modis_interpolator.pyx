@@ -190,29 +190,26 @@ cdef class Interpolator:
     cdef int _coarse_resolution
     cdef int _fine_resolution
 
+    @cython.cdivision(True)
+    @cython.wraparound(False)
     def __cinit__(self, unsigned int coarse_resolution, unsigned int fine_resolution, unsigned int coarse_scan_width=0):
         if coarse_resolution == 1000:
-            coarse_scan_length = 10
-            coarse_scan_width = 1354
+            self._coarse_scan_length = 10
+            self._coarse_scan_width = 1354
         elif coarse_resolution == 5000:
-            coarse_scan_length = 2
+            self._coarse_scan_length = 2
             if coarse_scan_width == 0:
-                coarse_scan_width = 271
+                self._coarse_scan_width = 271
             else:
-                coarse_scan_width = coarse_scan_width
-        self._coarse_scan_length = coarse_scan_length
-        self._coarse_scan_width = coarse_scan_width
+                self._coarse_scan_width = coarse_scan_width
         self._coarse_pixels_per_1km = coarse_resolution // 1000
 
-        fine_pixels_per_1km = {
-            250: 4,
-            500: 2,
-            1000: 1,
-        }[fine_resolution]
+
+        cdef int fine_pixels_per_1km = 1000 // fine_resolution
         self._fine_pixels_per_coarse_pixel = fine_pixels_per_1km * self._coarse_pixels_per_1km
         self._fine_scan_width = 1354 * fine_pixels_per_1km
         # TODO: This is actually the same as fine_pixels_per_coarse_pixel I think?
-        self._fine_scan_length = fine_pixels_per_1km * 10 // coarse_scan_length
+        self._fine_scan_length = fine_pixels_per_1km * 10 // self._coarse_scan_length
         self._coarse_resolution = coarse_resolution
         self._fine_resolution = fine_resolution
 
@@ -236,7 +233,18 @@ cdef class Interpolator:
             expanded_arr_view = expanded_arr
             self._expand_tiepoint_array_1km(input_arr_view, expanded_arr_view)
             return expanded_arr
-        return self._expand_tiepoint_array_5km(arr)
+
+        num_rows = arr.shape[0] * (arr.shape[1] + 1) * self._fine_pixels_per_coarse_pixel
+        factor = self._fine_pixels_per_coarse_pixel // self._coarse_pixels_per_1km
+        if self._coarse_scan_width == 271:
+            num_cols = (arr.shape[2]) * self._fine_pixels_per_coarse_pixel + 4 * factor
+        else:
+            num_cols = (arr.shape[2] + 1) * self._fine_pixels_per_coarse_pixel + 4 * factor
+
+        expanded_arr = np.empty((num_rows, num_cols), dtype=arr.dtype)
+        expanded_arr_view = expanded_arr
+        self._expand_tiepoint_array_5km_new(input_arr_view, expanded_arr_view)
+        return expanded_arr
 
     cdef interpolate(
             self,
@@ -245,7 +253,7 @@ cdef class Interpolator:
             np.ndarray[floating, ndim=2] satz1):
         """Interpolate MODIS geolocation from 'coarse_resolution' to 'fine_resolution'."""
         lon1 = np.ascontiguousarray(lon1)
-        la11 = np.ascontiguousarray(lat1)
+        lat1 = np.ascontiguousarray(lat1)
         satz1 = np.ascontiguousarray(satz1)
 
         cdef np.ndarray[floating, ndim=2] a_track, a_scan, new_lons, new_lats
@@ -408,6 +416,7 @@ cdef class Interpolator:
     @cython.cdivision(True)
     @cython.wraparound(False)
     cdef tuple _get_coords_1km(self, unsigned int scans):
+        # TODO: nogil this and the 5km version...if possible
         cdef int half_scan_length = self._fine_scan_length // 2
         cdef np.ndarray[np.float32_t, ndim=1] y = np.empty((scans * self._coarse_scan_length * self._fine_scan_length,), dtype=np.float32)
         cdef np.float32_t[::1] y_view = y
@@ -509,18 +518,37 @@ cdef class Interpolator:
                                     arr_2d_view[scan_offset + row_offset + length_repeat_cycle + half_scan_offset + self._fine_scan_length // 2,
                                                 col_offset + self._fine_pixels_per_coarse_pixel + width_repeat_cycle] = tiepoint_value
 
-    cdef np.ndarray[floating, ndim=2] _expand_tiepoint_array_5km(self, np.ndarray[floating, ndim=3] arr):
-        arr = np.repeat(arr, self._fine_scan_length * 2, axis=1)
-        cdef np.ndarray[floating, ndim=2] arr_2d = np.repeat(arr.reshape((-1, self._coarse_scan_width - 1)), self._fine_pixels_per_coarse_pixel, axis=1)
-        factor = self._fine_pixels_per_coarse_pixel // self._coarse_pixels_per_1km
-        if self._coarse_scan_width == 271:
-            return np.hstack((arr_2d[:, :2 * factor], arr_2d, arr_2d[:, -2 * factor:]))
-        else:
-            return np.hstack(
-                (
-                    arr_2d[:, :2 * factor],
-                    arr_2d,
-                    arr_2d[:, -self._fine_pixels_per_coarse_pixel:],
-                    arr_2d[:, -2 * factor:],
-                )
-            )
+    cdef void _expand_tiepoint_array_5km_new(self, floating[:, :, :] arr, floating[:, ::1] arr_2d_view) nogil:
+        cdef floating tiepoint_value
+        cdef Py_ssize_t scan_idx, row_idx, col_idx, length_repeat_cycle, width_repeat_cycle, half_scan_offset, scan_offset, row_offset, col_offset
+        # FIXME: This is not an actual scan length
+        half_scan_offset = self._fine_scan_length // 2
+        # FIXME: This is equivalent to "fine_pixels_per_1km" in __init__
+        cdef Py_ssize_t factor = self._fine_pixels_per_coarse_pixel // self._coarse_pixels_per_1km
+        for scan_idx in range(arr.shape[0]):
+            scan_offset = scan_idx * self._fine_scan_length * self._coarse_scan_length
+            for row_idx in range(arr.shape[1]):
+                row_offset = row_idx * self._fine_scan_length * 2
+                for col_idx in range(arr.shape[2]):
+                    col_offset = col_idx * self._fine_pixels_per_coarse_pixel
+                    tiepoint_value = arr[scan_idx, row_idx, col_idx]
+                    for length_repeat_cycle in range(self._fine_scan_length * 2):
+                        for width_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
+                            # main "center" scan portion
+                            arr_2d_view[scan_offset + row_offset + length_repeat_cycle,
+                                        col_offset + width_repeat_cycle + factor * 2] = tiepoint_value
+                            if (col_offset + width_repeat_cycle) < factor * 2:
+                                arr_2d_view[scan_offset + row_offset + length_repeat_cycle,
+                                            col_offset + width_repeat_cycle] = tiepoint_value
+                            if self._coarse_scan_width == 270 and (col_idx >= arr.shape[2] - 1):
+                                # need an extra coarse column copied over
+                                arr_2d_view[scan_offset + row_offset + length_repeat_cycle,
+                                            col_offset + factor * 2 + width_repeat_cycle + self._fine_pixels_per_coarse_pixel] = tiepoint_value
+                            if self._coarse_scan_width == 270 and (arr_2d_view.shape[1] - (col_offset + width_repeat_cycle + factor * 2) <= (2 * factor + 2 * factor + self._fine_pixels_per_coarse_pixel)):
+                                # add the right most portion
+                                arr_2d_view[scan_offset + row_offset + length_repeat_cycle,
+                                            col_offset + factor * 2 + factor * 2 + self._fine_pixels_per_coarse_pixel + width_repeat_cycle] = tiepoint_value
+                            elif arr_2d_view.shape[1] - (col_offset + width_repeat_cycle + factor * 2) <= (2 * factor + 2 * factor):
+                                # add the right most portion
+                                arr_2d_view[scan_offset + row_offset + length_repeat_cycle,
+                                            col_offset + factor * 2 + factor * 2 + width_repeat_cycle] = tiepoint_value
