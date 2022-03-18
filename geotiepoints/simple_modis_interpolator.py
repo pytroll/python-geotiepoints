@@ -37,6 +37,7 @@ from functools import wraps
 import numpy as np
 from scipy.ndimage.interpolation import map_coordinates
 from .geointerpolator import lonlat2xyz, xyz2lonlat
+from . import _simple_modis_interpolator
 
 try:
     import dask.array as da
@@ -48,15 +49,6 @@ try:
     import xarray as xr
 except ImportError:
     xr = None
-
-
-def _rows_per_scan_for_resolution(res):
-    return {
-        5000: 2,
-        1000: 10,
-        500: 20,
-        250: 40,
-    }[res]
 
 
 def scanline_mapblocks(func):
@@ -79,7 +71,7 @@ def scanline_mapblocks(func):
             # assume it is dask or xarray with dask, ensure proper chunk size
             # if DataArray get just the dask array
             dask_args = _extract_dask_arrays_from_args(args)
-            rows_per_scan = _rows_per_scan_for_resolution(coarse_resolution)
+            rows_per_scan = _simple_modis_interpolator.rows_per_scan_for_resolution(coarse_resolution)
             rechunked_args = _rechunk_dask_arrays_if_needed(dask_args, rows_per_scan)
             results = _call_map_blocks_interp(
                 func,
@@ -190,61 +182,9 @@ def interpolate_geolocation_cartesian(lon_array, lat_array, coarse_resolution, f
         A two-element tuple (lon, lat).
 
     """
-    rows_per_scan = _rows_per_scan_for_resolution(coarse_resolution)
-    res_factor = coarse_resolution // fine_resolution
-    num_rows, num_cols = lon_array.shape
-    num_scans = int(num_rows / rows_per_scan)
-    x_in, y_in, z_in = lonlat2xyz(lon_array, lat_array)
-
-    # Create an array of indexes that we want our result to have
-    x = np.arange(res_factor * num_cols, dtype=np.float32) * (1. / res_factor)
-    # 0.375 for 250m, 0.25 for 500m
-    y = np.arange(res_factor * rows_per_scan, dtype=np.float32) * \
-        (1. / res_factor) - (res_factor * (1. / 16) + (1. / 8))
-    x, y = np.meshgrid(x, y)
-    coordinates = np.array([y, x])  # Used by map_coordinates, major optimization
-
-    new_x = np.empty((num_rows * res_factor, num_cols * res_factor), dtype=lon_array.dtype)
-    new_y = new_x.copy()
-    new_z = new_x.copy()
-    nav_arrays = [(x_in, new_x), (y_in, new_y), (z_in, new_z)]
-
-    # Interpolate each scan, one at a time, otherwise the math doesn't work well
-    for scan_idx in range(num_scans):
-        # Calculate indexes
-        j0 = rows_per_scan * scan_idx
-        j1 = j0 + rows_per_scan
-        k0 = rows_per_scan * res_factor * scan_idx
-        k1 = k0 + rows_per_scan * res_factor
-
-        for nav_array, result_array in nav_arrays:
-            # Use bilinear interpolation for all 250 meter pixels
-            map_coordinates(nav_array[j0:j1, :], coordinates, output=result_array[k0:k1, :], order=1, mode='nearest')
-
-            if res_factor == 4:
-                # Use linear extrapolation for the first two 250 meter pixels along track
-                m, b = _calc_slope_offset_250(result_array, y, k0, 2)
-                result_array[k0 + 0, :] = m * y[0, 0] + b
-                result_array[k0 + 1, :] = m * y[1, 0] + b
-
-                # Use linear extrapolation for the last  two 250 meter pixels along track
-                # m = (result_array[k0 + 37, :] - result_array[k0 + 34, :]) / (y[37, 0] - y[34, 0])
-                # b = result_array[k0 + 37, :] - m * y[37, 0]
-                m, b = _calc_slope_offset_250(result_array, y, k0, 34)
-                result_array[k0 + 38, :] = m * y[38, 0] + b
-                result_array[k0 + 39, :] = m * y[39, 0] + b
-            else:
-                # 500m
-                # Use linear extrapolation for the first two 250 meter pixels along track
-                m, b = _calc_slope_offset_500(result_array, y, k0, 1)
-                result_array[k0 + 0, :] = m * y[0, 0] + b
-
-                # Use linear extrapolation for the last two 250 meter pixels along track
-                m, b = _calc_slope_offset_500(result_array, y, k0, 17)
-                result_array[k0 + 19, :] = m * y[19, 0] + b
-
-    new_lons, new_lats = xyz2lonlat(new_x, new_y, new_z, low_lat_z=True)
-    return new_lons.astype(lon_array.dtype), new_lats.astype(lon_array.dtype)
+    return _simple_modis_interpolator.interpolate_geolocation_cartesian(
+        lon_array, lat_array, coarse_resolution, fine_resolution
+    )
 
 
 def _calc_slope_offset_250(result_array, y, start_idx, offset):

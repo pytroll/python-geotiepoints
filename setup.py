@@ -52,6 +52,12 @@ EXTENSIONS = [
         extra_compile_args=extra_compile_args,
         include_dirs=[np.get_include()],
     ),
+    Extension(
+        'geotiepoints._simple_modis_interpolator',
+        sources=['geotiepoints/_simple_modis_interpolator.pyx'],
+        extra_compile_args=extra_compile_args,
+        include_dirs=[np.get_include()],
+    ),
 ]
 
 cmdclass = versioneer.get_cmdclass()
