@@ -37,42 +37,17 @@ def interpolate_geolocation_cartesian(
 
     # Interpolate each scan, one at a time, otherwise the math doesn't work well
     cdef Py_ssize_t scan_idx, j0, j1, k0, k1, comp_index
+    cdef floating[:, :] result_array
     for scan_idx in range(num_scans):
         # Calculate indexes
         j0 = rows_per_scan * scan_idx
         j1 = j0 + rows_per_scan
         k0 = rows_per_scan * res_factor * scan_idx
         k1 = k0 + rows_per_scan * res_factor
-
-        for comp_index in range(3):
-            nav_array = xyz_input[comp_index]
-            result_array = xyz_result[:, :, comp_index]
-            # Use bilinear interpolation for all 250 meter pixels
-            map_coordinates(nav_array[j0:j1, :], coordinates,
-                            output=xyz_result[k0:k1, :, comp_index],
-                            order=1, mode='nearest')
-
-            if res_factor == 4:
-                # Use linear extrapolation for the first two 250 meter pixels along track
-                m, b = _calc_slope_offset_250(result_array, coordinates[0], k0, 2)
-                result_array[k0 + 0, :] = m * coordinates[0, 0, 0] + b
-                result_array[k0 + 1, :] = m * coordinates[0, 1, 0] + b
-
-                # Use linear extrapolation for the last  two 250 meter pixels along track
-                # m = (result_array[k0 + 37, :] - result_array[k0 + 34, :]) / (y[37, 0] - y[34, 0])
-                # b = result_array[k0 + 37, :] - m * y[37, 0]
-                m, b = _calc_slope_offset_250(result_array, coordinates[0], k0, 34)
-                result_array[k0 + 38, :] = m * coordinates[0, 38, 0] + b
-                result_array[k0 + 39, :] = m * coordinates[0, 39, 0] + b
-            else:
-                # 500m
-                # Use linear extrapolation for the first two 250 meter pixels along track
-                m, b = _calc_slope_offset_500(result_array, coordinates[0], k0, 1)
-                result_array[k0 + 0, :] = m * coordinates[0, 0, 0] + b
-
-                # Use linear extrapolation for the last two 250 meter pixels along track
-                m, b = _calc_slope_offset_500(result_array, coordinates[0], k0, 17)
-                result_array[k0 + 19, :] = m * coordinates[0, 19, 0] + b
+        _compute_interpolated_xyz_scan(
+            j0, j1, k0, k1, res_factor,
+            coordinates, xyz_input,
+            xyz_result_view)
 
     cdef np.ndarray[floating, ndim=2] new_lons = np.empty((xyz_result_view.shape[0], xyz_result_view.shape[1]),
                                                           dtype=lon_array.dtype)
@@ -84,7 +59,54 @@ def interpolate_geolocation_cartesian(
     return new_lons, new_lats
 
 
+cdef void _compute_interpolated_xyz_scan(
+        Py_ssize_t j0,
+        Py_ssize_t j1,
+        Py_ssize_t k0,
+        Py_ssize_t k1,
+        unsigned int res_factor,
+        np.ndarray[floating, ndim=3] coordinates,
+        list xyz_input,
+        floating[:, :, ::1] xyz_result_view,
+):
+    cdef Py_ssize_t comp_index
+    cdef np.ndarray[floating, ndim=2] nav_array, result_array
+    cdef floating[:, :] result_view
+    for comp_index in range(3):
+        nav_array = xyz_input[comp_index]
+        result_view = xyz_result_view[:, :, comp_index]
+        result_array = np.asarray(result_view)
+        # Use bilinear interpolation for all 250 meter pixels
+        map_coordinates(nav_array[j0:j1, :], coordinates,
+                        output=result_array[k0:k1, :],
+                        order=1, mode='nearest')
 
+        if res_factor == 4:
+            # Use linear extrapolation for the first two 250 meter pixels along track
+            m, b = _calc_slope_offset_250(result_array, coordinates[0], k0, 2)
+            result_array[k0 + 0, :] = m * coordinates[0, 0, 0] + b
+            result_array[k0 + 1, :] = m * coordinates[0, 1, 0] + b
+
+            # Use linear extrapolation for the last  two 250 meter pixels along track
+            # m = (result_array[k0 + 37, :] - result_array[k0 + 34, :]) / (y[37, 0] - y[34, 0])
+            # b = result_array[k0 + 37, :] - m * y[37, 0]
+            m, b = _calc_slope_offset_250(result_array, coordinates[0], k0, 34)
+            result_array[k0 + 38, :] = m * coordinates[0, 38, 0] + b
+            result_array[k0 + 39, :] = m * coordinates[0, 39, 0] + b
+        else:
+            # 500m
+            # Use linear extrapolation for the first two 250 meter pixels along track
+            m, b = _calc_slope_offset_500(result_array, coordinates[0], k0, 1)
+            result_array[k0 + 0, :] = m * coordinates[0, 0, 0] + b
+
+            # Use linear extrapolation for the last two 250 meter pixels along track
+            m, b = _calc_slope_offset_500(result_array, coordinates[0], k0, 17)
+            result_array[k0 + 19, :] = m * coordinates[0, 19, 0] + b
+
+
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.wraparound(False)
 cdef void _compute_xy_coordinate_arrays(
         unsigned int res_factor,
         floating[:, :, ::1] coordinates,
