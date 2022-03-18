@@ -44,8 +44,8 @@ def interpolate(
 @cython.cdivision(True)
 @cython.wraparound(False)
 cdef void lonlat2xyz(
-        floating[:, :, ::1] lons,
-        floating[:, :, ::1] lats,
+        floating[:, :, :] lons,
+        floating[:, :, :] lats,
         floating[:, :, :, ::1] xyz,
 ) nogil:
     """Convert lons and lats to cartesian coordinates."""
@@ -104,7 +104,7 @@ cdef inline floating _deg2rad(floating x) nogil:
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
-cdef void _compute_expansion_alignment(floating[:, :, ::1] satz_a, floating [:, :, ::1] satz_b,
+cdef void _compute_expansion_alignment(floating[:, :, :] satz_a, floating [:, :, :] satz_b,
                                        floating[:, :, ::1] c_expansion, floating[:, :, ::1] c_alignment) nogil:
     """Fill in expansion and alignment.
     
@@ -149,24 +149,20 @@ cdef inline floating _compute_zeta(floating phi) nogil:
     return asin((R + H) * sin(phi) / R)
 
 
-cdef floating[:, :, ::1] _get_upper_left_corner(floating[:, :, ::1] arr):
-    cdef floating[:, :, ::1] ret = arr[:, :-1, :-1].copy()
-    return ret
+cdef floating[:, :, :] _get_upper_left_corner(floating[:, :, ::1] arr) nogil:
+    return arr[:, :-1, :-1]
 
 
-cdef floating[:, :, ::1] _get_upper_right_corner(floating[:, :, ::1] arr):
-    cdef floating[:, :, ::1] ret = arr[:, :-1, 1:].copy()
-    return ret
+cdef floating[:, :, :] _get_upper_right_corner(floating[:, :, ::1] arr) nogil:
+    return arr[:, :-1, 1:]
 
 
-cdef floating[:, :, ::1] _get_lower_right_corner(floating[:, :, ::1] arr):
-    cdef floating[:, :, ::1] ret = arr[:, 1:, 1:].copy()
-    return ret
+cdef floating[:, :, :] _get_lower_right_corner(floating[:, :, ::1] arr) nogil:
+    return arr[:, 1:, 1:]
 
 
-cdef floating[:, :, ::1] _get_lower_left_corner(floating[:, :, ::1] arr):
-    cdef floating[:, :, ::1] ret = arr[:, 1:, :-1].copy()
-    return ret
+cdef floating[:, :, :] _get_lower_left_corner(floating[:, :, ::1] arr) nogil:
+    return arr[:, 1:, :-1]
 
 
 cdef class Interpolator:
@@ -226,9 +222,8 @@ cdef class Interpolator:
         cdef unsigned int scans = satz1.shape[0] // self._coarse_scan_length
         # reshape to (num scans, rows per scan, columns per scan)
         cdef floating[:, :, ::1] satz1_3d = satz1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
-        # TODO: What's performance like if we remove the copy in the corner functions?
-        cdef floating[:, :, ::1] satz_a_view = _get_upper_left_corner(satz1_3d)
-        cdef floating[:, :, ::1] satz_b_view = _get_upper_right_corner(satz1_3d)
+        cdef floating[:, :, :] satz_a_view = _get_upper_left_corner(satz1_3d)
+        cdef floating[:, :, :] satz_b_view = _get_upper_right_corner(satz1_3d)
         cdef np.ndarray[floating, ndim=3] c_exp = np.empty(
             (satz_a_view.shape[0], satz_a_view.shape[1], satz_a_view.shape[2]),
             dtype=satz1.dtype)
@@ -357,7 +352,7 @@ cdef class Interpolator:
         cdef floating[:, :, ::1] lon1_3d_view, lat1_3d_view
         lon1_3d_view = lon1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
         lat1_3d_view = lat1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
-        cdef floating[:, :, ::1] lon1_a, lon1_b, lon1_c, lon1_d, lat1_a, lat1_b, lat1_c, lat1_d
+        cdef floating[:, :, :] lon1_a, lon1_b, lon1_c, lon1_d, lat1_a, lat1_b, lat1_c, lat1_d
         lon1_a = _get_upper_left_corner(lon1_3d_view)
         lon1_b = _get_upper_right_corner(lon1_3d_view)
         lon1_c = _get_lower_right_corner(lon1_3d_view)
