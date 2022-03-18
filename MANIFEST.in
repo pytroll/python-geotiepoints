@@ -1,6 +1,7 @@
 include doc/Makefile
 recursive-include doc/source *
 include LICENSE.txt
-include geotiepoints/multilinear_cython.pyx
+include geotiepoints/*.pyx
+include geotiepoints/*.pxd
 include versioneer.py
 include geotiepoints/version.py

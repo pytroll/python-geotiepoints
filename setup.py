@@ -58,6 +58,12 @@ EXTENSIONS = [
         extra_compile_args=extra_compile_args,
         include_dirs=[np.get_include()],
     ),
+    Extension(
+        'geotiepoints._modis_utils',
+        sources=['geotiepoints/_modis_utils.pyx'],
+        extra_compile_args=extra_compile_args,
+        include_dirs=[np.get_include()],
+    ),
 ]
 
 cmdclass = versioneer.get_cmdclass()

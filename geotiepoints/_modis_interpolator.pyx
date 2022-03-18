@@ -1,15 +1,11 @@
 cimport cython
+from ._modis_utils cimport lonlat2xyz, xyz2lonlat, floating, deg2rad
 from .simple_modis_interpolator import scanline_mapblocks
 
-cimport numpy as np
 from libc.math cimport asin, sin, cos, sqrt, acos, M_PI
+cimport numpy as np
 import numpy as np
 
-ctypedef fused floating:
-    np.float32_t
-    np.float64_t
-
-DEF EARTH_RADIUS = 6370997.0
 DEF R = 6371.0
 # Aqua scan width and altitude in km
 DEF scan_width = 10.00017
@@ -43,67 +39,6 @@ def interpolate(
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
-cdef void lonlat2xyz(
-        floating[:, :, :] lons,
-        floating[:, :, :] lats,
-        floating[:, :, :, ::1] xyz,
-) nogil:
-    """Convert lons and lats to cartesian coordinates."""
-    cdef Py_ssize_t i, j, k
-    cdef floating lon_rad, lat_rad
-    for i in range(lons.shape[0]):
-        for j in range(lons.shape[1]):
-            for k in range(lons.shape[2]):
-                lon_rad = _deg2rad(lons[i, j, k])
-                lat_rad = _deg2rad(lats[i, j, k])
-                xyz[i, j, k, 0] = EARTH_RADIUS * cos(lat_rad) * cos(lon_rad)
-                xyz[i, j, k, 1] = EARTH_RADIUS * cos(lat_rad) * sin(lon_rad)
-                xyz[i, j, k, 2] = EARTH_RADIUS * sin(lat_rad)
-
-
-@cython.boundscheck(False)
-@cython.cdivision(True)
-@cython.wraparound(False)
-cdef void xyz2lonlat(
-        floating[:, :, ::1] xyz,
-        floating[:, ::1] lons,
-        floating[:, ::1] lats,
-        floating thr=0.8,
-        bint low_lat_z=True) nogil:
-    """Get longitudes from cartesian coordinates."""
-    cdef Py_ssize_t i, j
-    cdef np.float64_t x, y, z
-    for i in range(xyz.shape[0]):
-        for j in range(xyz.shape[1]):
-            # 64-bit precision matters apparently
-            x = <np.float64_t>xyz[i, j, 0]
-            y = <np.float64_t>xyz[i, j, 1]
-            z = <np.float64_t>xyz[i, j, 2]
-            lons[i, j] = _rad2deg(acos(x / sqrt(x ** 2 + y ** 2))) * _sign(y)
-            # if we are at low latitudes - small z, then get the
-            # latitudes only from z. If we are at high latitudes (close to the poles)
-            # then derive the latitude using x and y:
-            if low_lat_z and (z < thr * EARTH_RADIUS) and (z > -1.0 * thr * EARTH_RADIUS):
-                lats[i, j] = 90 - _rad2deg(acos(z / EARTH_RADIUS))
-            else:
-                lats[i, j] = _sign(z) * (90 - _rad2deg(asin(sqrt(x ** 2 + y ** 2) / EARTH_RADIUS)))
-
-
-cdef inline int _sign(floating x) nogil:
-    return 1 if x > 0 else (-1 if x < 0 else 0)
-
-
-cdef inline floating _rad2deg(floating x) nogil:
-    return x * (180.0 / M_PI)
-
-
-cdef inline floating _deg2rad(floating x) nogil:
-    return x * (M_PI / 180.0)
-
-
-@cython.boundscheck(False)
-@cython.cdivision(True)
-@cython.wraparound(False)
 cdef void _compute_expansion_alignment(floating[:, :, :] satz_a, floating [:, :, :] satz_b,
                                        floating[:, :, ::1] c_expansion, floating[:, :, ::1] c_alignment) nogil:
     """Fill in expansion and alignment.
@@ -116,8 +51,8 @@ cdef void _compute_expansion_alignment(floating[:, :, :] satz_a, floating [:, :,
     for i in range(satz_a.shape[0]):
         for j in range(satz_a.shape[1]):
             for k in range(satz_a.shape[2]):
-                satz_a_rad = _deg2rad(satz_a[i, j, k])
-                satz_b_rad = _deg2rad(satz_b[i, j, k])
+                satz_a_rad = deg2rad(satz_a[i, j, k])
+                satz_b_rad = deg2rad(satz_b[i, j, k])
                 phi_a = _compute_phi(satz_a_rad)
                 phi_b = _compute_phi(satz_b_rad)
                 theta_a = _compute_theta(satz_a_rad, phi_a)
