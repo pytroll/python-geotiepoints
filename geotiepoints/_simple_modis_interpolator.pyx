@@ -55,7 +55,7 @@ def interpolate_geolocation_cartesian(
         lonlat2xyz(lon_in_view[None, j0:j1, :], lat_in_view[None, j0:j1, :], xyz_4d_in_view)
 
         _compute_interpolated_xyz_scan(
-            res_factor, coordinates, xyz_in_view,
+            res_factor, coordinates_view, xyz_in_view,
             xyz_result_view)
 
         xyz2lonlat(xyz_result_view, new_lons_view[k0:k1], new_lats_view[k0:k1], low_lat_z=True)
@@ -78,24 +78,24 @@ cdef void _compute_xy_coordinate_arrays(
             coordinates[1, j, i] = i * (1.0 / res_factor)
 
 
+@cython.boundscheck(False)
 cdef void _compute_interpolated_xyz_scan(
         unsigned int res_factor,
-        np.ndarray[floating, ndim=3] coordinates,
+        floating[:, :, ::1] coordinates_view,
         floating[:, :, ::1] xyz_input_view,
         floating[:, :, ::1] xyz_result_view,
-):
+) nogil:
     cdef Py_ssize_t comp_index
-    cdef np.ndarray[floating, ndim=2] nav_array, result_array
-    cdef floating[:, :] result_view
-    cdef floating[:, :, :] coordinates_view = coordinates
+    cdef floating[:, :] input_view, result_view
     for comp_index in range(3):
+        input_view = xyz_input_view[:, :, comp_index]
         result_view = xyz_result_view[:, :, comp_index]
-        nav_array = np.asarray(xyz_input_view[:, :, comp_index])
-        result_array = np.asarray(result_view)
-        # Use bilinear interpolation for all 250 meter pixels
-        map_coordinates(nav_array, coordinates,
-                        output=result_array,
-                        order=1, mode='nearest')
+        with gil:
+            _call_map_coordinates(
+                input_view,
+                coordinates_view,
+                result_view,
+            )
         if res_factor == 4:
             _interpolate_xyz_250(
                 result_view,
@@ -108,22 +108,35 @@ cdef void _compute_interpolated_xyz_scan(
             )
 
 
+cdef void _call_map_coordinates(
+        floating[:, :] nav_array_view,
+        floating[:, :, ::1] coordinates_view,
+        floating[:, :] result_view,
+):
+    cdef np.ndarray[floating, ndim=2] nav_array = np.asarray(nav_array_view)
+    cdef np.ndarray[floating, ndim=3] coordinates_array = np.asarray(coordinates_view)
+    cdef np.ndarray[floating, ndim=2] result_array = np.asarray(result_view)
+    # Use bilinear interpolation for all 250 meter pixels
+    map_coordinates(nav_array, coordinates_array,
+                    output=result_array,
+                    order=1, mode='nearest')
+
+
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
 cdef void _interpolate_xyz_250(
         floating[:, :] result_view,
-        floating[:, :, :] coordinates_view,
+        floating[:, :, ::1] coordinates_view,
 ) nogil:
     cdef Py_ssize_t col_idx
     cdef floating m, b
     cdef floating[:] result_col_view
-    cdef floating[:, :] y_coordinates = coordinates_view[0]
+    cdef floating[:, ::1] y_coordinates = coordinates_view[0]
     # FIXME: This doesn't need to run for every *row*, it only uses a few of them at a time.
     for col_idx in range(result_view.shape[1]):
         result_col_view = result_view[:, col_idx]
         # Use linear extrapolation for the first two 250 meter pixels along track
-        # m = _calc_slope_250(result_view[:, col_idx],
         m = _calc_slope_250(result_col_view,
                             y_coordinates,
                             2)
@@ -153,7 +166,7 @@ cdef void _interpolate_xyz_250(
 @cython.wraparound(False)
 cdef void _interpolate_xyz_500(
         floating[:, :] result_view,
-        floating[:, :, :] coordinates_view,
+        floating[:, :, ::1] coordinates_view,
 ) nogil:
     cdef Py_ssize_t col_idx
     cdef floating m, b
@@ -188,7 +201,7 @@ cdef void _interpolate_xyz_500(
 @cython.wraparound(False)
 cdef inline floating _calc_slope_250(
         floating[:] result_view,
-        floating[:, :] y,
+        floating[:, ::1] y,
         Py_ssize_t offset,
 ) nogil:
     return (result_view[offset + 3] - result_view[offset]) / \
@@ -200,7 +213,7 @@ cdef inline floating _calc_slope_250(
 @cython.wraparound(False)
 cdef inline floating _calc_offset_250(
         floating[:] result_view,
-        floating[:, :] y,
+        floating[:, ::1] y,
         floating m,
         Py_ssize_t offset,
 ) nogil:
@@ -212,7 +225,7 @@ cdef inline floating _calc_offset_250(
 @cython.wraparound(False)
 cdef inline floating _calc_slope_500(
         floating[:] result_view,
-        floating[:, :] y,
+        floating[:, ::1] y,
         Py_ssize_t offset,
 ) nogil:
     return (result_view[offset + 1] - result_view[offset]) / \
@@ -224,7 +237,7 @@ cdef inline floating _calc_slope_500(
 @cython.wraparound(False)
 cdef inline floating _calc_offset_500(
         floating[:] result_view,
-        floating[:, :] y,
+        floating[:, ::1] y,
         floating m,
         Py_ssize_t offset,
 ) nogil:
