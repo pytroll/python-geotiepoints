@@ -87,21 +87,26 @@ cdef void _compute_interpolated_xyz_scan(
 ) nogil:
     cdef Py_ssize_t comp_index
     cdef floating[:, :] input_view, result_view
-    for comp_index in range(3):
-        input_view = xyz_input_view[:, :, comp_index]
-        result_view = xyz_result_view[:, :, comp_index]
-        with gil:
+    with gil:
+        for comp_index in range(3):
+            input_view = xyz_input_view[:, :, comp_index]
+            result_view = xyz_result_view[:, :, comp_index]
             _call_map_coordinates(
                 input_view,
                 coordinates_view,
                 result_view,
             )
-        if res_factor == 4:
+
+    if res_factor == 4:
+        for comp_index in range(3):
+            result_view = xyz_result_view[:, :, comp_index]
             _interpolate_xyz_250(
                 result_view,
                 coordinates_view,
             )
-        else:
+    else:
+        for comp_index in range(3):
+            result_view = xyz_result_view[:, :, comp_index]
             _interpolate_xyz_500(
                 result_view,
                 coordinates_view,
