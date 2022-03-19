@@ -1,12 +1,11 @@
 cimport cython
 
 from ._modis_utils cimport floating
-from ._modis_utils cimport xyz2lonlat as xyz2lonlat_cython
+from ._modis_utils cimport lonlat2xyz, xyz2lonlat
 from ._modis_utils import rows_per_scan_for_resolution
 cimport numpy as np
 import numpy as np
 from scipy.ndimage.interpolation import map_coordinates
-from .geointerpolator import lonlat2xyz
 
 
 def interpolate_geolocation_cartesian(
@@ -31,8 +30,12 @@ def interpolate_geolocation_cartesian(
     cdef np.ndarray[floating, ndim=3] xyz_result = np.empty(
         (res_factor * rows_per_scan, num_cols * res_factor, 3), dtype=lon_array.dtype)
     cdef floating[:, :, ::1] xyz_result_view = xyz_result
-    cdef np.ndarray[floating, ndim=2] x_in, y_in, z_in
-    cdef list xyz_input
+    cdef np.ndarray[floating, ndim=3] xyz_in = np.empty(
+        (rows_per_scan, num_cols, 3), dtype=lon_array.dtype)
+    cdef floating[:, :, ::1] xyz_in_view = xyz_in
+    cdef floating[:, :, :, ::1] xyz_4d_in_view = xyz_in[None, :, :, :]
+    cdef floating[:, :] lon_in_view = lon_array
+    cdef floating[:, :] lat_in_view = lat_array
 
     cdef np.ndarray[floating, ndim=2] new_lons = np.empty((res_factor * num_rows, res_factor * num_cols),
                                                           dtype=lon_array.dtype)
@@ -49,18 +52,13 @@ def interpolate_geolocation_cartesian(
         j1 = j0 + rows_per_scan
         k0 = rows_per_scan * res_factor * scan_idx
         k1 = k0 + rows_per_scan * res_factor
-
-        # TODO: Use lon/lat views and cython version of lonlat2xyz
-        #   Use .reshape or similar to get a 3D view of the lon/lat arrays and 4D view of the xyz 3D array (scan, rows, cols, xyz)
-        #   If we did this, could we declare all memory views as `::1`
-        x_in, y_in, z_in = lonlat2xyz(lon_array[j0:j1], lat_array[j0:j1])
-        xyz_input = [x_in, y_in, z_in]
+        lonlat2xyz(lon_in_view[None, j0:j1, :], lat_in_view[None, j0:j1, :], xyz_4d_in_view)
 
         _compute_interpolated_xyz_scan(
-            res_factor, coordinates, xyz_input,
+            res_factor, coordinates, xyz_in_view,
             xyz_result_view)
 
-        xyz2lonlat_cython(xyz_result_view, new_lons_view[k0:k1], new_lats_view[k0:k1], low_lat_z=True)
+        xyz2lonlat(xyz_result_view, new_lons_view[k0:k1], new_lats_view[k0:k1], low_lat_z=True)
     return new_lons, new_lats
 
 
@@ -83,7 +81,7 @@ cdef void _compute_xy_coordinate_arrays(
 cdef void _compute_interpolated_xyz_scan(
         unsigned int res_factor,
         np.ndarray[floating, ndim=3] coordinates,
-        list xyz_input,
+        floating[:, :, ::1] xyz_input_view,
         floating[:, :, ::1] xyz_result_view,
 ):
     cdef Py_ssize_t comp_index
@@ -91,8 +89,8 @@ cdef void _compute_interpolated_xyz_scan(
     cdef floating[:, :] result_view
     cdef floating[:, :, :] coordinates_view = coordinates
     for comp_index in range(3):
-        nav_array = xyz_input[comp_index]
         result_view = xyz_result_view[:, :, comp_index]
+        nav_array = np.asarray(xyz_input_view[:, :, comp_index])
         result_array = np.asarray(result_view)
         # Use bilinear interpolation for all 250 meter pixels
         map_coordinates(nav_array, coordinates,
