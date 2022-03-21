@@ -66,7 +66,33 @@ EXTENSIONS = [
     ),
 ]
 
+
+try:
+    sys.argv.remove("--cython-coverage")
+    cython_coverage = True
+except ValueError:
+    cython_coverage = False
+
+
+cython_directives = {
+    "language_level": "3",
+}
+define_macros = []
+if cython_coverage:
+    print("Enabling directives/macros for Cython coverage support")
+    cython_directives.update({
+        "linetrace": True,
+        "profile": True,
+    })
+    define_macros.extend([
+        ("CYTHON_TRACE", "1"),
+        ("CYTHON_TRACE_NOGIL", "1"),
+    ])
+    for ext in EXTENSIONS:
+        ext.define_macros = define_macros
+
 cmdclass = versioneer.get_cmdclass()
+
 
 if __name__ == "__main__":
     setup(name='python-geotiepoints',
@@ -88,7 +114,7 @@ if __name__ == "__main__":
           python_requires='>=3.6',
           cmdclass=cmdclass,
           install_requires=requirements,
-          ext_modules=cythonize(EXTENSIONS, compiler_directives={'language_level': '3'}),
+          ext_modules=cythonize(EXTENSIONS, compiler_directives=cython_directives),
           tests_require=test_requires,
           zip_safe=False
           )
