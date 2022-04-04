@@ -546,7 +546,8 @@ cdef class Interpolator:
     cdef void _expand_tiepoint_array_5km(self, floating[:, :, :] arr, floating[:, ::1] arr_2d_view) nogil:
         cdef floating tiepoint_value
         cdef Py_ssize_t scan_idx, row_idx, col_idx, length_repeat_cycle, width_repeat_cycle, scan_offset, row_offset, col_offset
-        cdef Py_ssize_t factor = self._fine_pixels_per_coarse_pixel
+        # partial rows/columns to repeat: 5km->1km => 2, 5km->500m => 4, 5km->250m => 8
+        cdef Py_ssize_t factor = self._fine_pixels_per_coarse_pixel // self._coarse_pixels_per_1km * 2
         for scan_idx in range(arr.shape[0]):
             scan_offset = scan_idx * self._fine_pixels_per_coarse_pixel * self._coarse_scan_length
             for row_idx in range(arr.shape[1]):
