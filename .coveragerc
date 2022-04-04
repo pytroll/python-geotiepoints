@@ -1,2 +1,2 @@
-[run]
-plugins = Cython.Coverage
+#[run]
+#plugins = Cython.Coverage
