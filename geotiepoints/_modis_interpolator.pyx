@@ -300,20 +300,20 @@ cdef class Interpolator:
             floating[::1] x_view,
             floating[::1] y_view,
     ) nogil:
-        cdef int half_scan_length = self._fine_pixels_per_coarse_pixel // 2
         cdef unsigned int scan_idx
         cdef int i
         cdef int fine_idx
+        cdef int half_scan_length = self._fine_pixels_per_coarse_pixel // 2
         cdef unsigned int fine_pixels_per_scan = self._coarse_scan_length * self._fine_pixels_per_coarse_pixel
         for scan_idx in range(scans):
             for i in range(fine_pixels_per_scan):
                 fine_idx = scan_idx * fine_pixels_per_scan + i
                 if i < half_scan_length:
-                    y_view[fine_idx] = (-half_scan_length + 0.5) - i
-                elif i > fine_pixels_per_scan - half_scan_length:
-                    y_view[fine_idx] = (self._fine_pixels_per_coarse_pixel + 0.5) + (fine_pixels_per_scan - i)
+                    y_view[fine_idx] = -half_scan_length + 0.5 + i
+                elif i >= fine_pixels_per_scan - half_scan_length:
+                    y_view[fine_idx] = (self._fine_pixels_per_coarse_pixel + 0.5) + (half_scan_length - (fine_pixels_per_scan - i))
                 else:
-                    y_view[fine_idx] = (i % self._fine_pixels_per_coarse_pixel) + 0.5
+                    y_view[fine_idx] = ((i + half_scan_length) % self._fine_pixels_per_coarse_pixel) + 0.5
 
         for i in range(self._fine_pixels_per_coarse_pixel):
             x_view[(self._fine_scan_width - self._fine_pixels_per_coarse_pixel) + i] = self._fine_pixels_per_coarse_pixel + i
