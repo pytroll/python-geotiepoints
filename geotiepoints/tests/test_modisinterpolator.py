@@ -64,6 +64,22 @@ def load_1km_lonlat_satz_as_xarray_dask():
     return _to_da(lon1), _to_da(lat1), _to_da(satz1)
 
 
+def load_5km_lonlat_satz1_as_xarray_dask():
+    lon1, lat1, satz1 = _load_h5_geo_vars('lon_1km', 'lat_1km', 'satz_1km')
+    lon5 = lon1[2::5, 2::5]
+    lat5 = lat1[2::5, 2::5]
+    satz5 = satz1[2::5, 2::5]
+    return _to_da(lon5), _to_da(lat5), _to_da(satz5)
+
+
+def load_l2_5km_lonlat_satz1_as_xarray_dask():
+    lon1, lat1, satz1 = _load_h5_geo_vars('lon_1km', 'lat_1km', 'satz_1km')
+    lon5 = lon1[2::5, 2:-5:5]
+    lat5 = lat1[2::5, 2:-5:5]
+    satz5 = satz1[2::5, 2:-5:5]
+    return _to_da(lon5), _to_da(lat5), _to_da(satz5)
+
+
 def load_500m_lonlat_expected_as_xarray_dask():
     h5f = h5py.File(FILENAME_DATA, 'r')
     lon500 = _to_da(h5f['lon_500m'])
@@ -113,9 +129,7 @@ class TestModisInterpolator:
         lons, lats = modis_1km_to_500m(lon1, lat1, satz1)
         assert_geodetic_distance(lons, lats, lon500, lat500, 1)
 
-        lat5 = lat1[2::5, 2::5]
-        lon5 = lon1[2::5, 2::5]
-        satz5 = satz1[2::5, 2::5]
+        lon5, lat5, satz5 = load_5km_lonlat_satz1_as_xarray_dask()
         lons, lats = modis_5km_to_1km(lon5, lat5, satz5)
         assert_geodetic_distance(lons, lats, lon1, lat1, 25)
 
@@ -134,9 +148,7 @@ class TestModisInterpolator:
         # self.assertTrue(np.allclose(lat250, lats, atol=1e-2))
 
         # Test level 2
-        lat5 = lat1[2::5, 2:-5:5]
-        lon5 = lon1[2::5, 2:-5:5]
-        satz5 = satz1[2::5, 2:-5:5]
+        lon5, lat5, satz5 = load_l2_5km_lonlat_satz1_as_xarray_dask()
         lons, lats = modis_5km_to_1km(lon5, lat5, satz5)
         assert_geodetic_distance(lons, lats, lon1, lat1, 106.0)
 
@@ -147,13 +159,9 @@ class TestModisInterpolator:
         assert not np.any(np.isnan(lats.compute()))
 
     def test_poles_datum(self):
-        import xarray as xr
-        h5f = h5py.File(FILENAME_DATA, 'r')
-        orig_lon = _to_da(h5f['lon_1km'])
+        orig_lon, lat1, satz1 = load_1km_lonlat_satz_as_xarray_dask()
         lon1 = orig_lon + 180
         lon1 = xr.where(lon1 > 180, lon1 - 360, lon1)
-        lat1 = _to_da(h5f['lat_1km'])
-        satz1 = _to_da(h5f['satz_1km'])
 
         lat5 = lat1[2::5, 2::5]
         lon5 = lon1[2::5, 2::5]
