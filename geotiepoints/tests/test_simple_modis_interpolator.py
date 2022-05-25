@@ -38,11 +38,11 @@ from .utils import CustomScheduler
     ("input_func", "exp_func", "interp_func", "dist_max"),
     [
         (load_1km_lonlat_as_xarray_dask, load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m, 16),
-        (load_1km_lonlat_as_xarray_dask, load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 26),
+        (load_1km_lonlat_as_xarray_dask, load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 27),
         (load_1km_lonlat_as_dask, load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m, 16),
-        (load_1km_lonlat_as_dask, load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 26),
+        (load_1km_lonlat_as_dask, load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 27),
         (load_1km_lonlat_as_numpy, load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m, 16),
-        (load_1km_lonlat_as_numpy, load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 26),
+        (load_1km_lonlat_as_numpy, load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 27),
     ]
 )
 def test_basic_interp(input_func, exp_func, interp_func, dist_max):
