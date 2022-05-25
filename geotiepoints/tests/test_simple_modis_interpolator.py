@@ -16,13 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Tests for simple MODIS interpolators."""
 
-import os
 import numpy as np
 import pytest
-import h5py
 import dask
 import dask.array as da
-import xarray as xr
 
 from geotiepoints.simple_modis_interpolator import modis_1km_to_250m, modis_1km_to_500m
 from .test_modisinterpolator import (
@@ -58,7 +55,6 @@ def test_basic_interp(input_func, exp_func, interp_func, dist_max):
 
     if hasattr(lons, "compute"):
         lons, lats = da.compute(lons, lats)
-    # our "truth" values are from the modis interpolator (cviirs) results
     assert_geodetic_distance(lons, lats, lons_exp, lats_exp, dist_max)
     assert not np.any(np.isnan(lons))
     assert not np.any(np.isnan(lats))
