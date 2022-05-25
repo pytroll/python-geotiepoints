@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright (c) 2017-2021 Python-geotiepoints developers
+# Copyright (c) 2017-2022 Python-geotiepoints developers
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Tests for MODIS interpolators."""
 
-import unittest
 import numpy as np
 from pyproj import Geod
 import h5py
@@ -60,7 +59,7 @@ def assert_geodetic_distance(
     np.testing.assert_array_less(dist, max_distance_diff)  # meters
 
 
-class TestModisInterpolator(unittest.TestCase):
+class TestModisInterpolator:
     def test_modis(self):
         h5f = h5py.File(FILENAME_DATA, 'r')
         lon1 = to_da(h5f['lon_1km'])
@@ -109,8 +108,8 @@ class TestModisInterpolator(unittest.TestCase):
         # Test nans issue (#19)
         satz1 = to_da(abs(np.linspace(-65.4, 65.4, 1354)).repeat(20).reshape(-1, 20).T)
         lons, lats = modis_1km_to_500m(lon1, lat1, satz1)
-        self.assertFalse(np.any(np.isnan(lons.compute())))
-        self.assertFalse(np.any(np.isnan(lats.compute())))
+        assert not np.any(np.isnan(lons.compute()))
+        assert not np.any(np.isnan(lats.compute()))
 
     def test_poles_datum(self):
         import xarray as xr
@@ -128,5 +127,4 @@ class TestModisInterpolator(unittest.TestCase):
 
         lons = lons + 180
         lons = xr.where(lons > 180, lons - 360, lons)
-        np.testing.assert_allclose(orig_lon, lons, atol=2.1e-04)
-        np.testing.assert_allclose(lat1, lats, atol=2.1e-04)
+        assert_geodetic_distance(lons, lats, orig_lon, lat1, 25.0)
