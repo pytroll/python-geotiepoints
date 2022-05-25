@@ -20,6 +20,8 @@ import numpy as np
 from pyproj import Geod
 import h5py
 import os
+import dask.array as da
+import xarray as xr
 from geotiepoints.modisinterpolator import (modis_1km_to_250m,
                                             modis_1km_to_500m,
                                             modis_5km_to_1km,
@@ -29,11 +31,51 @@ FILENAME_DATA = os.path.join(
     os.path.dirname(__file__), '../../testdata/modis_test_data.h5')
 
 
-def to_da(arr):
-    import xarray as xr
-    import dask.array as da
+def _to_dask(arr):
+    return da.from_array(arr, chunks=4096)
 
-    return xr.DataArray(da.from_array(arr, chunks=4096), dims=['y', 'x'])
+
+def _to_da(arr):
+    return xr.DataArray(_to_dask(arr), dims=['y', 'x'])
+
+
+def _load_h5_geo_vars(*var_names):
+    h5f = h5py.File(FILENAME_DATA, 'r')
+    return tuple(h5f[var_name] for var_name in var_names)
+
+
+def load_1km_lonlat_as_numpy():
+    lon1, lat1 = _load_h5_geo_vars('lon_1km', 'lat_1km')
+    return lon1[:], lat1[:]
+
+
+def load_1km_lonlat_as_dask():
+    lon1, lat1 = _load_h5_geo_vars('lon_1km', 'lat_1km')
+    return _to_dask(lon1), _to_dask(lat1)
+
+
+def load_1km_lonlat_as_xarray_dask():
+    lon1, lat1 = _load_h5_geo_vars('lon_1km', 'lat_1km')
+    return _to_da(lon1), _to_da(lat1)
+
+
+def load_1km_lonlat_satz_as_xarray_dask():
+    lon1, lat1, satz1 = _load_h5_geo_vars('lon_1km', 'lat_1km', 'satz_1km')
+    return _to_da(lon1), _to_da(lat1), _to_da(satz1)
+
+
+def load_500m_lonlat_expected_as_xarray_dask():
+    h5f = h5py.File(FILENAME_DATA, 'r')
+    lon500 = _to_da(h5f['lon_500m'])
+    lat500 = _to_da(h5f['lat_500m'])
+    return lon500, lat500
+
+
+def load_250m_lonlat_expected_as_xarray_dask():
+    h5f = h5py.File(FILENAME_DATA, 'r')
+    lon250 = _to_da(h5f['lon_250m'])
+    lat250 = _to_da(h5f['lat_250m'])
+    return lon250, lat250
 
 
 def assert_geodetic_distance(
@@ -61,16 +103,9 @@ def assert_geodetic_distance(
 
 class TestModisInterpolator:
     def test_modis(self):
-        h5f = h5py.File(FILENAME_DATA, 'r')
-        lon1 = to_da(h5f['lon_1km'])
-        lat1 = to_da(h5f['lat_1km'])
-        satz1 = to_da(h5f['satz_1km'])
-
-        lon250 = to_da(h5f['lon_250m'])
-        lon500 = to_da(h5f['lon_500m'])
-
-        lat250 = to_da(h5f['lat_250m'])
-        lat500 = to_da(h5f['lat_500m'])
+        lon1, lat1, satz1 = load_1km_lonlat_satz_as_xarray_dask()
+        lon500, lat500 = load_500m_lonlat_expected_as_xarray_dask()
+        lon250, lat250 = load_250m_lonlat_expected_as_xarray_dask()
 
         lons, lats = modis_1km_to_250m(lon1, lat1, satz1)
         assert_geodetic_distance(lons, lats, lon250, lat250, 1)
@@ -106,7 +141,7 @@ class TestModisInterpolator:
         assert_geodetic_distance(lons, lats, lon1, lat1, 106.0)
 
         # Test nans issue (#19)
-        satz1 = to_da(abs(np.linspace(-65.4, 65.4, 1354)).repeat(20).reshape(-1, 20).T)
+        satz1 = _to_da(abs(np.linspace(-65.4, 65.4, 1354)).repeat(20).reshape(-1, 20).T)
         lons, lats = modis_1km_to_500m(lon1, lat1, satz1)
         assert not np.any(np.isnan(lons.compute()))
         assert not np.any(np.isnan(lats.compute()))
@@ -114,11 +149,11 @@ class TestModisInterpolator:
     def test_poles_datum(self):
         import xarray as xr
         h5f = h5py.File(FILENAME_DATA, 'r')
-        orig_lon = to_da(h5f['lon_1km'])
+        orig_lon = _to_da(h5f['lon_1km'])
         lon1 = orig_lon + 180
         lon1 = xr.where(lon1 > 180, lon1 - 360, lon1)
-        lat1 = to_da(h5f['lat_1km'])
-        satz1 = to_da(h5f['satz_1km'])
+        lat1 = _to_da(h5f['lat_1km'])
+        satz1 = _to_da(h5f['satz_1km'])
 
         lat5 = lat1[2::5, 2::5]
         lon5 = lon1[2::5, 2::5]
