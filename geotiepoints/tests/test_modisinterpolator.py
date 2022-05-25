@@ -122,7 +122,7 @@ def assert_geodetic_distance(
 @pytest.mark.parametrize(
     ("input_func", "exp_func", "interp_func", "dist_max"),
     [
-        (load_1km_lonlat_satz_as_xarray_dask, load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m, 4),
+        (load_1km_lonlat_satz_as_xarray_dask, load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m, 5),
         (load_1km_lonlat_satz_as_xarray_dask, load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 8),
         (load_5km_lonlat_satz1_as_xarray_dask, load_1km_lonlat_as_xarray_dask, modis_5km_to_1km, 25),
         (load_l2_5km_lonlat_satz1_as_xarray_dask, load_1km_lonlat_as_xarray_dask, modis_5km_to_1km, 110),
