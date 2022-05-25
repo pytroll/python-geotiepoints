@@ -116,7 +116,7 @@ def assert_geodetic_distance(
     """
     g = Geod(ellps="WGS84")
     _, _, dist = g.inv(lons_actual, lats_actual, lons_desired, lats_desired)
-    np.testing.assert_array_less(dist, max_distance_diff)  # meters
+    np.testing.assert_array_less(dist, max_distance_diff, verbose=True)  # meters
 
 
 @pytest.mark.parametrize(
