@@ -17,3 +17,4 @@ dependencies:
   - h5py
   - pytest
   - pytest-cov
+  - pyproj
