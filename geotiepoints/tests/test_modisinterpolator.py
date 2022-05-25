@@ -18,6 +18,7 @@
 
 import unittest
 import numpy as np
+from pyproj import Geod
 import h5py
 import os
 from geotiepoints.modisinterpolator import (modis_1km_to_250m,
@@ -36,6 +37,29 @@ def to_da(arr):
     return xr.DataArray(da.from_array(arr, chunks=4096), dims=['y', 'x'])
 
 
+def assert_geodetic_distance(
+        lons_actual: np.ndarray,
+        lats_actual: np.ndarray,
+        lons_desired: np.ndarray,
+        lats_desired: np.ndarray,
+        max_distance_diff: float,
+) -> None:
+    """Check that the geodetic distance between two sets of coordinates is smaller than a threshold.
+
+    Args:
+        lons_actual: Longitude array produced by interpolation being tested.
+        lats_actual: Latitude array produced by interpolation being tested.
+        lons_desired: Longitude array of expected/truth coordinates.
+        lats_desired: Latitude array of expected/truth coordinates.
+        max_distance_diff: Limit of allowed distance difference in meters.
+
+    """
+    g = Geod(ellps="WGS84")
+    _, _, dist = g.inv(lons_actual, lats_actual, lons_desired, lats_desired)
+    print(dist.min(), dist.max())
+    np.testing.assert_array_less(dist, max_distance_diff)  # meters
+
+
 class TestModisInterpolator(unittest.TestCase):
     def test_modis(self):
         h5f = h5py.File(FILENAME_DATA, 'r')
@@ -50,19 +74,16 @@ class TestModisInterpolator(unittest.TestCase):
         lat500 = to_da(h5f['lat_500m'])
 
         lons, lats = modis_1km_to_250m(lon1, lat1, satz1)
-        np.testing.assert_allclose(lons, lon250)
-        np.testing.assert_allclose(lats, lat250)
+        assert_geodetic_distance(lons, lats, lon250, lat250, 1)
 
         lons, lats = modis_1km_to_500m(lon1, lat1, satz1)
-        np.testing.assert_allclose(lons, lon500)
-        np.testing.assert_allclose(lats, lat500)
+        assert_geodetic_distance(lons, lats, lon500, lat500, 1)
 
         lat5 = lat1[2::5, 2::5]
         lon5 = lon1[2::5, 2::5]
         satz5 = satz1[2::5, 2::5]
         lons, lats = modis_5km_to_1km(lon5, lat5, satz5)
-        np.testing.assert_allclose(lons, lon1, atol=1e-04, rtol=1e-05)
-        np.testing.assert_allclose(lats, lat1, atol=1e-04, rtol=1e-05)
+        assert_geodetic_distance(lons, lats, lon1, lat1, 25)
 
         # 5km to 500m
         lons, lats = modis_5km_to_500m(lon5, lat5, satz5)
@@ -83,8 +104,7 @@ class TestModisInterpolator(unittest.TestCase):
         lon5 = lon1[2::5, 2:-5:5]
         satz5 = satz1[2::5, 2:-5:5]
         lons, lats = modis_5km_to_1km(lon5, lat5, satz5)
-        np.testing.assert_allclose(lons, lon1, atol=9e-04, rtol=1e-05)
-        np.testing.assert_allclose(lats, lat1, atol=9e-04, rtol=1e-05)
+        assert_geodetic_distance(lons, lats, lon1, lat1, 106.0)
 
         # Test nans issue (#19)
         satz1 = to_da(abs(np.linspace(-65.4, 65.4, 1354)).repeat(20).reshape(-1, 20).T)

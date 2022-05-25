@@ -25,6 +25,7 @@ import dask.array as da
 import xarray as xr
 
 from geotiepoints.simple_modis_interpolator import modis_1km_to_250m, modis_1km_to_500m
+from .test_modisinterpolator import assert_geodetic_distance
 from .utils import CustomScheduler
 
 FILENAME_DATA = os.path.join(
@@ -76,17 +77,17 @@ def _load_250m_lonlat_expected_as_xarray_dask():
 
 
 @pytest.mark.parametrize(
-    ("input_func", "exp_func", "interp_func"),
+    ("input_func", "exp_func", "interp_func", "dist_max"),
     [
-        (_load_1km_lonlat_as_xarray_dask, _load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m),
-        (_load_1km_lonlat_as_xarray_dask, _load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m),
-        (_load_1km_lonlat_as_dask, _load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m),
-        (_load_1km_lonlat_as_dask, _load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m),
-        (_load_1km_lonlat_as_numpy, _load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m),
-        (_load_1km_lonlat_as_numpy, _load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m),
+        (_load_1km_lonlat_as_xarray_dask, _load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m, 16),
+        (_load_1km_lonlat_as_xarray_dask, _load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 26),
+        (_load_1km_lonlat_as_dask, _load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m, 16),
+        (_load_1km_lonlat_as_dask, _load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 26),
+        (_load_1km_lonlat_as_numpy, _load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m, 16),
+        (_load_1km_lonlat_as_numpy, _load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 26),
     ]
 )
-def test_basic_interp(input_func, exp_func, interp_func):
+def test_basic_interp(input_func, exp_func, interp_func, dist_max):
     lon1, lat1 = input_func()
     lons_exp, lats_exp = exp_func()
 
@@ -97,10 +98,7 @@ def test_basic_interp(input_func, exp_func, interp_func):
     if hasattr(lons, "compute"):
         lons, lats = da.compute(lons, lats)
     # our "truth" values are from the modis interpolator (cviirs) results
-    atol = 3e-4
-    rtol = 1e-06
-    np.testing.assert_allclose(lons_exp, lons, atol=atol, rtol=rtol)
-    np.testing.assert_allclose(lats_exp, lats, atol=atol, rtol=rtol)
+    assert_geodetic_distance(lons, lats, lons_exp, lats_exp, dist_max)
     assert not np.any(np.isnan(lons))
     assert not np.any(np.isnan(lats))
 
