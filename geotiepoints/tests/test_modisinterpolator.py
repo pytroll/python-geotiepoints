@@ -50,43 +50,41 @@ class TestModisInterpolator(unittest.TestCase):
         lat500 = to_da(h5f['lat_500m'])
 
         lons, lats = modis_1km_to_250m(lon1, lat1, satz1)
-        self.assertTrue(np.allclose(lon250, lons, atol=1e-2))
-        self.assertTrue(np.allclose(lat250, lats, atol=1e-2))
+        np.testing.assert_allclose(lons, lon250)
+        np.testing.assert_allclose(lats, lat250)
 
         lons, lats = modis_1km_to_500m(lon1, lat1, satz1)
-        self.assertTrue(np.allclose(lon500, lons, atol=1e-2))
-        self.assertTrue(np.allclose(lat500, lats, atol=1e-2))
+        np.testing.assert_allclose(lons, lon500)
+        np.testing.assert_allclose(lats, lat500)
 
         lat5 = lat1[2::5, 2::5]
         lon5 = lon1[2::5, 2::5]
-
         satz5 = satz1[2::5, 2::5]
         lons, lats = modis_5km_to_1km(lon5, lat5, satz5)
-        self.assertTrue(np.allclose(lon1, lons, atol=1e-2))
-        self.assertTrue(np.allclose(lat1, lats, atol=1e-2))
+        np.testing.assert_allclose(lons, lon1, atol=1e-04, rtol=1e-05)
+        np.testing.assert_allclose(lats, lat1, atol=1e-04, rtol=1e-05)
 
         # 5km to 500m
         lons, lats = modis_5km_to_500m(lon5, lat5, satz5)
-        self.assertEqual(lon500.shape, lons.shape)
-        self.assertEqual(lat500.shape, lats.shape)
+        assert lons.shape == lon500.shape
+        assert lats.shape == lat500.shape
         # self.assertTrue(np.allclose(lon500, lons, atol=1e-2))
         # self.assertTrue(np.allclose(lat500, lats, atol=1e-2))
 
         # 5km to 250m
         lons, lats = modis_5km_to_250m(lon5, lat5, satz5)
-        self.assertEqual(lon250.shape, lons.shape)
-        self.assertEqual(lat250.shape, lats.shape)
+        assert lons.shape == lon250.shape
+        assert lats.shape == lat250.shape
         # self.assertTrue(np.allclose(lon250, lons, atol=1e-2))
         # self.assertTrue(np.allclose(lat250, lats, atol=1e-2))
 
         # Test level 2
         lat5 = lat1[2::5, 2:-5:5]
         lon5 = lon1[2::5, 2:-5:5]
-
         satz5 = satz1[2::5, 2:-5:5]
         lons, lats = modis_5km_to_1km(lon5, lat5, satz5)
-        self.assertTrue(np.allclose(lon1, lons, atol=1e-2))
-        self.assertTrue(np.allclose(lat1, lats, atol=1e-2))
+        np.testing.assert_allclose(lons, lon1, atol=9e-04, rtol=1e-05)
+        np.testing.assert_allclose(lats, lat1, atol=9e-04, rtol=1e-05)
 
         # Test nans issue (#19)
         satz1 = to_da(abs(np.linspace(-65.4, 65.4, 1354)).repeat(20).reshape(-1, 20).T)
