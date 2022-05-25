@@ -23,7 +23,14 @@
 """Interpolation of geographical tiepoints using the second order interpolation
 scheme implemented in the CVIIRS software, as described here:
 Compact VIIRS SDR Product Format User Guide (V1J)
-http://www.eumetsat.int/website/wcm/idc/idcplg?IdcService=GET_FILE&dDocName=PDF_DMT_708025&RevisionSelectionMethod=LatestReleased&Rendition=Web
+https://www.eumetsat.int/media/45988
+and
+Anders Meier Soerensen, Stephan Zinke,
+A tie-point zone group compaction schema for the geolocation data of S-NPP and NOAA-20 VIIRS SDRs to reduce file sizes
+in memory-sensitive environments,
+Applied Computing and Geosciences, Volume 6, 2020, 100025, ISSN 2590-1974,
+https://doi.org/10.1016/j.acags.2020.100025.
+(https://www.sciencedirect.com/science/article/pii/S2590197420300070)
 """
 
 import xarray as xr
@@ -34,9 +41,8 @@ import warnings
 from .geointerpolator import lonlat2xyz, xyz2lonlat
 
 R = 6371.
-# Aqua scan width and altitude in km
-scan_width = 10.00017
-H = 705.
+# Aqua altitude in km
+H = 709.
 
 
 def compute_phi(zeta):
@@ -51,7 +57,7 @@ def compute_zeta(phi):
     return np.arcsin((R + H) * np.sin(phi) / R)
 
 
-def compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d):
+def compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d, scan_width):
     """All angles in radians."""
     zeta_a = satz_a
     zeta_b = satz_b
@@ -180,7 +186,7 @@ class ModisInterpolator(object):
 
         satz_a, satz_b, satz_c, satz_d = get_corners(da.deg2rad(satz1))
 
-        c_exp, c_ali = compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d)
+        c_exp, c_ali = compute_expansion_alignment(satz_a, satz_b, satz_c, satz_d, self.cscan_width)
 
         x, y = self.get_coords(scans)
         i_rs, i_rt = da.meshgrid(x, y)
