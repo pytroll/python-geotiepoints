@@ -63,13 +63,13 @@ def main():
         lons_250m = lons_250m.astype(np.float32, copy=False)
         lats_250m = lats_250m.astype(np.float32, copy=False)
 
-        output_h.create_dataset("lon_1km", data=lons_1km, compression="gzip", compression_opts=9)
-        output_h.create_dataset("lat_1km", data=lats_1km, compression="gzip", compression_opts=9)
-        output_h.create_dataset("satz_1km", data=satz_1km, compression="gzip", compression_opts=9)
-        output_h.create_dataset("lon_500m", data=lons_500m, compression="gzip", compression_opts=9)
-        output_h.create_dataset('lat_500m', data=lats_500m, compression="gzip", compression_opts=9)
-        output_h.create_dataset("lon_250m", data=lons_250m, compression="gzip", compression_opts=9)
-        output_h.create_dataset("lat_250m", data=lats_250m, compression="gzip", compression_opts=9)
+        output_h.create_dataset("lon_1km", data=lons_1km, compression="gzip", compression_opts=9, shuffle=True)
+        output_h.create_dataset("lat_1km", data=lats_1km, compression="gzip", compression_opts=9, shuffle=True)
+        output_h.create_dataset("satz_1km", data=satz_1km, compression="gzip", compression_opts=9, shuffle=True)
+        output_h.create_dataset("lon_500m", data=lons_500m, compression="gzip", compression_opts=9, shuffle=True)
+        output_h.create_dataset('lat_500m', data=lats_500m, compression="gzip", compression_opts=9, shuffle=True)
+        output_h.create_dataset("lon_250m", data=lons_250m, compression="gzip", compression_opts=9, shuffle=True)
+        output_h.create_dataset("lat_250m", data=lats_250m, compression="gzip", compression_opts=9, shuffle=True)
         output_h.attrs["1km_data_origin"] = os.path.basename(args.input)
         output_h.attrs["description"] = (
             "MODIS interpolation test data for the python-geotiepoints package. "
