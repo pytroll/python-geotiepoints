@@ -116,7 +116,10 @@ def assert_geodetic_distance(
     """
     g = Geod(ellps="WGS84")
     _, _, dist = g.inv(lons_actual, lats_actual, lons_desired, lats_desired)
-    np.testing.assert_array_less(dist, max_distance_diff)  # meters
+    np.testing.assert_array_less(
+        dist, max_distance_diff,
+        err_msg=f"Coordinates are greater than {max_distance_diff} geodetic "
+                "meters from the expected coordinates.")
 
 
 @pytest.mark.parametrize(
@@ -130,7 +133,7 @@ def assert_geodetic_distance(
         (load_5km_lonlat_satz1_as_xarray_dask, load_250m_lonlat_expected_as_xarray_dask, modis_5km_to_250m, 25800),
     ]
 )
-def test_cviirs_interp(input_func, exp_func, interp_func, dist_max):
+def test_sat_angle_based_interp(input_func, exp_func, interp_func, dist_max):
     lon1, lat1, satz1 = input_func()
     lons_exp, lats_exp = exp_func()
 
@@ -145,7 +148,7 @@ def test_cviirs_interp(input_func, exp_func, interp_func, dist_max):
     assert not np.any(np.isnan(lats))
 
 
-def test_cviirs_nan_handling():
+def test_sat_angle_based_interp_nan_handling():
     # See GH #19
     lon1, lat1, satz1 = load_1km_lonlat_satz_as_xarray_dask()
     satz1 = _to_da(abs(np.linspace(-65.4, 65.4, 1354)).repeat(20).reshape(-1, 20).T)
