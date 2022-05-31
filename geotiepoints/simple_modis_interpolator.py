@@ -220,6 +220,7 @@ def interpolate_geolocation_cartesian(lon_array, lat_array, coarse_resolution, f
         for nav_array, result_array in nav_arrays:
             # Use bilinear interpolation for all 250 meter pixels
             map_coordinates(nav_array[j0:j1, :], coordinates, output=result_array[k0:k1, :], order=1, mode='nearest')
+            _extrapolate_rightmost_columns(res_factor, result_array[k0:k1])
 
             if res_factor == 4:
                 # Use linear extrapolation for the first two 250 meter pixels along track
@@ -245,6 +246,14 @@ def interpolate_geolocation_cartesian(lon_array, lat_array, coarse_resolution, f
 
     new_lons, new_lats = xyz2lonlat(new_x, new_y, new_z, low_lat_z=True)
     return new_lons.astype(lon_array.dtype), new_lats.astype(lon_array.dtype)
+
+
+def _extrapolate_rightmost_columns(res_factor, result_array):
+    outer_columns_offset = 3 if res_factor == 4 else 1
+    # take the last two interpolated (not extrapolated) columns and find the difference
+    right_diff = result_array[:, -(outer_columns_offset + 1)] - result_array[:, -(outer_columns_offset + 2)]
+    for factor, column_idx in enumerate(range(-outer_columns_offset, 0)):
+        result_array[:, column_idx] += right_diff * (factor + 1)
 
 
 def _calc_slope_offset_250(result_array, y, start_idx, offset):
