@@ -58,7 +58,7 @@ def _compute_zeta(phi):
     return np.arcsin((R + H) * np.sin(phi) / R)
 
 
-def compute_expansion_alignment(satz_a, satz_b, scan_width):
+def _compute_expansion_alignment(satz_a, satz_b, scan_width):
     """All angles in radians."""
     zeta_a = satz_a
     zeta_b = satz_b
@@ -155,7 +155,7 @@ class _Interpolator:
         satz1 = satz1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
 
         satz_a, satz_b = _get_corners(np.deg2rad(satz1))[:2]
-        c_exp, c_ali = _compute_expansion_alignment(satz_a, satz_b, self._coarse_scan_width)
+        c_exp, c_ali = _compute_expansion_alignment(satz_a, satz_b, self._coarse_pixels_per_1km)
 
         x, y = self._get_coords(scans)
         i_rs, i_rt = np.meshgrid(x, y)
