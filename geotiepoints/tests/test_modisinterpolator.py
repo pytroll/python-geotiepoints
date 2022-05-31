@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright (c) 2017-2021 Python-geotiepoints developers
+# Copyright (c) 2017-2022 Python-geotiepoints developers
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,10 +16,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Tests for MODIS interpolators."""
 
-import unittest
 import numpy as np
+from pyproj import Geod
 import h5py
 import os
+import dask
+import dask.array as da
+import xarray as xr
+import pytest
+from .utils import CustomScheduler
 from geotiepoints.modisinterpolator import (modis_1km_to_250m,
                                             modis_1km_to_500m,
                                             modis_5km_to_1km,
@@ -29,86 +34,139 @@ FILENAME_DATA = os.path.join(
     os.path.dirname(__file__), '../../testdata/modis_test_data.h5')
 
 
-def to_da(arr):
-    import xarray as xr
-    import dask.array as da
-
-    return xr.DataArray(da.from_array(arr, chunks=4096), dims=['y', 'x'])
+def _to_dask(arr):
+    return da.from_array(arr, chunks=4096)
 
 
-class TestModisInterpolator(unittest.TestCase):
-    def test_modis(self):
-        h5f = h5py.File(FILENAME_DATA, 'r')
-        lon1 = to_da(h5f['lon_1km'])
-        lat1 = to_da(h5f['lat_1km'])
-        satz1 = to_da(h5f['satz_1km'])
+def _to_da(arr):
+    return xr.DataArray(_to_dask(arr), dims=['y', 'x'])
 
-        lon250 = to_da(h5f['lon_250m'])
-        lon500 = to_da(h5f['lon_500m'])
 
-        lat250 = to_da(h5f['lat_250m'])
-        lat500 = to_da(h5f['lat_500m'])
+def _load_h5_geo_vars(*var_names):
+    h5f = h5py.File(FILENAME_DATA, 'r')
+    return tuple(h5f[var_name] for var_name in var_names)
 
-        lons, lats = modis_1km_to_250m(lon1, lat1, satz1)
-        self.assertTrue(np.allclose(lon250, lons, atol=1e-2))
-        self.assertTrue(np.allclose(lat250, lats, atol=1e-2))
 
-        lons, lats = modis_1km_to_500m(lon1, lat1, satz1)
-        self.assertTrue(np.allclose(lon500, lons, atol=1e-2))
-        self.assertTrue(np.allclose(lat500, lats, atol=1e-2))
+def load_1km_lonlat_as_numpy():
+    lon1, lat1 = _load_h5_geo_vars('lon_1km', 'lat_1km')
+    return lon1[:], lat1[:]
 
-        lat5 = lat1[2::5, 2::5]
-        lon5 = lon1[2::5, 2::5]
 
-        satz5 = satz1[2::5, 2::5]
-        lons, lats = modis_5km_to_1km(lon5, lat5, satz5)
-        self.assertTrue(np.allclose(lon1, lons, atol=1e-2))
-        self.assertTrue(np.allclose(lat1, lats, atol=1e-2))
+def load_1km_lonlat_as_dask():
+    lon1, lat1 = _load_h5_geo_vars('lon_1km', 'lat_1km')
+    return _to_dask(lon1), _to_dask(lat1)
 
-        # 5km to 500m
-        lons, lats = modis_5km_to_500m(lon5, lat5, satz5)
-        self.assertEqual(lon500.shape, lons.shape)
-        self.assertEqual(lat500.shape, lats.shape)
-        # self.assertTrue(np.allclose(lon500, lons, atol=1e-2))
-        # self.assertTrue(np.allclose(lat500, lats, atol=1e-2))
 
-        # 5km to 250m
-        lons, lats = modis_5km_to_250m(lon5, lat5, satz5)
-        self.assertEqual(lon250.shape, lons.shape)
-        self.assertEqual(lat250.shape, lats.shape)
-        # self.assertTrue(np.allclose(lon250, lons, atol=1e-2))
-        # self.assertTrue(np.allclose(lat250, lats, atol=1e-2))
+def load_1km_lonlat_as_xarray_dask():
+    lon1, lat1 = _load_h5_geo_vars('lon_1km', 'lat_1km')
+    return _to_da(lon1), _to_da(lat1)
 
-        # Test level 2
-        lat5 = lat1[2::5, 2:-5:5]
-        lon5 = lon1[2::5, 2:-5:5]
 
-        satz5 = satz1[2::5, 2:-5:5]
-        lons, lats = modis_5km_to_1km(lon5, lat5, satz5)
-        self.assertTrue(np.allclose(lon1, lons, atol=1e-2))
-        self.assertTrue(np.allclose(lat1, lats, atol=1e-2))
+def load_1km_lonlat_satz_as_xarray_dask():
+    lon1, lat1, satz1 = _load_h5_geo_vars('lon_1km', 'lat_1km', 'satz_1km')
+    return _to_da(lon1), _to_da(lat1), _to_da(satz1)
 
-        # Test nans issue (#19)
-        satz1 = to_da(abs(np.linspace(-65.4, 65.4, 1354)).repeat(20).reshape(-1, 20).T)
-        lons, lats = modis_1km_to_500m(lon1, lat1, satz1)
-        self.assertFalse(np.any(np.isnan(lons.compute())))
-        self.assertFalse(np.any(np.isnan(lats.compute())))
 
-    def test_poles_datum(self):
-        import xarray as xr
-        h5f = h5py.File(FILENAME_DATA, 'r')
-        orig_lon = to_da(h5f['lon_1km'])
-        lon1 = orig_lon + 180
-        lon1 = xr.where(lon1 > 180, lon1 - 360, lon1)
-        lat1 = to_da(h5f['lat_1km'])
-        satz1 = to_da(h5f['satz_1km'])
+def load_5km_lonlat_satz1_as_xarray_dask():
+    lon1, lat1, satz1 = _load_h5_geo_vars('lon_1km', 'lat_1km', 'satz_1km')
+    lon5 = lon1[2::5, 2::5]
+    lat5 = lat1[2::5, 2::5]
+    satz5 = satz1[2::5, 2::5]
+    return _to_da(lon5), _to_da(lat5), _to_da(satz5)
 
-        lat5 = lat1[2::5, 2::5]
-        lon5 = lon1[2::5, 2::5]
 
-        satz5 = satz1[2::5, 2::5]
-        lons, lats = modis_5km_to_1km(lon5, lat5, satz5)
-        lons = lons + 180
-        lons = xr.where(lons > 180, lons - 360, lons)
-        self.assertTrue(np.allclose(orig_lon, lons, atol=1e-2))
-        self.assertTrue(np.allclose(lat1, lats, atol=1e-2))
+def load_l2_5km_lonlat_satz1_as_xarray_dask():
+    lon1, lat1, satz1 = _load_h5_geo_vars('lon_1km', 'lat_1km', 'satz_1km')
+    lon5 = lon1[2::5, 2:-5:5]
+    lat5 = lat1[2::5, 2:-5:5]
+    satz5 = satz1[2::5, 2:-5:5]
+    return _to_da(lon5), _to_da(lat5), _to_da(satz5)
+
+
+def load_500m_lonlat_expected_as_xarray_dask():
+    h5f = h5py.File(FILENAME_DATA, 'r')
+    lon500 = _to_da(h5f['lon_500m'])
+    lat500 = _to_da(h5f['lat_500m'])
+    return lon500, lat500
+
+
+def load_250m_lonlat_expected_as_xarray_dask():
+    h5f = h5py.File(FILENAME_DATA, 'r')
+    lon250 = _to_da(h5f['lon_250m'])
+    lat250 = _to_da(h5f['lat_250m'])
+    return lon250, lat250
+
+
+def assert_geodetic_distance(
+        lons_actual: np.ndarray,
+        lats_actual: np.ndarray,
+        lons_desired: np.ndarray,
+        lats_desired: np.ndarray,
+        max_distance_diff: float,
+) -> None:
+    """Check that the geodetic distance between two sets of coordinates is smaller than a threshold.
+
+    Args:
+        lons_actual: Longitude array produced by interpolation being tested.
+        lats_actual: Latitude array produced by interpolation being tested.
+        lons_desired: Longitude array of expected/truth coordinates.
+        lats_desired: Latitude array of expected/truth coordinates.
+        max_distance_diff: Limit of allowed distance difference in meters.
+
+    """
+    g = Geod(ellps="WGS84")
+    _, _, dist = g.inv(lons_actual, lats_actual, lons_desired, lats_desired)
+    np.testing.assert_array_less(
+        dist, max_distance_diff,
+        err_msg=f"Coordinates are greater than {max_distance_diff} geodetic "
+                "meters from the expected coordinates.")
+
+
+@pytest.mark.parametrize(
+    ("input_func", "exp_func", "interp_func", "dist_max"),
+    [
+        (load_1km_lonlat_satz_as_xarray_dask, load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m, 5),
+        (load_1km_lonlat_satz_as_xarray_dask, load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 8),
+        (load_5km_lonlat_satz1_as_xarray_dask, load_1km_lonlat_as_xarray_dask, modis_5km_to_1km, 25),
+        (load_l2_5km_lonlat_satz1_as_xarray_dask, load_1km_lonlat_as_xarray_dask, modis_5km_to_1km, 110),
+        (load_5km_lonlat_satz1_as_xarray_dask, load_500m_lonlat_expected_as_xarray_dask, modis_5km_to_500m, 19500),
+        (load_5km_lonlat_satz1_as_xarray_dask, load_250m_lonlat_expected_as_xarray_dask, modis_5km_to_250m, 25800),
+    ]
+)
+def test_sat_angle_based_interp(input_func, exp_func, interp_func, dist_max):
+    lon1, lat1, satz1 = input_func()
+    lons_exp, lats_exp = exp_func()
+
+    # when working with dask arrays, we shouldn't compute anything
+    with dask.config.set(scheduler=CustomScheduler(0)):
+        lons, lats = interp_func(lon1, lat1, satz1)
+
+    if hasattr(lons, "compute"):
+        lons, lats = da.compute(lons, lats)
+    assert_geodetic_distance(lons, lats, lons_exp, lats_exp, dist_max)
+    assert not np.any(np.isnan(lons))
+    assert not np.any(np.isnan(lats))
+
+
+def test_sat_angle_based_interp_nan_handling():
+    # See GH #19
+    lon1, lat1, satz1 = load_1km_lonlat_satz_as_xarray_dask()
+    satz1 = _to_da(abs(np.linspace(-65.4, 65.4, 1354)).repeat(20).reshape(-1, 20).T)
+    lons, lats = modis_1km_to_500m(lon1, lat1, satz1)
+    assert not np.any(np.isnan(lons.compute()))
+    assert not np.any(np.isnan(lats.compute()))
+
+
+def test_poles_datum():
+    orig_lon, lat1, satz1 = load_1km_lonlat_satz_as_xarray_dask()
+    lon1 = orig_lon + 180
+    lon1 = xr.where(lon1 > 180, lon1 - 360, lon1)
+
+    lat5 = lat1[2::5, 2::5]
+    lon5 = lon1[2::5, 2::5]
+    satz5 = satz1[2::5, 2::5]
+    lons, lats = modis_5km_to_1km(lon5, lat5, satz5)
+
+    lons = lons + 180
+    lons = xr.where(lons > 180, lons - 360, lons)
+    assert_geodetic_distance(lons, lats, orig_lon, lat1, 25.0)

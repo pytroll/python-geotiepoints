@@ -16,77 +16,36 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Tests for simple MODIS interpolators."""
 
-import os
 import numpy as np
 import pytest
-import h5py
 import dask
 import dask.array as da
-import xarray as xr
 
 from geotiepoints.simple_modis_interpolator import modis_1km_to_250m, modis_1km_to_500m
+from .test_modisinterpolator import (
+    assert_geodetic_distance,
+    load_1km_lonlat_as_xarray_dask,
+    load_1km_lonlat_as_dask,
+    load_1km_lonlat_as_numpy,
+    load_500m_lonlat_expected_as_xarray_dask,
+    load_250m_lonlat_expected_as_xarray_dask,
+)
+
 from .utils import CustomScheduler
-
-FILENAME_DATA = os.path.join(
-    os.path.dirname(__file__), '../../testdata/modis_test_data.h5')
-
-
-def _to_dask(arr):
-    return da.from_array(arr, chunks=4096)
-
-
-def _to_da(arr):
-    return xr.DataArray(_to_dask(arr), dims=['y', 'x'])
-
-
-def _load_h5_lonlat_vars(lon_var, lat_var):
-    h5f = h5py.File(FILENAME_DATA, 'r')
-    lon1 = h5f[lon_var]
-    lat1 = h5f[lat_var]
-    return lon1, lat1
-
-
-def _load_1km_lonlat_as_numpy():
-    lon1, lat1 = _load_h5_lonlat_vars('lon_1km', 'lat_1km')
-    return lon1[:], lat1[:]
-
-
-def _load_1km_lonlat_as_dask():
-    lon1, lat1 = _load_h5_lonlat_vars('lon_1km', 'lat_1km')
-    return _to_dask(lon1), _to_dask(lat1)
-
-
-def _load_1km_lonlat_as_xarray_dask():
-    lon1, lat1 = _load_h5_lonlat_vars('lon_1km', 'lat_1km')
-    return _to_da(lon1), _to_da(lat1)
-
-
-def _load_500m_lonlat_expected_as_xarray_dask():
-    h5f = h5py.File(FILENAME_DATA, 'r')
-    lon500 = _to_da(h5f['lon_500m'])
-    lat500 = _to_da(h5f['lat_500m'])
-    return lon500, lat500
-
-
-def _load_250m_lonlat_expected_as_xarray_dask():
-    h5f = h5py.File(FILENAME_DATA, 'r')
-    lon250 = _to_da(h5f['lon_250m'])
-    lat250 = _to_da(h5f['lat_250m'])
-    return lon250, lat250
 
 
 @pytest.mark.parametrize(
-    ("input_func", "exp_func", "interp_func"),
+    ("input_func", "exp_func", "interp_func", "dist_max"),
     [
-        (_load_1km_lonlat_as_xarray_dask, _load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m),
-        (_load_1km_lonlat_as_xarray_dask, _load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m),
-        (_load_1km_lonlat_as_dask, _load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m),
-        (_load_1km_lonlat_as_dask, _load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m),
-        (_load_1km_lonlat_as_numpy, _load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m),
-        (_load_1km_lonlat_as_numpy, _load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m),
+        (load_1km_lonlat_as_xarray_dask, load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m, 16),
+        (load_1km_lonlat_as_xarray_dask, load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 27),
+        (load_1km_lonlat_as_dask, load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m, 16),
+        (load_1km_lonlat_as_dask, load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 27),
+        (load_1km_lonlat_as_numpy, load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m, 16),
+        (load_1km_lonlat_as_numpy, load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 27),
     ]
 )
-def test_basic_interp(input_func, exp_func, interp_func):
+def test_basic_interp(input_func, exp_func, interp_func, dist_max):
     lon1, lat1 = input_func()
     lons_exp, lats_exp = exp_func()
 
@@ -96,17 +55,13 @@ def test_basic_interp(input_func, exp_func, interp_func):
 
     if hasattr(lons, "compute"):
         lons, lats = da.compute(lons, lats)
-    # our "truth" values are from the modisinterpolator results
-    atol = 0.038  # 1e-2
-    rtol = 0
-    np.testing.assert_allclose(lons_exp, lons, atol=atol, rtol=rtol)
-    np.testing.assert_allclose(lats_exp, lats, atol=atol, rtol=rtol)
+    assert_geodetic_distance(lons, lats, lons_exp, lats_exp, dist_max)
     assert not np.any(np.isnan(lons))
     assert not np.any(np.isnan(lats))
 
 
 def test_nonstandard_scan_size():
-    lon1, lat1 = _load_1km_lonlat_as_xarray_dask()
+    lon1, lat1 = load_1km_lonlat_as_xarray_dask()
     # remove 1 row from the end
     lon1 = lon1[:-1]
     lat1 = lat1[:-1]

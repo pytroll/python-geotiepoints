@@ -32,7 +32,7 @@ import numpy as np
 from Cython.Build import cythonize
 
 requirements = ['numpy', 'scipy', 'pandas']
-test_requires = ['pytest', 'pytest-cov', 'h5py', 'xarray', 'dask']
+test_requires = ['pytest', 'pytest-cov', 'h5py', 'xarray', 'dask', 'pyproj']
 
 if sys.platform.startswith("win"):
     extra_compile_args = []
