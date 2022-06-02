@@ -109,11 +109,11 @@ def _interpolate(
     (N rows per scan) and contain the entire scan width.
 
     """
-    interp = _Interpolator(coarse_resolution, fine_resolution, coarse_scan_width=coarse_scan_width)
+    interp = _MODISInterpolator(coarse_resolution, fine_resolution, coarse_scan_width=coarse_scan_width)
     return interp.interpolate(lon1, lat1, satz1)
 
 
-class _Interpolator:
+class _MODISInterpolator:
     """Helper class for MODIS interpolation.
 
     Not intended for public use. Use ``modis_X_to_Y`` functions instead.
