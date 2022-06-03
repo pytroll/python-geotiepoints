@@ -7,9 +7,8 @@ cimport numpy as np
 import numpy as np
 
 DEF R = 6371.0
-# Aqua scan width and altitude in km
-DEF scan_width = 10.00017
-DEF H = 705.0
+# Aqua altitude in km
+DEF H = 709.0
 
 
 @scanline_mapblocks
@@ -32,14 +31,14 @@ def interpolate(
         raise NotImplementedError(
             "Can't interpolate if 5km tiepoints have less than 270 columns."
         )
-    interp = Interpolator(coarse_resolution, fine_resolution, coarse_scan_width=coarse_scan_width or 0)
+    interp = MODISInterpolator(coarse_resolution, fine_resolution, coarse_scan_width=coarse_scan_width or 0)
     return interp.interpolate(lon1, lat1, satz1)
 
 
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
-cdef void _compute_expansion_alignment(floating[:, :, :] satz_a, floating [:, :, :] satz_b,
+cdef void _compute_expansion_alignment(floating[:, :, :] satz_a, floating [:, :, :] satz_b, int scan_width,
                                        floating[:, :, ::1] c_expansion, floating[:, :, ::1] c_alignment) nogil:
     """Fill in expansion and alignment.
     
@@ -100,7 +99,7 @@ cdef floating[:, :, :] _get_lower_left_corner(floating[:, :, ::1] arr) nogil:
     return arr[:, 1:, :-1]
 
 
-cdef class Interpolator:
+cdef class MODISInterpolator:
     """Helper class for MODIS interpolation.
 
     Not intended for public use. Use ``modis_X_to_Y`` functions instead.
@@ -165,7 +164,7 @@ cdef class Interpolator:
             dtype=satz1.dtype)
         cdef floating[:, :, ::1] c_exp_view = c_exp
         cdef floating[:, :, ::1] c_ali_view = c_ali
-        _compute_expansion_alignment(satz_a_view, satz_b_view, c_exp_view, c_ali_view)
+        _compute_expansion_alignment(satz_a_view, satz_b_view, self._coarse_pixels_per_1km, c_exp_view, c_ali_view)
 
         cdef floating[:, :, :] c_exp_view2 = c_exp
         cdef np.ndarray[floating, ndim=2] c_exp_full = self._create_expanded_output_array(c_exp_view2)

@@ -126,7 +126,7 @@ def assert_geodetic_distance(
     ("input_func", "exp_func", "interp_func", "dist_max"),
     [
         (load_1km_lonlat_satz_as_xarray_dask, load_500m_lonlat_expected_as_xarray_dask, modis_1km_to_500m, 5),
-        (load_1km_lonlat_satz_as_xarray_dask, load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 8),
+        (load_1km_lonlat_satz_as_xarray_dask, load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 8.30),
         (load_5km_lonlat_satz1_as_xarray_dask, load_1km_lonlat_as_xarray_dask, modis_5km_to_1km, 25),
         (load_l2_5km_lonlat_satz1_as_xarray_dask, load_1km_lonlat_as_xarray_dask, modis_5km_to_1km, 110),
         (load_5km_lonlat_satz1_as_xarray_dask, load_500m_lonlat_expected_as_xarray_dask, modis_5km_to_500m, 19500),
@@ -151,7 +151,7 @@ def test_sat_angle_based_interp(input_func, exp_func, interp_func, dist_max):
 def test_sat_angle_based_interp_nan_handling():
     # See GH #19
     lon1, lat1, satz1 = load_1km_lonlat_satz_as_xarray_dask()
-    satz1 = _to_da(abs(np.linspace(-65.4, 65.4, 1354)).repeat(20).reshape(-1, 20).T)
+    satz1 = _to_da(abs(np.linspace(-65.4, 65.4, 1354, dtype=np.float32)).repeat(20).reshape(-1, 20).T)
     lons, lats = modis_1km_to_500m(lon1, lat1, satz1)
     assert not np.any(np.isnan(lons.compute()))
     assert not np.any(np.isnan(lats.compute()))
