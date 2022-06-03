@@ -24,7 +24,14 @@
 Interpolation of geographical tiepoints using the second order interpolation
 scheme implemented in the CVIIRS software, as described here:
 Compact VIIRS SDR Product Format User Guide (V1J)
-http://www.eumetsat.int/website/wcm/idc/idcplg?IdcService=GET_FILE&dDocName=PDF_DMT_708025&RevisionSelectionMethod=LatestReleased&Rendition=Web
+https://www.eumetsat.int/media/45988
+and
+Anders Meier Soerensen, Stephan Zinke,
+A tie-point zone group compaction schema for the geolocation data of S-NPP and NOAA-20 VIIRS SDRs to reduce file sizes
+in memory-sensitive environments,
+Applied Computing and Geosciences, Volume 6, 2020, 100025, ISSN 2590-1974,
+https://doi.org/10.1016/j.acags.2020.100025.
+(https://www.sciencedirect.com/science/article/pii/S2590197420300070)
 """
 
 import warnings
