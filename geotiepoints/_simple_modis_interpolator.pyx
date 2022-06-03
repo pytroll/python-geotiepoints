@@ -5,7 +5,7 @@ from ._modis_utils cimport lonlat2xyz, xyz2lonlat
 from ._modis_utils import rows_per_scan_for_resolution
 cimport numpy as np
 import numpy as np
-from scipy.ndimage.interpolation import map_coordinates
+from scipy.ndimage import map_coordinates
 
 
 def interpolate_geolocation_cartesian(
