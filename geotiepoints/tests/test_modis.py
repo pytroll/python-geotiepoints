@@ -46,6 +46,7 @@ class TestUtils:
         """
         ncpus = 3
         scene_splits = get_scene_splits(1060, 10, ncpus)
+        assert list(scene_splits) == [350, 700, 1050]
 
 
 class TestMODIS:
