@@ -156,8 +156,6 @@ cdef void _interpolate_xyz_250(
     cdef floating m, b
     cdef floating[:] result_col_view
     cdef floating[:, ::1] y_coordinates = coordinates_view[0]
-    # FIXME: This doesn't need to run for every *row*, it only uses a few of them at a time.
-
     for col_idx in range(result_view.shape[1]):
         result_col_view = result_view[:, col_idx]
         # Use linear extrapolation for the first two 250 meter pixels along track
