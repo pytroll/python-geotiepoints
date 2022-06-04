@@ -25,7 +25,7 @@ def interpolate_geolocation_cartesian(
     cdef np.ndarray[floating, ndim=3] coordinates = np.empty(
         (2, res_factor * rows_per_scan, res_factor * num_cols), dtype=lon_array.dtype)
     cdef floating[:, :, ::1] coordinates_view = coordinates
-    _compute_xy_coordinate_arrays(res_factor, coordinates_view)
+    _compute_yx_coordinate_arrays(res_factor, coordinates_view)
 
     cdef np.ndarray[floating, ndim=3] xyz_result = np.empty(
         (res_factor * rows_per_scan, num_cols * res_factor, 3), dtype=lon_array.dtype)
@@ -65,7 +65,7 @@ def interpolate_geolocation_cartesian(
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
-cdef void _compute_xy_coordinate_arrays(
+cdef void _compute_yx_coordinate_arrays(
         unsigned int res_factor,
         floating[:, :, ::1] coordinates,
 ) nogil:
@@ -100,6 +100,7 @@ cdef void _compute_interpolated_xyz_scan(
     if res_factor == 4:
         for comp_index in range(3):
             result_view = xyz_result_view[:, :, comp_index]
+            _extrapolate_xyz_rightmost_columns(result_view, 3)
             _interpolate_xyz_250(
                 result_view,
                 coordinates_view,
@@ -107,6 +108,7 @@ cdef void _compute_interpolated_xyz_scan(
     else:
         for comp_index in range(3):
             result_view = xyz_result_view[:, :, comp_index]
+            _extrapolate_xyz_rightmost_columns(result_view, 1)
             _interpolate_xyz_500(
                 result_view,
                 coordinates_view,
@@ -130,6 +132,22 @@ cdef void _call_map_coordinates(
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
+cdef void _extrapolate_xyz_rightmost_columns(
+        floating[:, :] result_view,
+        int num_columns,
+) nogil:
+    cdef Py_ssize_t row_idx, col_offset
+    cdef floating last_interp_col_diff
+    for row_idx in range(result_view.shape[0]):
+        last_interp_col_diff = result_view[row_idx, result_view.shape[1] - num_columns - 1] - result_view[row_idx, result_view.shape[1] - num_columns - 2]
+        for col_offset in range(num_columns):
+            # map_coordinates repeated the last columns value, we now add more to it as an "extrapolation"
+            result_view[row_idx, result_view.shape[1] - num_columns + col_offset] += last_interp_col_diff * (col_offset + 1)
+
+
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.wraparound(False)
 cdef void _interpolate_xyz_250(
         floating[:, :] result_view,
         floating[:, :, ::1] coordinates_view,
@@ -139,6 +157,7 @@ cdef void _interpolate_xyz_250(
     cdef floating[:] result_col_view
     cdef floating[:, ::1] y_coordinates = coordinates_view[0]
     # FIXME: This doesn't need to run for every *row*, it only uses a few of them at a time.
+
     for col_idx in range(result_view.shape[1]):
         result_col_view = result_view[:, col_idx]
         # Use linear extrapolation for the first two 250 meter pixels along track
