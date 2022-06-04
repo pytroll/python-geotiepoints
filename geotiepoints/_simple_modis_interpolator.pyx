@@ -139,10 +139,10 @@ cdef void _extrapolate_xyz_rightmost_columns(
     cdef Py_ssize_t row_idx, col_offset
     cdef floating last_interp_col_diff
     for row_idx in range(result_view.shape[0]):
-        last_interp_col_diff = result_view[row_idx, result_view.shape[1] - num_columns - 1] - result_view[row_idx, result_view.shape[1] - num_columns - 2]
+        last_interp_col_diff = result_view[row_idx, -(num_columns + 1)] - result_view[row_idx, -(num_columns + 2)]
         for col_offset in range(num_columns):
             # map_coordinates repeated the last columns value, we now add more to it as an "extrapolation"
-            result_view[row_idx, result_view.shape[1] - num_columns + col_offset] += last_interp_col_diff * (col_offset + 1)
+            result_view[row_idx, -num_columns + col_offset] += last_interp_col_diff * (col_offset + 1)
 
 
 @cython.boundscheck(False)
