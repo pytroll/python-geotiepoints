@@ -18,10 +18,6 @@ except ImportError:
 
 
 DEF EARTH_RADIUS = 6370997.0
-DEF R = 6371.0
-# Aqua scan width and altitude in km
-DEF scan_width = 10.00017
-DEF H = 705.0
 
 
 @cython.boundscheck(False)
