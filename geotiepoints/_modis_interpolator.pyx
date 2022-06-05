@@ -6,7 +6,7 @@ from libc.math cimport asin, sin, cos, sqrt, acos, M_PI
 cimport numpy as np
 import numpy as np
 
-DEF R = 6371.0
+DEF R = 6370.997
 # Aqua altitude in km
 DEF H = 709.0
 
