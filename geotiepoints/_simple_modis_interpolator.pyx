@@ -142,7 +142,7 @@ cdef void _extrapolate_xyz_rightmost_columns(
         last_interp_col_diff = result_view[row_idx, -(num_columns + 1)] - result_view[row_idx, -(num_columns + 2)]
         for col_offset in range(num_columns):
             # map_coordinates repeated the last columns value, we now add more to it as an "extrapolation"
-            result_view[row_idx, -num_columns + col_offset] += last_interp_col_diff * (col_offset + 1)
+            result_view[row_idx, col_offset - num_columns] += last_interp_col_diff * (col_offset + 1)
 
 
 @cython.boundscheck(False)
