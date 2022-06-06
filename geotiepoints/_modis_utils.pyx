@@ -73,13 +73,14 @@ cdef inline int _sign(floating x) nogil:
     return 1 if x > 0 else (-1 if x < 0 else 0)
 
 
+@cython.cdivision(True)
 cdef inline floating rad2deg(floating x) nogil:
     return x * (180.0 / M_PI)
 
 
+@cython.cdivision(True)
 cdef inline floating deg2rad(floating x) nogil:
     return x * (M_PI / 180.0)
-
 
 
 def rows_per_scan_for_resolution(res):

@@ -84,19 +84,35 @@ cdef inline floating _compute_zeta(floating phi) nogil:
     return asin((R + H) * sin(phi) / R)
 
 
-cdef floating[:, :, :] _get_upper_left_corner(floating[:, :, ::1] arr) nogil:
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.wraparound(False)
+@cython.initializedcheck(False)
+cdef inline floating[:, :, :] _get_upper_left_corner(floating[:, :, ::1] arr) nogil:
     return arr[:, :-1, :-1]
 
 
-cdef floating[:, :, :] _get_upper_right_corner(floating[:, :, ::1] arr) nogil:
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.wraparound(False)
+@cython.initializedcheck(False)
+cdef inline floating[:, :, :] _get_upper_right_corner(floating[:, :, ::1] arr) nogil:
     return arr[:, :-1, 1:]
 
 
-cdef floating[:, :, :] _get_lower_right_corner(floating[:, :, ::1] arr) nogil:
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.wraparound(False)
+@cython.initializedcheck(False)
+cdef inline floating[:, :, :] _get_lower_right_corner(floating[:, :, ::1] arr) nogil:
     return arr[:, 1:, 1:]
 
 
-cdef floating[:, :, :] _get_lower_left_corner(floating[:, :, ::1] arr) nogil:
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.wraparound(False)
+@cython.initializedcheck(False)
+cdef inline floating[:, :, :] _get_lower_left_corner(floating[:, :, ::1] arr) nogil:
     return arr[:, 1:, :-1]
 
 
