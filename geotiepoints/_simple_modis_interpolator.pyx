@@ -65,6 +65,7 @@ def interpolate_geolocation_cartesian(
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
+@cython.initializedcheck(False)
 cdef void _compute_yx_coordinate_arrays(
         unsigned int res_factor,
         floating[:, :, ::1] coordinates,
@@ -132,6 +133,7 @@ cdef void _call_map_coordinates(
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
+@cython.initializedcheck(False)
 cdef void _extrapolate_xyz_rightmost_columns(
         floating[:, :] result_view,
         int num_columns,
@@ -139,7 +141,8 @@ cdef void _extrapolate_xyz_rightmost_columns(
     cdef Py_ssize_t row_idx, col_offset
     cdef floating last_interp_col_diff
     for row_idx in range(result_view.shape[0]):
-        last_interp_col_diff = result_view[row_idx, -(num_columns + 1)] - result_view[row_idx, -(num_columns + 2)]
+        last_interp_col_diff = result_view[row_idx, result_view.shape[1] - num_columns - 1] - \
+                               result_view[row_idx, result_view.shape[1] - num_columns - 2]
         for col_offset in range(num_columns):
             # map_coordinates repeated the last columns value, we now add more to it as an "extrapolation"
             result_view[row_idx, result_view.shape[1] - num_columns + col_offset] += last_interp_col_diff * (col_offset + 1)
@@ -148,6 +151,7 @@ cdef void _extrapolate_xyz_rightmost_columns(
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
+@cython.initializedcheck(False)
 cdef void _interpolate_xyz_250(
         floating[:, :] result_view,
         floating[:, :, ::1] coordinates_view,
@@ -186,6 +190,7 @@ cdef void _interpolate_xyz_250(
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
+@cython.initializedcheck(False)
 cdef void _interpolate_xyz_500(
         floating[:, :] result_view,
         floating[:, :, ::1] coordinates_view,
@@ -221,6 +226,7 @@ cdef void _interpolate_xyz_500(
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
+@cython.initializedcheck(False)
 cdef inline floating _calc_slope_250(
         floating[:] result_view,
         floating[:, ::1] y,
@@ -233,6 +239,7 @@ cdef inline floating _calc_slope_250(
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
+@cython.initializedcheck(False)
 cdef inline floating _calc_offset_250(
         floating[:] result_view,
         floating[:, ::1] y,
@@ -245,6 +252,7 @@ cdef inline floating _calc_offset_250(
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
+@cython.initializedcheck(False)
 cdef inline floating _calc_slope_500(
         floating[:] result_view,
         floating[:, ::1] y,
@@ -257,6 +265,7 @@ cdef inline floating _calc_slope_500(
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
+@cython.initializedcheck(False)
 cdef inline floating _calc_offset_500(
         floating[:] result_view,
         floating[:, ::1] y,

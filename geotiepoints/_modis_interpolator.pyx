@@ -38,6 +38,7 @@ def interpolate(
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
+@cython.initializedcheck(False)
 cdef void _compute_expansion_alignment(floating[:, :, :] satz_a, floating [:, :, :] satz_b, int scan_width,
                                        floating[:, :, ::1] c_expansion, floating[:, :, ::1] c_alignment) nogil:
     """Fill in expansion and alignment.
@@ -194,6 +195,7 @@ cdef class MODISInterpolator:
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
+    @cython.initializedcheck(False)
     cdef void _calculate_atrack_ascan(
             self,
             floating[::1] coords_x,
@@ -228,6 +230,7 @@ cdef class MODISInterpolator:
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
+    @cython.initializedcheck(False)
     cdef void _get_coords_1km(
             self,
             unsigned int scans,
@@ -276,6 +279,7 @@ cdef class MODISInterpolator:
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
+    @cython.initializedcheck(False)
     cdef tuple _interpolate_lons_lats(self,
                                       np.ndarray[floating, ndim=2] lon1,
                                       np.ndarray[floating, ndim=2] lat1,
@@ -323,6 +327,7 @@ cdef class MODISInterpolator:
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
+    @cython.initializedcheck(False)
     cdef void _compute_fine_xyz(
             self,
             floating[:, ::1] a_track_view,
@@ -369,6 +374,7 @@ cdef class MODISInterpolator:
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
+    @cython.initializedcheck(False)
     cdef void _compute_fine_xyz_component(
             self,
             floating[:, ::1] a_track_view,
@@ -430,6 +436,7 @@ cdef class MODISInterpolator:
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
+    @cython.initializedcheck(False)
     cdef void _expand_tiepoint_array_1km(self, floating[:, :, :] input_arr, floating[:, ::1] expanded_arr) nogil:
         # TODO: Replace shape multiplication with self._fine_pixel_length and self._fine_pixel_width
         cdef floating tiepoint_value
@@ -477,6 +484,7 @@ cdef class MODISInterpolator:
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
+    @cython.initializedcheck(False)
     cdef void _expand_tiepoint_array_5km(self, floating[:, :, :] input_arr, floating[:, ::1] expanded_arr) nogil:
         cdef floating tiepoint_value
         cdef Py_ssize_t scan_idx, row_idx, col_idx, length_repeat_cycle, width_repeat_cycle, scan_offset, row_offset, col_offset
