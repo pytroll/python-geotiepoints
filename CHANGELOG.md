@@ -1,5 +1,25 @@
-## Version 1.4.0 (2022/02/21)
+## Version 1.4.1 (2022/06/08)
 
+### Issues Closed
+
+* [Issue 39](https://github.com/pytroll/python-geotiepoints/issues/39) - MODIS Interpolation Comparisons ([PR 41](https://github.com/pytroll/python-geotiepoints/pull/41) by [@djhoese](https://github.com/djhoese))
+
+In this release 1 issue was closed.
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 41](https://github.com/pytroll/python-geotiepoints/pull/41) - Fix MODIS cviirs-based interpolation ([39](https://github.com/pytroll/python-geotiepoints/issues/39))
+
+#### Features added
+
+* [PR 35](https://github.com/pytroll/python-geotiepoints/pull/35) - Optimize angle-based modis interpolation for dask
+
+In this release 2 pull requests were closed.
+
+
+## Version 1.4.0 (2022/02/21)
 
 ### Pull Requests Merged
 
