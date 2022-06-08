@@ -176,6 +176,7 @@ def modis1kmto250m(lons1km, lats1km, cores=1):
 
     return lons250m, lats250m
 
-from .version import get_versions
-__version__ = get_versions()['version']
-del get_versions
+
+from . import version
+__version__ = version.get_versions()['version']
+

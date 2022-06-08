@@ -93,11 +93,15 @@ if cython_coverage:
 
 cmdclass = versioneer.get_cmdclass()
 
+with open('README.md', 'r') as readme:
+    README = readme.read()
 
 if __name__ == "__main__":
     setup(name='python-geotiepoints',
           version=versioneer.get_version(),
           description='Interpolation of geographic tiepoints in Python',
+          long_description=README,
+          long_description_content_type='text/markdown',
           author='Adam Dybbroe, Martin Raspaud',
           author_email='martin.raspaud@smhi.se',
           classifiers=["Development Status :: 5 - Producton/Stable",
@@ -111,7 +115,7 @@ if __name__ == "__main__":
           packages=['geotiepoints'],
           # packages=find_packages(),
           setup_requires=['numpy', 'cython'],
-          python_requires='>=3.6',
+          python_requires='>=3.7',
           cmdclass=cmdclass,
           install_requires=requirements,
           ext_modules=cythonize(EXTENSIONS, compiler_directives=cython_directives),
