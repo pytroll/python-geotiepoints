@@ -3,14 +3,14 @@ set -e -x
 
 # This is to be run by Docker inside a Docker image.
 # You can test it locally on a Linux machine by installing docker and running from this repo's root:
-# $ docker run -e PLAT=manylinux1_x86_64 -v `pwd`:/io quay.io/pypa/manylinux1_x86_64 /io/scripts/build-manylinux-wheels.sh
+# $ docker run -e PLAT=manylinux2014_x86_64 -v `pwd`:/io quay.io/pypa/manylinux1_x86_64 /io/scripts/build-manylinux-wheels.sh
 
 # * The -e just defines an environment variable PLAT=[docker name] inside the
 #    docker - auditwheel can't detect the docker name automatically.
 # * The -v gives a directory alias for passing files in and out of the docker
 #    (/io is arbitrary). E.g the `setup.py` script would be accessed in the
 #    docker via `/io/setup.py`.
-# * quay.io/pypa/manylinux1_x86_64 is the full docker image name. Docker
+# * quay.io/pypa/manylinux2014_x86_64 is the full docker image name. Docker
 #    downloads it automatically.
 # * The last argument is a shell command that the Docker will execute.
 #    Filenames must be from the Docker's perspective.
@@ -23,6 +23,10 @@ mkdir -p /io/temp-wheels
 
 # Clean out any old existing wheels.
 find /io/temp-wheels/ -type f -delete
+
+# /io might be owned by someone else since we are in docker
+# this may stop versioneer from using git the way it needs
+git config --global --add safe.directory /io
 
 # Iterate through available pythons.
 for PYBIN in /opt/python/cp3{7,8,9,10}*/bin; do
