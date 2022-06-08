@@ -72,7 +72,7 @@ if __name__ == "__main__":
           packages=['geotiepoints'],
           # packages=find_packages(),
           setup_requires=['numpy', 'cython'],
-          python_requires='>=3.6',
+          python_requires='>=3.7',
           cmdclass=cmdclass,
           install_requires=requirements,
           ext_modules=cythonize(EXTENSIONS),
