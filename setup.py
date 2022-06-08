@@ -50,10 +50,15 @@ EXTENSIONS = [
 
 cmdclass = versioneer.get_cmdclass()
 
+with open('README.md', 'r') as readme:
+    README = readme.read()
+
 if __name__ == "__main__":
     setup(name='python-geotiepoints',
           version=versioneer.get_version(),
           description='Interpolation of geographic tiepoints in Python',
+          long_description=README,
+          long_description_content_type='text/markdown',
           author='Adam Dybbroe, Martin Raspaud',
           author_email='martin.raspaud@smhi.se',
           classifiers=["Development Status :: 4 - Beta",
