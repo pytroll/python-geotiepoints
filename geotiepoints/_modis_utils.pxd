@@ -5,9 +5,9 @@ ctypedef fused floating:
     np.float64_t
 
 cdef void lonlat2xyz(
-        floating[:, :, :] lons,
-        floating[:, :, :] lats,
-        floating[:, :, :, ::1] xyz,
+        floating[:, :] lons,
+        floating[:, :] lats,
+        floating[:, :, ::1] xyz,
 ) nogil
 
 cdef void xyz2lonlat(

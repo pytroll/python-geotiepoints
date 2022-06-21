@@ -33,7 +33,6 @@ def interpolate_geolocation_cartesian(
     cdef np.ndarray[floating, ndim=3] xyz_in = np.empty(
         (rows_per_scan, num_cols, 3), dtype=lon_array.dtype)
     cdef floating[:, :, ::1] xyz_in_view = xyz_in
-    cdef floating[:, :, :, ::1] xyz_4d_in_view = xyz_in[None, :, :, :]
     cdef floating[:, :] lon_in_view = lon_array
     cdef floating[:, :] lat_in_view = lat_array
 
@@ -52,7 +51,7 @@ def interpolate_geolocation_cartesian(
         j1 = j0 + rows_per_scan
         k0 = rows_per_scan * res_factor * scan_idx
         k1 = k0 + rows_per_scan * res_factor
-        lonlat2xyz(lon_in_view[None, j0:j1, :], lat_in_view[None, j0:j1, :], xyz_4d_in_view)
+        lonlat2xyz(lon_in_view[j0:j1, :], lat_in_view[j0:j1, :], xyz_in_view)
 
         _compute_interpolated_xyz_scan(
             res_factor, coordinates_view, xyz_in_view,

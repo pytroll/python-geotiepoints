@@ -39,37 +39,36 @@ def interpolate(
 @cython.cdivision(True)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cdef void _compute_expansion_alignment(floating[:, :, :] satz_a, floating [:, :, :] satz_b, int scan_width,
-                                       floating[:, :, ::1] c_expansion, floating[:, :, ::1] c_alignment) nogil:
+cdef void _compute_expansion_alignment(floating[:, :] satz_a, floating [:, :] satz_b, int scan_width,
+                                       floating[:, ::1] c_expansion, floating[:, ::1] c_alignment) nogil:
     """Fill in expansion and alignment.
     
     Input angles should be in degrees and will be converted to radians.
     
     """
-    cdef Py_ssize_t i, j, k
+    cdef Py_ssize_t i, j
     cdef floating satz_a_rad, satz_b_rad, phi_a, phi_b, theta_a, theta_b, phi, zeta, theta, denominator, sin_beta_2, d, e
     for i in range(satz_a.shape[0]):
         for j in range(satz_a.shape[1]):
-            for k in range(satz_a.shape[2]):
-                satz_a_rad = deg2rad(satz_a[i, j, k])
-                satz_b_rad = deg2rad(satz_b[i, j, k])
-                phi_a = _compute_phi(satz_a_rad)
-                phi_b = _compute_phi(satz_b_rad)
-                theta_a = _compute_theta(satz_a_rad, phi_a)
-                theta_b = _compute_theta(satz_b_rad, phi_b)
-                phi = (phi_a + phi_b) / 2
-                zeta = _compute_zeta(phi)
-                theta = _compute_theta(zeta, phi)
-                # Workaround for tiepoints symmetrical about the subsatellite-track
-                denominator = theta_a * 2 if theta_a == theta_b else theta_a - theta_b
+            satz_a_rad = deg2rad(satz_a[i, j])
+            satz_b_rad = deg2rad(satz_b[i, j])
+            phi_a = _compute_phi(satz_a_rad)
+            phi_b = _compute_phi(satz_b_rad)
+            theta_a = _compute_theta(satz_a_rad, phi_a)
+            theta_b = _compute_theta(satz_b_rad, phi_b)
+            phi = (phi_a + phi_b) / 2
+            zeta = _compute_zeta(phi)
+            theta = _compute_theta(zeta, phi)
+            # Workaround for tiepoints symmetrical about the subsatellite-track
+            denominator = theta_a * 2 if theta_a == theta_b else theta_a - theta_b
 
-                c_expansion[i, j, k] = 4 * (((theta_a + theta_b) / 2 - theta) / denominator)
+            c_expansion[i, j] = 4 * (((theta_a + theta_b) / 2 - theta) / denominator)
 
-                sin_beta_2 = scan_width / (2 * H)
-                d = ((R + H) / R * cos(phi) - cos(zeta)) * sin_beta_2
-                e = cos(zeta) - sqrt(cos(zeta) ** 2 - d ** 2)
+            sin_beta_2 = scan_width / (2 * H)
+            d = ((R + H) / R * cos(phi) - cos(zeta)) * sin_beta_2
+            e = cos(zeta) - sqrt(cos(zeta) ** 2 - d ** 2)
 
-                c_alignment[i, j, k] = 4 * e * sin(zeta) / denominator
+            c_alignment[i, j] = 4 * e * sin(zeta) / denominator
 
 
 cdef inline floating _compute_phi(floating zeta) nogil:
@@ -88,32 +87,32 @@ cdef inline floating _compute_zeta(floating phi) nogil:
 @cython.cdivision(True)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cdef inline floating[:, :, :] _get_upper_left_corner(floating[:, :, ::1] arr) nogil:
-    return arr[:, :-1, :-1]
+cdef inline floating[:, :] _get_upper_left_corner(floating[:, ::1] arr) nogil:
+    return arr[:-1, :-1]
 
 
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cdef inline floating[:, :, :] _get_upper_right_corner(floating[:, :, ::1] arr) nogil:
-    return arr[:, :-1, 1:]
+cdef inline floating[:, :] _get_upper_right_corner(floating[:, ::1] arr) nogil:
+    return arr[:-1, 1:]
 
 
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cdef inline floating[:, :, :] _get_lower_right_corner(floating[:, :, ::1] arr) nogil:
-    return arr[:, 1:, 1:]
+cdef inline floating[:, :] _get_lower_right_corner(floating[:, ::1] arr) nogil:
+    return arr[1:, 1:]
 
 
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cdef inline floating[:, :, :] _get_lower_left_corner(floating[:, :, ::1] arr) nogil:
-    return arr[:, 1:, :-1]
+cdef inline floating[:, :] _get_lower_left_corner(floating[:, ::1] arr) nogil:
+    return arr[1:, :-1]
 
 
 cdef class MODISInterpolator:
@@ -162,44 +161,65 @@ cdef class MODISInterpolator:
         lat1 = np.ascontiguousarray(lat1)
         satz1 = np.ascontiguousarray(satz1)
 
-        cdef np.ndarray[floating, ndim=2] a_track, a_scan, new_lons, new_lats
-        a_track, a_scan = self._get_atrack_ascan(satz1)
-        new_lons, new_lats = self._interpolate_lons_lats(lon1, lat1, a_track, a_scan)
+        cdef np.ndarray[floating, ndim=2] a_track, a_scan
+        cdef floating[:, ::1] a_track_view, a_scan_view
+        cdef Py_ssize_t scan_idx
+        cdef floating[:, ::1] satz1_scan
+        cdef unsigned int scans = satz1.shape[0] // self._coarse_scan_length
+        cdef np.ndarray[floating, ndim=2] new_lons = np.empty((satz1.shape[0] * self._fine_pixels_per_coarse_pixel, self._fine_scan_width), dtype=lon1.dtype)
+        cdef np.ndarray[floating, ndim=2] new_lats = np.empty((satz1.shape[0] * self._fine_pixels_per_coarse_pixel, self._fine_scan_width), dtype=lon1.dtype)
+        cdef floating[:, ::1] lons_scan, lats_scan
+        cdef floating[:, ::1] new_lons_scan, new_lats_scan
+        for scan_idx in range(0, scans):
+            lons_scan = lon1[scan_idx * self._coarse_scan_length:(scan_idx + 1) * self._coarse_scan_length]
+            lats_scan = lat1[scan_idx * self._coarse_scan_length:(scan_idx + 1) * self._coarse_scan_length]
+            satz1_scan = satz1[scan_idx * self._coarse_scan_length:(scan_idx + 1) * self._coarse_scan_length]
+            new_lons_scan = new_lons[scan_idx * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel:(scan_idx + 1) * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel]
+            new_lats_scan = new_lats[scan_idx * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel:(scan_idx + 1) * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel]
+            a_track, a_scan = self._get_atrack_ascan(satz1_scan)
+            a_track_view = a_track
+            a_scan_view = a_scan
+            self._interpolate_lons_lats(lons_scan, lats_scan, a_track_view, a_scan_view, new_lons_scan, new_lats_scan, lon1.dtype)
         return new_lons, new_lats
 
-    cdef tuple _get_atrack_ascan(self, np.ndarray[floating, ndim=2] satz1):
-        cdef unsigned int scans = satz1.shape[0] // self._coarse_scan_length
+    cdef tuple _get_atrack_ascan(self, floating[:, ::1] satz1_scan):
         # reshape to (num scans, rows per scan, columns per scan)
-        cdef floating[:, :, ::1] satz1_3d = satz1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
-        cdef floating[:, :, :] satz_a_view = _get_upper_left_corner(satz1_3d)
-        cdef floating[:, :, :] satz_b_view = _get_upper_right_corner(satz1_3d)
-        cdef np.ndarray[floating, ndim=3] c_exp = np.empty(
-            (satz_a_view.shape[0], satz_a_view.shape[1], satz_a_view.shape[2]),
-            dtype=satz1.dtype)
-        cdef np.ndarray[floating, ndim=3] c_ali = np.empty(
-            (satz_a_view.shape[0], satz_a_view.shape[1], satz_a_view.shape[2]),
-            dtype=satz1.dtype)
-        cdef floating[:, :, ::1] c_exp_view = c_exp
-        cdef floating[:, :, ::1] c_ali_view = c_ali
+        # cdef floating[:, ::1] satz1_3d = satz1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
+        cdef floating[:, :] satz_a_view = _get_upper_left_corner(satz1_scan)
+        cdef floating[:, :] satz_b_view = _get_upper_right_corner(satz1_scan)
+        cdef Py_ssize_t scan_idx
+        # cdef np.dtype dtype
+        if floating is np.float32_t:
+            dtype = np.float32
+        else:
+            dtype = np.float64
+        cdef np.ndarray[floating, ndim=2] c_exp = np.empty(
+            (satz_a_view.shape[0], satz_a_view.shape[1]),
+            dtype=dtype)
+        cdef np.ndarray[floating, ndim=2] c_ali = np.empty(
+            (satz_a_view.shape[0], satz_a_view.shape[1]),
+            dtype=dtype)
+        cdef floating[:, ::1] c_exp_view = c_exp
+        cdef floating[:, ::1] c_ali_view = c_ali
         _compute_expansion_alignment(satz_a_view, satz_b_view, self._coarse_pixels_per_1km, c_exp_view, c_ali_view)
 
-        cdef floating[:, :, :] c_exp_view2 = c_exp
+        cdef floating[:, :] c_exp_view2 = c_exp
         cdef np.ndarray[floating, ndim=2] c_exp_full = self._create_expanded_output_array(c_exp_view2)
         cdef floating[:, ::1] c_exp_full_view = c_exp_full
         self._expand_tiepoint_array(c_exp_view2, c_exp_full_view)
 
-        cdef floating[:, :, :] c_ali_view2 = c_ali
+        cdef floating[:, :] c_ali_view2 = c_ali
         cdef np.ndarray[floating, ndim=2] c_ali_full = self._create_expanded_output_array(c_ali_view2)
         cdef floating[:, ::1] c_ali_full_view = c_ali_full
         self._expand_tiepoint_array(c_ali_view2, c_ali_full_view)
 
-        coords_xy = self._get_coords(scans)
+        coords_xy = self._get_coords()
         cdef np.ndarray[floating, ndim=1] x = coords_xy[0]
         cdef np.ndarray[floating, ndim=1] y = coords_xy[1]
         cdef floating[::1] x_view = x
         cdef floating[::1] y_view = y
-        cdef np.ndarray[floating, ndim=2] a_track = np.empty((y.shape[0], x.shape[0]), dtype=satz1.dtype)
-        cdef np.ndarray[floating, ndim=2] a_scan = np.empty((y.shape[0], x.shape[0]), dtype=satz1.dtype)
+        cdef np.ndarray[floating, ndim=2] a_track = np.empty((y.shape[0], x.shape[0]), dtype=dtype)
+        cdef np.ndarray[floating, ndim=2] a_scan = np.empty((y.shape[0], x.shape[0]), dtype=dtype)
         cdef floating[:, ::1] a_track_view = a_track
         cdef floating[:, ::1] a_scan_view = a_scan
         self._calculate_atrack_ascan(
@@ -230,17 +250,17 @@ cdef class MODISInterpolator:
                 a_track[j, i] = s_t
                 a_scan[j, i] = s_s + s_s * (1 - s_s) * c_exp_full[j, i] + s_t * (1 - s_t) * c_ali_full[j, i]
 
-    cdef tuple _get_coords(self, unsigned int scans):
+    cdef tuple _get_coords(self):
         cdef np.ndarray[np.float32_t, ndim=1] x, y
         cdef np.float32_t[::1] x_view, y_view
         if self._coarse_scan_length == 10:
             x = np.arange(self._fine_scan_width, dtype=np.float32) % self._fine_pixels_per_coarse_pixel
-            y = np.empty((scans * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel,), dtype=np.float32)
+            y = np.empty((self._coarse_scan_length * self._fine_pixels_per_coarse_pixel,), dtype=np.float32)
             x_view = x
             y_view = y
-            self._get_coords_1km(scans, x_view, y_view)
+            self._get_coords_1km(x_view, y_view)
         else:
-            x, y = self._get_coords_5km(scans)
+            x, y = self._get_coords_5km()
         return x, y
 
     @cython.boundscheck(False)
@@ -249,7 +269,6 @@ cdef class MODISInterpolator:
     @cython.initializedcheck(False)
     cdef void _get_coords_1km(
             self,
-            unsigned int scans,
             floating[::1] x_view,
             floating[::1] y_view,
     ) nogil:
@@ -258,23 +277,19 @@ cdef class MODISInterpolator:
         cdef int fine_idx
         cdef int half_scan_length = self._fine_pixels_per_coarse_pixel // 2
         cdef unsigned int fine_pixels_per_scan = self._coarse_scan_length * self._fine_pixels_per_coarse_pixel
-        for scan_idx in range(scans):
-            for i in range(fine_pixels_per_scan):
-                fine_idx = scan_idx * fine_pixels_per_scan + i
-                if i < half_scan_length:
-                    y_view[fine_idx] = -half_scan_length + 0.5 + i
-                elif i >= fine_pixels_per_scan - half_scan_length:
-                    y_view[fine_idx] = (self._fine_pixels_per_coarse_pixel + 0.5) + (half_scan_length - (fine_pixels_per_scan - i))
-                else:
-                    y_view[fine_idx] = ((i + half_scan_length) % self._fine_pixels_per_coarse_pixel) + 0.5
+        for fine_idx in range(fine_pixels_per_scan):
+            if fine_idx < half_scan_length:
+                y_view[fine_idx] = -half_scan_length + 0.5 + fine_idx
+            elif fine_idx >= fine_pixels_per_scan - half_scan_length:
+                y_view[fine_idx] = (self._fine_pixels_per_coarse_pixel + 0.5) + (half_scan_length - (fine_pixels_per_scan - fine_idx))
+            else:
+                y_view[fine_idx] = ((fine_idx + half_scan_length) % self._fine_pixels_per_coarse_pixel) + 0.5
 
         for i in range(self._fine_pixels_per_coarse_pixel):
             x_view[(self._fine_scan_width - self._fine_pixels_per_coarse_pixel) + i] = self._fine_pixels_per_coarse_pixel + i
 
-    cdef tuple _get_coords_5km(self, unsigned int scans):
+    cdef tuple _get_coords_5km(self):
         cdef np.ndarray[np.float32_t, ndim=1] y = np.arange(self._fine_pixels_per_coarse_pixel * self._coarse_scan_length, dtype=np.float32) - 2
-        y = np.tile(y, scans)
-
         cdef np.ndarray[np.float32_t, ndim=1] x = (np.arange(self._fine_scan_width, dtype=np.float32) - 2) % self._fine_pixels_per_coarse_pixel
         x[0] = -2
         x[1] = -1
@@ -282,7 +297,7 @@ cdef class MODISInterpolator:
             x[-2] = 5
             x[-1] = 6
         else:
-            # elif self._coarse_scan_width == 270:
+            # self._coarse_scan_width == 270
             x[-7] = 5
             x[-6] = 6
             x[-5] = 7
@@ -296,28 +311,29 @@ cdef class MODISInterpolator:
     @cython.cdivision(True)
     @cython.wraparound(False)
     @cython.initializedcheck(False)
-    cdef tuple _interpolate_lons_lats(self,
-                                      np.ndarray[floating, ndim=2] lon1,
-                                      np.ndarray[floating, ndim=2] lat1,
-                                      np.ndarray[floating, ndim=2] a_track,
-                                      np.ndarray[floating, ndim=2] a_scan):
-        cdef floating[:, :, ::1] lon1_3d_view, lat1_3d_view
-        lon1_3d_view = lon1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
-        lat1_3d_view = lat1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
-        cdef floating[:, :, :] lon1_a, lon1_b, lon1_c, lon1_d, lat1_a, lat1_b, lat1_c, lat1_d
-        lon1_a = _get_upper_left_corner(lon1_3d_view)
-        lon1_b = _get_upper_right_corner(lon1_3d_view)
-        lon1_c = _get_lower_right_corner(lon1_3d_view)
-        lon1_d = _get_lower_left_corner(lon1_3d_view)
-        lat1_a = _get_upper_left_corner(lat1_3d_view)
-        lat1_b = _get_upper_right_corner(lat1_3d_view)
-        lat1_c = _get_lower_right_corner(lat1_3d_view)
-        lat1_d = _get_lower_left_corner(lat1_3d_view)
-        cdef np.ndarray[floating, ndim=4] xyz_a = np.empty((lon1_a.shape[0], lon1_a.shape[1], lon1_a.shape[2], 3), dtype=lon1.dtype)
-        cdef np.ndarray[floating, ndim=4] xyz_b = np.empty((lon1_b.shape[0], lon1_b.shape[1], lon1_b.shape[2], 3), dtype=lon1.dtype)
-        cdef np.ndarray[floating, ndim=4] xyz_c = np.empty((lon1_c.shape[0], lon1_c.shape[1], lon1_c.shape[2], 3), dtype=lon1.dtype)
-        cdef np.ndarray[floating, ndim=4] xyz_d = np.empty((lon1_d.shape[0], lon1_d.shape[1], lon1_d.shape[2], 3), dtype=lon1.dtype)
-        cdef floating[:, :, :, ::1] xyz_a_view, xyz_b_view, xyz_c_view, xyz_d_view
+    cdef void _interpolate_lons_lats(self,
+                                     floating[:, ::1] lon1,
+                                     floating[:, ::1] lat1,
+                                     floating[:, ::1] a_track,
+                                     floating[:, ::1] a_scan,
+                                     floating[:, ::1] new_lons_view,
+                                     floating[:, ::1] new_lats_view,
+                                     dtype,
+                                     ):
+        cdef floating[:, :] lon1_a, lon1_b, lon1_c, lon1_d, lat1_a, lat1_b, lat1_c, lat1_d
+        lon1_a = _get_upper_left_corner(lon1)
+        lon1_b = _get_upper_right_corner(lon1)
+        lon1_c = _get_lower_right_corner(lon1)
+        lon1_d = _get_lower_left_corner(lon1)
+        lat1_a = _get_upper_left_corner(lat1)
+        lat1_b = _get_upper_right_corner(lat1)
+        lat1_c = _get_lower_right_corner(lat1)
+        lat1_d = _get_lower_left_corner(lat1)
+        cdef np.ndarray[floating, ndim=3] xyz_a = np.empty((lon1_a.shape[0], lon1_a.shape[1], 3), dtype=dtype)
+        cdef np.ndarray[floating, ndim=3] xyz_b = np.empty((lon1_b.shape[0], lon1_b.shape[1], 3), dtype=dtype)
+        cdef np.ndarray[floating, ndim=3] xyz_c = np.empty((lon1_c.shape[0], lon1_c.shape[1], 3), dtype=dtype)
+        cdef np.ndarray[floating, ndim=3] xyz_d = np.empty((lon1_d.shape[0], lon1_d.shape[1], 3), dtype=dtype)
+        cdef floating[:, :, ::1] xyz_a_view, xyz_b_view, xyz_c_view, xyz_d_view
         xyz_a_view = xyz_a
         xyz_b_view = xyz_b
         xyz_c_view = xyz_c
@@ -327,18 +343,11 @@ cdef class MODISInterpolator:
         lonlat2xyz(lon1_c, lat1_c, xyz_c_view)
         lonlat2xyz(lon1_d, lat1_d, xyz_d_view)
 
-        cdef floating[:, ::1] a_track_view = a_track
-        cdef floating[:, ::1] a_scan_view = a_scan
-        cdef np.ndarray[floating, ndim=3] comp_arr_2d = np.empty((a_scan.shape[0], a_scan.shape[1], 3), dtype=lon1.dtype)
+        cdef np.ndarray[floating, ndim=3] comp_arr_2d = np.empty((a_scan.shape[0], a_scan.shape[1], 3), dtype=dtype)
         cdef floating[:, :, ::1] xyz_comp_view = comp_arr_2d
-        self._compute_fine_xyz(a_track_view, a_scan_view, xyz_a, xyz_b, xyz_c, xyz_d, xyz_comp_view)
+        self._compute_fine_xyz(a_track, a_scan, xyz_a, xyz_b, xyz_c, xyz_d, xyz_comp_view)
 
-        cdef np.ndarray[floating, ndim=2] new_lons = np.empty((a_scan.shape[0], a_scan.shape[1]), dtype=lon1.dtype)
-        cdef np.ndarray[floating, ndim=2] new_lats = np.empty((a_scan.shape[0], a_scan.shape[1]), dtype=lon1.dtype)
-        cdef floating[:, ::1] new_lons_view = new_lons
-        cdef floating[:, ::1] new_lats_view = new_lats
         xyz2lonlat(xyz_comp_view, new_lons_view, new_lats_view)
-        return new_lons, new_lats
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
@@ -348,17 +357,17 @@ cdef class MODISInterpolator:
             self,
             floating[:, ::1] a_track_view,
             floating[:, ::1] a_scan_view,
-            np.ndarray[floating, ndim=4] xyz_a,
-            np.ndarray[floating, ndim=4] xyz_b,
-            np.ndarray[floating, ndim=4] xyz_c,
-            np.ndarray[floating, ndim=4] xyz_d,
+            np.ndarray[floating, ndim=3] xyz_a,
+            np.ndarray[floating, ndim=3] xyz_b,
+            np.ndarray[floating, ndim=3] xyz_c,
+            np.ndarray[floating, ndim=3] xyz_d,
             floating[:, :, ::1] xyz_comp_view,
     ):
         cdef Py_ssize_t k
-        cdef floating[:, :, :] comp_a_view, comp_b_view, comp_c_view, comp_d_view
+        cdef floating[:, :] comp_a_view, comp_b_view, comp_c_view, comp_d_view
         cdef np.ndarray[floating, ndim=2] data_a_2d, data_b_2d, data_c_2d, data_d_2d
         cdef floating[:, ::1] data_a_2d_view, data_b_2d_view, data_c_2d_view, data_d_2d_view
-        comp_a_view = xyz_a[:, :, :, 0]
+        comp_a_view = xyz_a[:, :, 0]
         data_a_2d = self._create_expanded_output_array(comp_a_view)
         data_b_2d = self._create_expanded_output_array(comp_a_view)
         data_c_2d = self._create_expanded_output_array(comp_a_view)
@@ -368,10 +377,10 @@ cdef class MODISInterpolator:
         data_c_2d_view = data_c_2d
         data_d_2d_view = data_d_2d
         for k in range(3):  # xyz
-            comp_a_view = xyz_a[:, :, :, k]
-            comp_b_view = xyz_b[:, :, :, k]
-            comp_c_view = xyz_c[:, :, :, k]
-            comp_d_view = xyz_d[:, :, :, k]
+            comp_a_view = xyz_a[:, :, k]
+            comp_b_view = xyz_b[:, :, k]
+            comp_c_view = xyz_c[:, :, k]
+            comp_d_view = xyz_d[:, :, k]
             self._expand_tiepoint_array(comp_a_view, data_a_2d_view)
             self._expand_tiepoint_array(comp_b_view, data_b_2d_view)
             self._expand_tiepoint_array(comp_c_view, data_c_2d_view)
@@ -414,11 +423,10 @@ cdef class MODISInterpolator:
 
     cdef np.ndarray[floating, ndim=2] _create_expanded_output_array(
             self,
-            floating[:, :, :] like_arr,
+            floating[:, :] like_arr,
     ):
-        cdef unsigned int num_scans = like_arr.shape[0]
-        cdef unsigned int num_rows = like_arr.shape[1]
-        cdef unsigned int num_cols = like_arr.shape[2]
+        cdef unsigned int num_rows = like_arr.shape[0]
+        cdef unsigned int num_cols = like_arr.shape[1]
         if floating is np.float32_t:
             dtype = np.float32
         else:
@@ -426,12 +434,12 @@ cdef class MODISInterpolator:
         if self._coarse_scan_length == 10:
             return np.empty(
                 (
-                    num_scans * (num_rows + 1) * self._fine_pixels_per_coarse_pixel,
+                    (num_rows + 1) * self._fine_pixels_per_coarse_pixel,
                     (num_cols + 1) * self._fine_pixels_per_coarse_pixel
                 ),
                 dtype=dtype)
         # 5km
-        num_rows = num_scans * (num_rows + 1) * self._fine_pixels_per_coarse_pixel
+        num_rows = (num_rows + 1) * self._fine_pixels_per_coarse_pixel
         factor = self._fine_pixels_per_coarse_pixel // self._coarse_pixels_per_1km
         if self._coarse_scan_width == 271:
             num_cols = num_cols * self._fine_pixels_per_coarse_pixel + 4 * factor
@@ -441,7 +449,7 @@ cdef class MODISInterpolator:
 
     cdef void _expand_tiepoint_array(
             self,
-            floating[:, :, :] input_arr,
+            floating[:, :] input_arr,
             floating[:, ::1] output_arr,
     ):
         if self._coarse_scan_length == 10:
@@ -453,83 +461,79 @@ cdef class MODISInterpolator:
     @cython.cdivision(True)
     @cython.wraparound(False)
     @cython.initializedcheck(False)
-    cdef void _expand_tiepoint_array_1km(self, floating[:, :, :] input_arr, floating[:, ::1] expanded_arr) nogil:
+    cdef void _expand_tiepoint_array_1km(self, floating[:, :] input_arr, floating[:, ::1] expanded_arr) nogil:
         # TODO: Replace shape multiplication with self._fine_pixel_length and self._fine_pixel_width
         cdef floating tiepoint_value
-        cdef Py_ssize_t scan_idx, row_idx, col_idx, length_repeat_cycle, width_repeat_cycle, half_coarse_pixel_fine_offset, scan_offset, row_offset, col_offset
+        cdef Py_ssize_t row_idx, col_idx, length_repeat_cycle, width_repeat_cycle, half_coarse_pixel_fine_offset, row_offset, col_offset
         half_coarse_pixel_fine_offset = self._fine_pixels_per_coarse_pixel // 2
-        for scan_idx in range(input_arr.shape[0]):
-            scan_offset = scan_idx * self._fine_pixels_per_coarse_pixel * self._coarse_scan_length
-            for row_idx in range(input_arr.shape[1]):
-                row_offset = row_idx * self._fine_pixels_per_coarse_pixel
-                for col_idx in range(input_arr.shape[2]):
-                    col_offset = col_idx * self._fine_pixels_per_coarse_pixel
-                    tiepoint_value = input_arr[scan_idx, row_idx, col_idx]
-                    for length_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
-                        for width_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
-                            # main "center" scan portion
-                            expanded_arr[scan_offset + row_offset + length_repeat_cycle + half_coarse_pixel_fine_offset,
+        for row_idx in range(input_arr.shape[0]):
+            row_offset = row_idx * self._fine_pixels_per_coarse_pixel
+            for col_idx in range(input_arr.shape[1]):
+                col_offset = col_idx * self._fine_pixels_per_coarse_pixel
+                tiepoint_value = input_arr[row_idx, col_idx]
+                for length_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
+                    for width_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
+                        # main "center" scan portion
+                        expanded_arr[row_offset + length_repeat_cycle + half_coarse_pixel_fine_offset,
+                                    col_offset + width_repeat_cycle] = tiepoint_value
+                        if row_offset < half_coarse_pixel_fine_offset:
+                            # copy of top half of the scan
+                            expanded_arr[row_offset + length_repeat_cycle,
                                         col_offset + width_repeat_cycle] = tiepoint_value
+                        elif row_offset >= (((input_arr.shape[0] - 1) * self._fine_pixels_per_coarse_pixel) - half_coarse_pixel_fine_offset):
+                            # copy of bottom half of the scan
+                            # TODO: Clean this up
+                            expanded_arr[row_offset + length_repeat_cycle + self._fine_pixels_per_coarse_pixel,
+                                        col_offset + width_repeat_cycle] = tiepoint_value
+                        if col_idx == input_arr.shape[1] - 1:
+                            # there is one less coarse column than needed by the fine resolution
+                            # copy last coarse column as the last fine coarse column
+                            # this last coarse column will be both the second to last and the last
+                            # fine resolution columns
+                            expanded_arr[row_offset + length_repeat_cycle + half_coarse_pixel_fine_offset,
+                                        col_offset + self._fine_pixels_per_coarse_pixel + width_repeat_cycle] = tiepoint_value
+                            # also need the top and bottom half copies
                             if row_offset < half_coarse_pixel_fine_offset:
                                 # copy of top half of the scan
-                                expanded_arr[scan_offset + row_offset + length_repeat_cycle,
-                                            col_offset + width_repeat_cycle] = tiepoint_value
-                            elif row_offset >= (((input_arr.shape[1] - 1) * self._fine_pixels_per_coarse_pixel) - half_coarse_pixel_fine_offset):
-                                # copy of bottom half of the scan
-                                # TODO: Clean this up
-                                expanded_arr[scan_offset + row_offset + length_repeat_cycle + self._fine_pixels_per_coarse_pixel,
-                                            col_offset + width_repeat_cycle] = tiepoint_value
-                            if col_idx == input_arr.shape[2] - 1:
-                                # there is one less coarse column than needed by the fine resolution
-                                # copy last coarse column as the last fine coarse column
-                                # this last coarse column will be both the second to last and the last
-                                # fine resolution columns
-                                expanded_arr[scan_offset + row_offset + length_repeat_cycle + half_coarse_pixel_fine_offset,
+                                expanded_arr[row_offset + length_repeat_cycle,
                                             col_offset + self._fine_pixels_per_coarse_pixel + width_repeat_cycle] = tiepoint_value
-                                # also need the top and bottom half copies
-                                if row_offset < half_coarse_pixel_fine_offset:
-                                    # copy of top half of the scan
-                                    expanded_arr[scan_offset + row_offset + length_repeat_cycle,
-                                                col_offset + self._fine_pixels_per_coarse_pixel + width_repeat_cycle] = tiepoint_value
-                                elif row_offset >= (((input_arr.shape[1] - 1) * self._fine_pixels_per_coarse_pixel) - half_coarse_pixel_fine_offset):
-                                    # TODO: Clean this up
-                                    # copy of bottom half of the scan
-                                    expanded_arr[scan_offset + row_offset + length_repeat_cycle + self._fine_pixels_per_coarse_pixel,
-                                                col_offset + self._fine_pixels_per_coarse_pixel + width_repeat_cycle] = tiepoint_value
+                            elif row_offset >= (((input_arr.shape[0] - 1) * self._fine_pixels_per_coarse_pixel) - half_coarse_pixel_fine_offset):
+                                # TODO: Clean this up
+                                # copy of bottom half of the scan
+                                expanded_arr[row_offset + length_repeat_cycle + self._fine_pixels_per_coarse_pixel,
+                                            col_offset + self._fine_pixels_per_coarse_pixel + width_repeat_cycle] = tiepoint_value
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
     @cython.initializedcheck(False)
-    cdef void _expand_tiepoint_array_5km(self, floating[:, :, :] input_arr, floating[:, ::1] expanded_arr) nogil:
+    cdef void _expand_tiepoint_array_5km(self, floating[:, :] input_arr, floating[:, ::1] expanded_arr) nogil:
         cdef floating tiepoint_value
-        cdef Py_ssize_t scan_idx, row_idx, col_idx, length_repeat_cycle, width_repeat_cycle, scan_offset, row_offset, col_offset
+        cdef Py_ssize_t row_idx, col_idx, length_repeat_cycle, width_repeat_cycle, row_offset, col_offset
         # partial rows/columns to repeat: 5km->1km => 2, 5km->500m => 4, 5km->250m => 8
         cdef Py_ssize_t factor = self._fine_pixels_per_coarse_pixel // self._coarse_pixels_per_1km * 2
-        for scan_idx in range(input_arr.shape[0]):
-            scan_offset = scan_idx * self._fine_pixels_per_coarse_pixel * self._coarse_scan_length
-            for row_idx in range(input_arr.shape[1]):
-                row_offset = row_idx * self._fine_pixels_per_coarse_pixel * 2
-                for col_idx in range(input_arr.shape[2]):
-                    col_offset = col_idx * self._fine_pixels_per_coarse_pixel
-                    tiepoint_value = input_arr[scan_idx, row_idx, col_idx]
-                    for length_repeat_cycle in range(self._fine_pixels_per_coarse_pixel * 2):
-                        for width_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
-                            # main "center" scan portion
-                            expanded_arr[scan_offset + row_offset + length_repeat_cycle,
-                                        col_offset + width_repeat_cycle + factor] = tiepoint_value
-                            if (col_offset + width_repeat_cycle) < factor:
-                                expanded_arr[scan_offset + row_offset + length_repeat_cycle,
-                                            col_offset + width_repeat_cycle] = tiepoint_value
-                            if self._coarse_scan_width == 270 and (col_idx >= input_arr.shape[2] - 1):
-                                # need an extra coarse column copied over
-                                expanded_arr[scan_offset + row_offset + length_repeat_cycle,
-                                            col_offset + factor + width_repeat_cycle + self._fine_pixels_per_coarse_pixel] = tiepoint_value
-                            if self._coarse_scan_width == 270 and (expanded_arr.shape[1] - (col_offset + width_repeat_cycle + factor) <= (factor + factor + self._fine_pixels_per_coarse_pixel)):
-                                # add the right most portion (in the 270 column case)
-                                expanded_arr[scan_offset + row_offset + length_repeat_cycle,
-                                            col_offset + factor + factor + self._fine_pixels_per_coarse_pixel + width_repeat_cycle] = tiepoint_value
-                            elif expanded_arr.shape[1] - (col_offset + width_repeat_cycle + factor) <= (factor + factor):
-                                # add the right most portion (in all cases including 270 column case)
-                                expanded_arr[scan_offset + row_offset + length_repeat_cycle,
-                                            col_offset + factor + factor + width_repeat_cycle] = tiepoint_value
+        for row_idx in range(input_arr.shape[0]):
+            row_offset = row_idx * self._fine_pixels_per_coarse_pixel * 2
+            for col_idx in range(input_arr.shape[1]):
+                col_offset = col_idx * self._fine_pixels_per_coarse_pixel
+                tiepoint_value = input_arr[row_idx, col_idx]
+                for length_repeat_cycle in range(self._fine_pixels_per_coarse_pixel * 2):
+                    for width_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
+                        # main "center" scan portion
+                        expanded_arr[row_offset + length_repeat_cycle,
+                                    col_offset + width_repeat_cycle + factor] = tiepoint_value
+                        if (col_offset + width_repeat_cycle) < factor:
+                            expanded_arr[row_offset + length_repeat_cycle,
+                                        col_offset + width_repeat_cycle] = tiepoint_value
+                        if self._coarse_scan_width == 270 and (col_idx >= input_arr.shape[1] - 1):
+                            # need an extra coarse column copied over
+                            expanded_arr[row_offset + length_repeat_cycle,
+                                        col_offset + factor + width_repeat_cycle + self._fine_pixels_per_coarse_pixel] = tiepoint_value
+                        if self._coarse_scan_width == 270 and (expanded_arr.shape[0] - (col_offset + width_repeat_cycle + factor) <= (factor + factor + self._fine_pixels_per_coarse_pixel)):
+                            # add the right most portion (in the 270 column case)
+                            expanded_arr[row_offset + length_repeat_cycle,
+                                        col_offset + factor + factor + self._fine_pixels_per_coarse_pixel + width_repeat_cycle] = tiepoint_value
+                        elif expanded_arr.shape[0] - (col_offset + width_repeat_cycle + factor) <= (factor + factor):
+                            # add the right most portion (in all cases including 270 column case)
+                            expanded_arr[row_offset + length_repeat_cycle,
+                                        col_offset + factor + factor + width_repeat_cycle] = tiepoint_value

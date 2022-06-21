@@ -24,21 +24,20 @@ DEF EARTH_RADIUS = 6370997.0
 @cython.cdivision(True)
 @cython.wraparound(False)
 cdef void lonlat2xyz(
-        floating[:, :, :] lons,
-        floating[:, :, :] lats,
-        floating[:, :, :, ::1] xyz,
+        floating[:, :] lons,
+        floating[:, :] lats,
+        floating[:, :, ::1] xyz,
 ) nogil:
     """Convert lons and lats to cartesian coordinates."""
     cdef Py_ssize_t i, j, k
     cdef floating lon_rad, lat_rad
     for i in range(lons.shape[0]):
         for j in range(lons.shape[1]):
-            for k in range(lons.shape[2]):
-                lon_rad = deg2rad(lons[i, j, k])
-                lat_rad = deg2rad(lats[i, j, k])
-                xyz[i, j, k, 0] = EARTH_RADIUS * cos(lat_rad) * cos(lon_rad)
-                xyz[i, j, k, 1] = EARTH_RADIUS * cos(lat_rad) * sin(lon_rad)
-                xyz[i, j, k, 2] = EARTH_RADIUS * sin(lat_rad)
+            lon_rad = deg2rad(lons[i, j])
+            lat_rad = deg2rad(lats[i, j])
+            xyz[i, j, 0] = EARTH_RADIUS * cos(lat_rad) * cos(lon_rad)
+            xyz[i, j, 1] = EARTH_RADIUS * cos(lat_rad) * sin(lon_rad)
+            xyz[i, j, 2] = EARTH_RADIUS * sin(lat_rad)
 
 
 @cython.boundscheck(False)
