@@ -167,30 +167,41 @@ cdef class MODISInterpolator:
         cdef np.ndarray[floating, ndim=2] a_scan = np.empty((num_fine_scan_rows, num_fine_scan_cols), dtype=lon1.dtype)
         cdef floating[:, ::1] a_track_view = a_track
         cdef floating[:, ::1] a_scan_view = a_scan
-        cdef Py_ssize_t scan_idx
+
+        cdef tuple coords_xy = self._get_coords()
+        cdef np.ndarray[floating, ndim=1] x = coords_xy[0]
+        cdef np.ndarray[floating, ndim=1] y = coords_xy[1]
+        cdef floating[::1] x_view = x
+        cdef floating[::1] y_view = y
+
         cdef floating[:, ::1] satz1_scan
         cdef unsigned int scans = satz1.shape[0] // self._coarse_scan_length
         cdef np.ndarray[floating, ndim=2] new_lons = np.empty((satz1.shape[0] * self._fine_pixels_per_coarse_pixel, self._fine_scan_width), dtype=lon1.dtype)
         cdef np.ndarray[floating, ndim=2] new_lats = np.empty((satz1.shape[0] * self._fine_pixels_per_coarse_pixel, self._fine_scan_width), dtype=lon1.dtype)
         cdef floating[:, ::1] lons_scan, lats_scan
         cdef floating[:, ::1] new_lons_scan, new_lats_scan
+        cdef Py_ssize_t scan_idx
         for scan_idx in range(0, scans):
             lons_scan = lon1[scan_idx * self._coarse_scan_length:(scan_idx + 1) * self._coarse_scan_length]
             lats_scan = lat1[scan_idx * self._coarse_scan_length:(scan_idx + 1) * self._coarse_scan_length]
             satz1_scan = satz1[scan_idx * self._coarse_scan_length:(scan_idx + 1) * self._coarse_scan_length]
             new_lons_scan = new_lons[scan_idx * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel:(scan_idx + 1) * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel]
             new_lats_scan = new_lats[scan_idx * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel:(scan_idx + 1) * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel]
-            self._get_atrack_ascan(satz1_scan, a_track_view, a_scan_view)
+            self._get_atrack_ascan(satz1_scan, x_view, y_view, a_track_view, a_scan_view)
             self._interpolate_lons_lats(lons_scan, lats_scan, a_track_view, a_scan_view, new_lons_scan, new_lats_scan, lon1.dtype)
         return new_lons, new_lats
 
-    cdef void _get_atrack_ascan(self, floating[:, ::1] satz1_scan, floating[:, ::1] a_track_view, floating[:, ::1] a_scan_view):
-        # reshape to (num scans, rows per scan, columns per scan)
-        # cdef floating[:, ::1] satz1_3d = satz1.reshape((-1, self._coarse_scan_length, self._coarse_scan_width))
+    cdef void _get_atrack_ascan(
+            self,
+            floating[:, ::1] satz1_scan,
+            floating[::1] x_view,
+            floating[::1] y_view,
+            floating[:, ::1] a_track_view,
+            floating[:, ::1] a_scan_view
+    ):
         cdef floating[:, :] satz_a_view = _get_upper_left_corner(satz1_scan)
         cdef floating[:, :] satz_b_view = _get_upper_right_corner(satz1_scan)
         cdef Py_ssize_t scan_idx
-        # cdef np.dtype dtype
         if floating is np.float32_t:
             dtype = np.float32
         else:
@@ -215,11 +226,6 @@ cdef class MODISInterpolator:
         cdef floating[:, ::1] c_ali_full_view = c_ali_full
         self._expand_tiepoint_array(c_ali_view2, c_ali_full_view)
 
-        coords_xy = self._get_coords()
-        cdef np.ndarray[floating, ndim=1] x = coords_xy[0]
-        cdef np.ndarray[floating, ndim=1] y = coords_xy[1]
-        cdef floating[::1] x_view = x
-        cdef floating[::1] y_view = y
         self._calculate_atrack_ascan(
             x_view, y_view,
             c_exp_full_view, c_ali_full_view,
