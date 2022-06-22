@@ -1,4 +1,5 @@
 cimport cython
+from cython cimport view
 from ._modis_utils cimport lonlat2xyz, xyz2lonlat, floating, deg2rad
 from .simple_modis_interpolator import scanline_mapblocks
 
@@ -221,32 +222,27 @@ cdef class MODISInterpolator:
             floating[:, ::1] satz1_scan,
             floating[::1] x_view,
             floating[::1] y_view,
+            floating[:, ::1] c_exp_coarse_view,
+            floating[:, ::1] c_ali_coarse_view,
             floating[:, ::1] c_exp_full_view,
             floating[:, ::1] c_ali_full_view,
             floating[:, ::1] a_track_view,
             floating[:, ::1] a_scan_view
-    ):
+    ) nogil:
         cdef floating[:, :] satz_a_view = _get_upper_left_corner(satz1_scan)
         cdef floating[:, :] satz_b_view = _get_upper_right_corner(satz1_scan)
         cdef Py_ssize_t scan_idx
-        if floating is np.float32_t:
-            dtype = np.float32
-        else:
-            dtype = np.float64
-        cdef np.ndarray[floating, ndim=2] c_exp = np.empty(
-            (satz_a_view.shape[0], satz_a_view.shape[1]),
-            dtype=dtype)
-        cdef np.ndarray[floating, ndim=2] c_ali = np.empty(
-            (satz_a_view.shape[0], satz_a_view.shape[1]),
-            dtype=dtype)
-        cdef floating[:, ::1] c_exp_view = c_exp
-        cdef floating[:, ::1] c_ali_view = c_ali
-        _compute_expansion_alignment(satz_a_view, satz_b_view, self._coarse_pixels_per_1km, c_exp_view, c_ali_view)
+        _compute_expansion_alignment(
+            satz_a_view,
+            satz_b_view,
+            self._coarse_pixels_per_1km,
+            c_exp_coarse_view,
+            c_ali_coarse_view)
 
-        cdef floating[:, :] c_exp_view2 = c_exp
+        cdef floating[:, :] c_exp_view2 = c_exp_coarse_view
         self._expand_tiepoint_array(c_exp_view2, c_exp_full_view)
 
-        cdef floating[:, :] c_ali_view2 = c_ali
+        cdef floating[:, :] c_ali_view2 = c_ali_coarse_view
         self._expand_tiepoint_array(c_ali_view2, c_ali_full_view)
 
         self._calculate_atrack_ascan(
@@ -354,7 +350,7 @@ cdef class MODISInterpolator:
                                      floating[:, :, ::1] xyz_fine_view,
                                      floating[:, ::1] new_lons_view,
                                      floating[:, ::1] new_lats_view,
-                                     ):
+                                     ) nogil:
         cdef floating[:, ::1] lons_scan, lats_scan, satz_scan
         cdef floating[:, ::1] new_lons_scan, new_lats_scan
         cdef Py_ssize_t scan_idx
@@ -368,8 +364,10 @@ cdef class MODISInterpolator:
                 satz_scan,
                 x_view,
                 y_view,
-                data_tiepoint_a_view,
-                data_tiepoint_b_view,
+                data_tiepoint_a_view[:self._coarse_scan_length - 1, :self._coarse_scan_width - 1],
+                data_tiepoint_b_view[:self._coarse_scan_length - 1, :self._coarse_scan_width - 1],
+                data_tiepoint_c_view,
+                data_tiepoint_d_view,
                 a_track,
                 a_scan)
             lonlat2xyz(lons_scan, lats_scan, xyz_coarse_view)
