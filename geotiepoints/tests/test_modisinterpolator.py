@@ -130,8 +130,10 @@ def assert_geodetic_distance(
         (load_1km_lonlat_satz_as_xarray_dask, load_250m_lonlat_expected_as_xarray_dask, modis_1km_to_250m, 8.30, False),
         (load_5km_lonlat_satz1_as_xarray_dask, load_1km_lonlat_as_xarray_dask, modis_5km_to_1km, 25, False),
         (load_l2_5km_lonlat_satz1_as_xarray_dask, load_1km_lonlat_as_xarray_dask, modis_5km_to_1km, 110, False),
-        (load_5km_lonlat_satz1_as_xarray_dask, load_500m_lonlat_expected_as_xarray_dask, modis_5km_to_500m, 19500, True),
-        (load_5km_lonlat_satz1_as_xarray_dask, load_250m_lonlat_expected_as_xarray_dask, modis_5km_to_250m, 25800, True),
+        (load_5km_lonlat_satz1_as_xarray_dask, load_500m_lonlat_expected_as_xarray_dask, modis_5km_to_500m,
+         19500, True),
+        (load_5km_lonlat_satz1_as_xarray_dask, load_250m_lonlat_expected_as_xarray_dask, modis_5km_to_250m,
+         25800, True),
     ]
 )
 def test_sat_angle_based_interp(input_func, exp_func, interp_func, dist_max, exp_5km_warning):
