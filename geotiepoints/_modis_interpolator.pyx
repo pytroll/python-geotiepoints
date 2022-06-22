@@ -174,6 +174,17 @@ cdef class MODISInterpolator:
         cdef floating[::1] x_view = x
         cdef floating[::1] y_view = y
 
+        cdef np.ndarray[floating, ndim=2] tmp_tiepoint_a, tmp_tiepoint_b, tmp_tiepoint_c, tmp_tiepoint_d
+        cdef floating[:, ::1] tmp_tiepoint_a_view, tmp_tiepoint_b_view, tmp_tiepoint_c_view, tmp_tiepoint_d_view
+        tmp_tiepoint_a = np.empty((num_fine_scan_rows, num_fine_scan_cols), dtype=lon1.dtype)
+        tmp_tiepoint_b = np.empty((num_fine_scan_rows, num_fine_scan_cols), dtype=lon1.dtype)
+        tmp_tiepoint_c = np.empty((num_fine_scan_rows, num_fine_scan_cols), dtype=lon1.dtype)
+        tmp_tiepoint_d = np.empty((num_fine_scan_rows, num_fine_scan_cols), dtype=lon1.dtype)
+        tmp_tiepoint_a_view = tmp_tiepoint_a
+        tmp_tiepoint_b_view = tmp_tiepoint_b
+        tmp_tiepoint_c_view = tmp_tiepoint_c
+        tmp_tiepoint_d_view = tmp_tiepoint_d
+
         cdef floating[:, ::1] satz1_scan
         cdef unsigned int scans = satz1.shape[0] // self._coarse_scan_length
         cdef np.ndarray[floating, ndim=2] new_lons = np.empty((satz1.shape[0] * self._fine_pixels_per_coarse_pixel, self._fine_scan_width), dtype=lon1.dtype)
@@ -187,8 +198,10 @@ cdef class MODISInterpolator:
             satz1_scan = satz1[scan_idx * self._coarse_scan_length:(scan_idx + 1) * self._coarse_scan_length]
             new_lons_scan = new_lons[scan_idx * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel:(scan_idx + 1) * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel]
             new_lats_scan = new_lats[scan_idx * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel:(scan_idx + 1) * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel]
-            self._get_atrack_ascan(satz1_scan, x_view, y_view, a_track_view, a_scan_view)
-            self._interpolate_lons_lats(lons_scan, lats_scan, a_track_view, a_scan_view, new_lons_scan, new_lats_scan, lon1.dtype)
+            self._get_atrack_ascan(satz1_scan, x_view, y_view, tmp_tiepoint_a_view, tmp_tiepoint_b_view, a_track_view, a_scan_view)
+            self._interpolate_lons_lats(lons_scan, lats_scan, a_track_view, a_scan_view,
+                                        tmp_tiepoint_a_view, tmp_tiepoint_b_view, tmp_tiepoint_c_view, tmp_tiepoint_d_view,
+                                        new_lons_scan, new_lats_scan, lon1.dtype)
         return new_lons, new_lats
 
     cdef void _get_atrack_ascan(
@@ -196,6 +209,8 @@ cdef class MODISInterpolator:
             floating[:, ::1] satz1_scan,
             floating[::1] x_view,
             floating[::1] y_view,
+            floating[:, ::1] c_exp_full_view,
+            floating[:, ::1] c_ali_full_view,
             floating[:, ::1] a_track_view,
             floating[:, ::1] a_scan_view
     ):
@@ -217,13 +232,13 @@ cdef class MODISInterpolator:
         _compute_expansion_alignment(satz_a_view, satz_b_view, self._coarse_pixels_per_1km, c_exp_view, c_ali_view)
 
         cdef floating[:, :] c_exp_view2 = c_exp
-        cdef np.ndarray[floating, ndim=2] c_exp_full = self._create_expanded_output_array(c_exp_view2)
-        cdef floating[:, ::1] c_exp_full_view = c_exp_full
+        # cdef np.ndarray[floating, ndim=2] c_exp_full = self._create_expanded_output_array(c_exp_view2)
+        # cdef floating[:, ::1] c_exp_full_view = c_exp_full
         self._expand_tiepoint_array(c_exp_view2, c_exp_full_view)
 
         cdef floating[:, :] c_ali_view2 = c_ali
-        cdef np.ndarray[floating, ndim=2] c_ali_full = self._create_expanded_output_array(c_ali_view2)
-        cdef floating[:, ::1] c_ali_full_view = c_ali_full
+        # cdef np.ndarray[floating, ndim=2] c_ali_full = self._create_expanded_output_array(c_ali_view2)
+        # cdef floating[:, ::1] c_ali_full_view = c_ali_full
         self._expand_tiepoint_array(c_ali_view2, c_ali_full_view)
 
         self._calculate_atrack_ascan(
@@ -319,6 +334,10 @@ cdef class MODISInterpolator:
                                      floating[:, ::1] lat1,
                                      floating[:, ::1] a_track,
                                      floating[:, ::1] a_scan,
+                                     floating[:, ::1] data_tiepoint_a_view,
+                                     floating[:, ::1] data_tiepoint_b_view,
+                                     floating[:, ::1] data_tiepoint_c_view,
+                                     floating[:, ::1] data_tiepoint_d_view,
                                      floating[:, ::1] new_lons_view,
                                      floating[:, ::1] new_lats_view,
                                      dtype,
@@ -348,7 +367,9 @@ cdef class MODISInterpolator:
 
         cdef np.ndarray[floating, ndim=3] comp_arr_2d = np.empty((a_scan.shape[0], a_scan.shape[1], 3), dtype=dtype)
         cdef floating[:, :, ::1] xyz_comp_view = comp_arr_2d
-        self._compute_fine_xyz(a_track, a_scan, xyz_a, xyz_b, xyz_c, xyz_d, xyz_comp_view)
+        self._compute_fine_xyz(a_track, a_scan, xyz_a, xyz_b, xyz_c, xyz_d,
+                               data_tiepoint_a_view, data_tiepoint_b_view, data_tiepoint_c_view, data_tiepoint_d_view,
+                               xyz_comp_view)
 
         xyz2lonlat(xyz_comp_view, new_lons_view, new_lats_view)
 
@@ -364,37 +385,31 @@ cdef class MODISInterpolator:
             np.ndarray[floating, ndim=3] xyz_b,
             np.ndarray[floating, ndim=3] xyz_c,
             np.ndarray[floating, ndim=3] xyz_d,
+            floating[:, ::1] data_tiepoint_a_view,
+            floating[:, ::1] data_tiepoint_b_view,
+            floating[:, ::1] data_tiepoint_c_view,
+            floating[:, ::1] data_tiepoint_d_view,
             floating[:, :, ::1] xyz_comp_view,
     ):
         cdef Py_ssize_t k
         cdef floating[:, :] comp_a_view, comp_b_view, comp_c_view, comp_d_view
         cdef np.ndarray[floating, ndim=2] data_a_2d, data_b_2d, data_c_2d, data_d_2d
-        cdef floating[:, ::1] data_a_2d_view, data_b_2d_view, data_c_2d_view, data_d_2d_view
-        comp_a_view = xyz_a[:, :, 0]
-        data_a_2d = self._create_expanded_output_array(comp_a_view)
-        data_b_2d = self._create_expanded_output_array(comp_a_view)
-        data_c_2d = self._create_expanded_output_array(comp_a_view)
-        data_d_2d = self._create_expanded_output_array(comp_a_view)
-        data_a_2d_view = data_a_2d
-        data_b_2d_view = data_b_2d
-        data_c_2d_view = data_c_2d
-        data_d_2d_view = data_d_2d
         for k in range(3):  # xyz
             comp_a_view = xyz_a[:, :, k]
             comp_b_view = xyz_b[:, :, k]
             comp_c_view = xyz_c[:, :, k]
             comp_d_view = xyz_d[:, :, k]
-            self._expand_tiepoint_array(comp_a_view, data_a_2d_view)
-            self._expand_tiepoint_array(comp_b_view, data_b_2d_view)
-            self._expand_tiepoint_array(comp_c_view, data_c_2d_view)
-            self._expand_tiepoint_array(comp_d_view, data_d_2d_view)
+            self._expand_tiepoint_array(comp_a_view, data_tiepoint_a_view)
+            self._expand_tiepoint_array(comp_b_view, data_tiepoint_b_view)
+            self._expand_tiepoint_array(comp_c_view, data_tiepoint_c_view)
+            self._expand_tiepoint_array(comp_d_view, data_tiepoint_d_view)
             self._compute_fine_xyz_component(
                 a_track_view,
                 a_scan_view,
-                data_a_2d_view,
-                data_b_2d_view,
-                data_c_2d_view,
-                data_d_2d_view,
+                data_tiepoint_a_view,
+                data_tiepoint_b_view,
+                data_tiepoint_c_view,
+                data_tiepoint_d_view,
                 xyz_comp_view,
                 k,
             )
@@ -428,26 +443,12 @@ cdef class MODISInterpolator:
             self,
             floating[:, :] like_arr,
     ):
-        cdef unsigned int num_rows = like_arr.shape[0]
-        cdef unsigned int num_cols = like_arr.shape[1]
         if floating is np.float32_t:
             dtype = np.float32
         else:
             dtype = np.float64
-        if self._coarse_scan_length == 10:
-            return np.empty(
-                (
-                    (num_rows + 1) * self._fine_pixels_per_coarse_pixel,
-                    (num_cols + 1) * self._fine_pixels_per_coarse_pixel
-                ),
-                dtype=dtype)
-        # 5km
-        num_rows = (num_rows + 1) * self._fine_pixels_per_coarse_pixel
-        factor = self._fine_pixels_per_coarse_pixel // self._coarse_pixels_per_1km
-        if self._coarse_scan_width == 271:
-            num_cols = num_cols * self._fine_pixels_per_coarse_pixel + 4 * factor
-        else:
-            num_cols = (num_cols + 1) * self._fine_pixels_per_coarse_pixel + 4 * factor
+        num_rows = self._coarse_scan_length * self._fine_pixels_per_coarse_pixel
+        num_cols = self._fine_scan_width
         return np.empty((num_rows, num_cols), dtype=dtype)
 
     cdef void _expand_tiepoint_array(
