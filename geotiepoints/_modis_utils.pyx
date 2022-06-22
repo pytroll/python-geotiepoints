@@ -24,8 +24,8 @@ DEF EARTH_RADIUS = 6370997.0
 @cython.cdivision(True)
 @cython.wraparound(False)
 cdef void lonlat2xyz(
-        floating[:, :] lons,
-        floating[:, :] lats,
+        floating[:, ::1] lons,
+        floating[:, ::1] lats,
         floating[:, :, ::1] xyz,
 ) nogil:
     """Convert lons and lats to cartesian coordinates."""
