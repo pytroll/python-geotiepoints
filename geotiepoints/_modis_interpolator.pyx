@@ -152,6 +152,10 @@ cdef class MODISInterpolator:
         self._coarse_resolution = coarse_resolution
         self._fine_resolution = fine_resolution
 
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
     cdef interpolate(
             self,
             np.ndarray[floating, ndim=2] lon1,
@@ -217,38 +221,42 @@ cdef class MODISInterpolator:
         )
         return new_lons, new_lats
 
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
     cdef void _get_atrack_ascan(
             self,
-            floating[:, ::1] satz1_scan,
-            floating[::1] x_view,
-            floating[::1] y_view,
-            floating[:, ::1] c_exp_coarse_view,
-            floating[:, ::1] c_ali_coarse_view,
-            floating[:, ::1] c_exp_full_view,
-            floating[:, ::1] c_ali_full_view,
-            floating[:, ::1] a_track_view,
-            floating[:, ::1] a_scan_view
+            floating[:, ::1] satz,
+            floating[::1] x,
+            floating[::1] y,
+            floating[:, ::1] c_exp_coarse,
+            floating[:, ::1] c_ali_coarse,
+            floating[:, ::1] c_exp_fine,
+            floating[:, ::1] c_ali_fine,
+            floating[:, ::1] a_track,
+            floating[:, ::1] a_scan
     ) nogil:
-        cdef floating[:, :] satz_a_view = _get_upper_left_corner(satz1_scan)
-        cdef floating[:, :] satz_b_view = _get_upper_right_corner(satz1_scan)
+        cdef floating[:, :] satz_a_view = _get_upper_left_corner(satz)
+        cdef floating[:, :] satz_b_view = _get_upper_right_corner(satz)
         cdef Py_ssize_t scan_idx
         _compute_expansion_alignment(
             satz_a_view,
             satz_b_view,
             self._coarse_pixels_per_1km,
-            c_exp_coarse_view,
-            c_ali_coarse_view)
+            c_exp_coarse,
+            c_ali_coarse)
 
-        cdef floating[:, :] c_exp_view2 = c_exp_coarse_view
-        self._expand_tiepoint_array(c_exp_view2, c_exp_full_view)
+        cdef floating[:, :] c_exp_view2 = c_exp_coarse
+        self._expand_tiepoint_array(c_exp_view2, c_exp_fine)
 
-        cdef floating[:, :] c_ali_view2 = c_ali_coarse_view
-        self._expand_tiepoint_array(c_ali_view2, c_ali_full_view)
+        cdef floating[:, :] c_ali_view2 = c_ali_coarse
+        self._expand_tiepoint_array(c_ali_view2, c_ali_fine)
 
         self._calculate_atrack_ascan(
-            x_view, y_view,
-            c_exp_full_view, c_ali_full_view,
-            a_track_view, a_scan_view)
+            x, y,
+            c_exp_fine, c_ali_fine,
+            a_track, a_scan)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
@@ -310,6 +318,9 @@ cdef class MODISInterpolator:
         for i in range(self._fine_pixels_per_coarse_pixel):
             x_view[(self._fine_scan_width - self._fine_pixels_per_coarse_pixel) + i] = self._fine_pixels_per_coarse_pixel + i
 
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.initializedcheck(False)
     cdef tuple _get_coords_5km(self):
         cdef np.ndarray[np.float32_t, ndim=1] y = np.arange(self._fine_pixels_per_coarse_pixel * self._coarse_scan_length, dtype=np.float32) - 2
         cdef np.ndarray[np.float32_t, ndim=1] x = (np.arange(self._fine_scan_width, dtype=np.float32) - 2) % self._fine_pixels_per_coarse_pixel
@@ -338,18 +349,18 @@ cdef class MODISInterpolator:
                                      floating[:, ::1] coarse_lons,
                                      floating[:, ::1] coarse_lats,
                                      floating[:, ::1] coarse_satz,
-                                     floating[::1] x_view,
-                                     floating[::1] y_view,
+                                     floating[::1] x,
+                                     floating[::1] y,
                                      floating[:, ::1] a_track,
                                      floating[:, ::1] a_scan,
-                                     floating[:, ::1] data_tiepoint_a_view,
-                                     floating[:, ::1] data_tiepoint_b_view,
-                                     floating[:, ::1] data_tiepoint_c_view,
-                                     floating[:, ::1] data_tiepoint_d_view,
-                                     floating[:, :, ::1] xyz_coarse_view,
-                                     floating[:, :, ::1] xyz_fine_view,
-                                     floating[:, ::1] new_lons_view,
-                                     floating[:, ::1] new_lats_view,
+                                     floating[:, ::1] tmp_fine_a,
+                                     floating[:, ::1] tmp_fine_b,
+                                     floating[:, ::1] tmp_fine_c,
+                                     floating[:, ::1] tmp_fine_d,
+                                     floating[:, :, ::1] coarse_xyz,
+                                     floating[:, :, ::1] fine_xyz,
+                                     floating[:, ::1] fine_lons,
+                                     floating[:, ::1] fine_lats,
                                      ) nogil:
         cdef floating[:, ::1] lons_scan, lats_scan, satz_scan
         cdef floating[:, ::1] new_lons_scan, new_lats_scan
@@ -358,24 +369,24 @@ cdef class MODISInterpolator:
             lons_scan = coarse_lons[scan_idx * self._coarse_scan_length:(scan_idx + 1) * self._coarse_scan_length]
             lats_scan = coarse_lats[scan_idx * self._coarse_scan_length:(scan_idx + 1) * self._coarse_scan_length]
             satz_scan = coarse_satz[scan_idx * self._coarse_scan_length:(scan_idx + 1) * self._coarse_scan_length]
-            new_lons_scan = new_lons_view[scan_idx * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel:(scan_idx + 1) * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel]
-            new_lats_scan = new_lats_view[scan_idx * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel:(scan_idx + 1) * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel]
+            new_lons_scan = fine_lons[scan_idx * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel:(scan_idx + 1) * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel]
+            new_lats_scan = fine_lats[scan_idx * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel:(scan_idx + 1) * self._coarse_scan_length * self._fine_pixels_per_coarse_pixel]
             self._get_atrack_ascan(
                 satz_scan,
-                x_view,
-                y_view,
-                data_tiepoint_a_view[:self._coarse_scan_length - 1, :self._coarse_scan_width - 1],
-                data_tiepoint_b_view[:self._coarse_scan_length - 1, :self._coarse_scan_width - 1],
-                data_tiepoint_c_view,
-                data_tiepoint_d_view,
+                x,
+                y,
+                tmp_fine_a[:self._coarse_scan_length - 1, :self._coarse_scan_width - 1],
+                tmp_fine_b[:self._coarse_scan_length - 1, :self._coarse_scan_width - 1],
+                tmp_fine_c,
+                tmp_fine_d,
                 a_track,
                 a_scan)
-            lonlat2xyz(lons_scan, lats_scan, xyz_coarse_view)
-            self._compute_fine_xyz(a_track, a_scan, xyz_coarse_view,
-                                   data_tiepoint_a_view, data_tiepoint_b_view, data_tiepoint_c_view, data_tiepoint_d_view,
-                                   xyz_fine_view)
+            lonlat2xyz(lons_scan, lats_scan, coarse_xyz)
+            self._compute_fine_xyz(a_track, a_scan, coarse_xyz,
+                                   tmp_fine_a, tmp_fine_b, tmp_fine_c, tmp_fine_d,
+                                   fine_xyz)
 
-            xyz2lonlat(xyz_fine_view, new_lons_scan, new_lats_scan)
+            xyz2lonlat(fine_xyz, new_lons_scan, new_lats_scan)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
