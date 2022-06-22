@@ -1,9 +1,8 @@
 cimport cython
-from cython cimport view
 from ._modis_utils cimport lonlat2xyz, xyz2lonlat, floating, deg2rad
 from .simple_modis_interpolator import scanline_mapblocks
 
-from libc.math cimport asin, sin, cos, sqrt, acos, M_PI
+from libc.math cimport asin, sin, cos, sqrt
 cimport numpy as np
 import numpy as np
 
