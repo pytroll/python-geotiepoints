@@ -220,65 +220,6 @@ cdef class MODISInterpolator:
         )
         return new_lons, new_lats
 
-    @cython.boundscheck(False)
-    @cython.cdivision(True)
-    @cython.wraparound(False)
-    @cython.initializedcheck(False)
-    cdef void _get_atrack_ascan(
-            self,
-            floating[:, ::1] satz,
-            floating[::1] x,
-            floating[::1] y,
-            floating[:, ::1] c_exp_coarse,
-            floating[:, ::1] c_ali_coarse,
-            floating[:, ::1] c_exp_fine,
-            floating[:, ::1] c_ali_fine,
-            floating[:, ::1] a_track,
-            floating[:, ::1] a_scan
-    ) nogil:
-        cdef floating[:, :] satz_a_view = _get_upper_left_corner(satz)
-        cdef floating[:, :] satz_b_view = _get_upper_right_corner(satz)
-        cdef Py_ssize_t scan_idx
-        _compute_expansion_alignment(
-            satz_a_view,
-            satz_b_view,
-            self._coarse_pixels_per_1km,
-            c_exp_coarse,
-            c_ali_coarse)
-
-        cdef floating[:, :] c_exp_view2 = c_exp_coarse
-        self._expand_tiepoint_array(c_exp_view2, c_exp_fine)
-
-        cdef floating[:, :] c_ali_view2 = c_ali_coarse
-        self._expand_tiepoint_array(c_ali_view2, c_ali_fine)
-
-        self._calculate_atrack_ascan(
-            x, y,
-            c_exp_fine, c_ali_fine,
-            a_track, a_scan)
-
-    @cython.boundscheck(False)
-    @cython.cdivision(True)
-    @cython.wraparound(False)
-    @cython.initializedcheck(False)
-    cdef void _calculate_atrack_ascan(
-            self,
-            floating[::1] coords_x,
-            floating[::1] coords_y,
-            floating[:, ::1] c_exp_full,
-            floating[:, ::1] c_ali_full,
-            floating[:, ::1] a_track,
-            floating[:, ::1] a_scan,
-    ) nogil:
-        cdef Py_ssize_t i, j
-        cdef floating s_s, s_t
-        for j in range(coords_y.shape[0]):
-            for i in range(coords_x.shape[0]):
-                s_s = coords_x[i] / self._fine_pixels_per_coarse_pixel
-                s_t = coords_y[j] / self._fine_pixels_per_coarse_pixel
-                a_track[j, i] = s_t
-                a_scan[j, i] = s_s + s_s * (1 - s_s) * c_exp_full[j, i] + s_t * (1 - s_t) * c_ali_full[j, i]
-
     cdef tuple _get_coords(self):
         cdef np.ndarray[np.float32_t, ndim=1] x, y
         cdef np.float32_t[::1] x_view, y_view
@@ -386,6 +327,65 @@ cdef class MODISInterpolator:
                                    fine_xyz)
 
             xyz2lonlat(fine_xyz, new_lons_scan, new_lats_scan)
+
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    cdef void _get_atrack_ascan(
+            self,
+            floating[:, ::1] satz,
+            floating[::1] x,
+            floating[::1] y,
+            floating[:, ::1] c_exp_coarse,
+            floating[:, ::1] c_ali_coarse,
+            floating[:, ::1] c_exp_fine,
+            floating[:, ::1] c_ali_fine,
+            floating[:, ::1] a_track,
+            floating[:, ::1] a_scan
+    ) nogil:
+        cdef floating[:, :] satz_a_view = _get_upper_left_corner(satz)
+        cdef floating[:, :] satz_b_view = _get_upper_right_corner(satz)
+        cdef Py_ssize_t scan_idx
+        _compute_expansion_alignment(
+            satz_a_view,
+            satz_b_view,
+            self._coarse_pixels_per_1km,
+            c_exp_coarse,
+            c_ali_coarse)
+
+        cdef floating[:, :] c_exp_view2 = c_exp_coarse
+        self._expand_tiepoint_array(c_exp_view2, c_exp_fine)
+
+        cdef floating[:, :] c_ali_view2 = c_ali_coarse
+        self._expand_tiepoint_array(c_ali_view2, c_ali_fine)
+
+        self._calculate_atrack_ascan(
+            x, y,
+            c_exp_fine, c_ali_fine,
+            a_track, a_scan)
+
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    cdef void _calculate_atrack_ascan(
+            self,
+            floating[::1] coords_x,
+            floating[::1] coords_y,
+            floating[:, ::1] c_exp_full,
+            floating[:, ::1] c_ali_full,
+            floating[:, ::1] a_track,
+            floating[:, ::1] a_scan,
+    ) nogil:
+        cdef Py_ssize_t i, j
+        cdef floating s_s, s_t
+        for j in range(coords_y.shape[0]):
+            for i in range(coords_x.shape[0]):
+                s_s = coords_x[i] / self._fine_pixels_per_coarse_pixel
+                s_t = coords_y[j] / self._fine_pixels_per_coarse_pixel
+                a_track[j, i] = s_t
+                a_scan[j, i] = s_s + s_s * (1 - s_s) * c_exp_full[j, i] + s_t * (1 - s_t) * c_ali_full[j, i]
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
