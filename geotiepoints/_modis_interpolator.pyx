@@ -464,9 +464,9 @@ cdef class MODISInterpolator:
     @cython.wraparound(False)
     @cython.initializedcheck(False)
     cdef void _expand_tiepoint_array_1km(self, floating[:, :] input_arr, floating[:, ::1] expanded_arr) nogil:
-        # TODO: Replace shape multiplication with self._fine_pixel_length and self._fine_pixel_width
         cdef floating tiepoint_value
         cdef Py_ssize_t row_idx, col_idx, length_repeat_cycle, width_repeat_cycle, half_coarse_pixel_fine_offset, row_offset, col_offset
+        cdef Py_ssize_t row_repeat_offset, col_repeat_offset
         half_coarse_pixel_fine_offset = self._fine_pixels_per_coarse_pixel // 2
         for row_idx in range(input_arr.shape[0]):
             row_offset = row_idx * self._fine_pixels_per_coarse_pixel
@@ -474,36 +474,36 @@ cdef class MODISInterpolator:
                 col_offset = col_idx * self._fine_pixels_per_coarse_pixel
                 tiepoint_value = input_arr[row_idx, col_idx]
                 for length_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
+                    row_repeat_offset = row_offset + length_repeat_cycle
                     for width_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
+                        col_repeat_offset = col_offset + width_repeat_cycle
                         # main "center" scan portion
-                        expanded_arr[row_offset + length_repeat_cycle + half_coarse_pixel_fine_offset,
-                                    col_offset + width_repeat_cycle] = tiepoint_value
+                        expanded_arr[row_repeat_offset + half_coarse_pixel_fine_offset,
+                                     col_repeat_offset] = tiepoint_value
                         if row_offset < half_coarse_pixel_fine_offset:
                             # copy of top half of the scan
-                            expanded_arr[row_offset + length_repeat_cycle,
-                                        col_offset + width_repeat_cycle] = tiepoint_value
+                            expanded_arr[row_repeat_offset,
+                                         col_repeat_offset] = tiepoint_value
                         elif row_offset >= (((input_arr.shape[0] - 1) * self._fine_pixels_per_coarse_pixel) - half_coarse_pixel_fine_offset):
                             # copy of bottom half of the scan
-                            # TODO: Clean this up
-                            expanded_arr[row_offset + length_repeat_cycle + self._fine_pixels_per_coarse_pixel,
-                                        col_offset + width_repeat_cycle] = tiepoint_value
+                            expanded_arr[row_repeat_offset + self._fine_pixels_per_coarse_pixel,
+                                         col_repeat_offset] = tiepoint_value
                         if col_idx == input_arr.shape[1] - 1:
                             # there is one less coarse column than needed by the fine resolution
                             # copy last coarse column as the last fine coarse column
                             # this last coarse column will be both the second to last and the last
                             # fine resolution columns
-                            expanded_arr[row_offset + length_repeat_cycle + half_coarse_pixel_fine_offset,
-                                        col_offset + self._fine_pixels_per_coarse_pixel + width_repeat_cycle] = tiepoint_value
+                            expanded_arr[row_repeat_offset + half_coarse_pixel_fine_offset,
+                                         col_repeat_offset + self._fine_pixels_per_coarse_pixel] = tiepoint_value
                             # also need the top and bottom half copies
                             if row_offset < half_coarse_pixel_fine_offset:
                                 # copy of top half of the scan
-                                expanded_arr[row_offset + length_repeat_cycle,
-                                            col_offset + self._fine_pixels_per_coarse_pixel + width_repeat_cycle] = tiepoint_value
+                                expanded_arr[row_repeat_offset,
+                                             col_repeat_offset + self._fine_pixels_per_coarse_pixel] = tiepoint_value
                             elif row_offset >= (((input_arr.shape[0] - 1) * self._fine_pixels_per_coarse_pixel) - half_coarse_pixel_fine_offset):
-                                # TODO: Clean this up
                                 # copy of bottom half of the scan
-                                expanded_arr[row_offset + length_repeat_cycle + self._fine_pixels_per_coarse_pixel,
-                                            col_offset + self._fine_pixels_per_coarse_pixel + width_repeat_cycle] = tiepoint_value
+                                expanded_arr[row_repeat_offset + self._fine_pixels_per_coarse_pixel,
+                                             col_repeat_offset + self._fine_pixels_per_coarse_pixel] = tiepoint_value
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
