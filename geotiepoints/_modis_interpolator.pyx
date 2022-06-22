@@ -232,13 +232,9 @@ cdef class MODISInterpolator:
         _compute_expansion_alignment(satz_a_view, satz_b_view, self._coarse_pixels_per_1km, c_exp_view, c_ali_view)
 
         cdef floating[:, :] c_exp_view2 = c_exp
-        # cdef np.ndarray[floating, ndim=2] c_exp_full = self._create_expanded_output_array(c_exp_view2)
-        # cdef floating[:, ::1] c_exp_full_view = c_exp_full
         self._expand_tiepoint_array(c_exp_view2, c_exp_full_view)
 
         cdef floating[:, :] c_ali_view2 = c_ali
-        # cdef np.ndarray[floating, ndim=2] c_ali_full = self._create_expanded_output_array(c_ali_view2)
-        # cdef floating[:, ::1] c_ali_full_view = c_ali_full
         self._expand_tiepoint_array(c_ali_view2, c_ali_full_view)
 
         self._calculate_atrack_ascan(
@@ -439,23 +435,11 @@ cdef class MODISInterpolator:
                 scan2_tmp = (1 - ascan1) * data_d_2d_view[i, j] + ascan1 * data_c_2d_view[i, j]
                 xyz_comp_view[i, j, k] = (1 - atrack1) * scan1_tmp + atrack1 * scan2_tmp
 
-    cdef np.ndarray[floating, ndim=2] _create_expanded_output_array(
-            self,
-            floating[:, :] like_arr,
-    ):
-        if floating is np.float32_t:
-            dtype = np.float32
-        else:
-            dtype = np.float64
-        num_rows = self._coarse_scan_length * self._fine_pixels_per_coarse_pixel
-        num_cols = self._fine_scan_width
-        return np.empty((num_rows, num_cols), dtype=dtype)
-
     cdef void _expand_tiepoint_array(
             self,
             floating[:, :] input_arr,
             floating[:, ::1] output_arr,
-    ):
+    ) nogil:
         if self._coarse_scan_length == 10:
             self._expand_tiepoint_array_1km(input_arr, output_arr)
         else:
