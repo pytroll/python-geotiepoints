@@ -45,19 +45,20 @@ def interpolate_geolocation_cartesian(
 
     # Interpolate each scan, one at a time, otherwise the math doesn't work well
     cdef Py_ssize_t scan_idx, j0, j1, k0, k1, comp_index
-    for scan_idx in range(num_scans):
-        # Calculate indexes
-        j0 = rows_per_scan * scan_idx
-        j1 = j0 + rows_per_scan
-        k0 = rows_per_scan * res_factor * scan_idx
-        k1 = k0 + rows_per_scan * res_factor
-        lonlat2xyz(lon_in_view[j0:j1, :], lat_in_view[j0:j1, :], xyz_in_view)
+    with nogil:
+        for scan_idx in range(num_scans):
+            # Calculate indexes
+            j0 = rows_per_scan * scan_idx
+            j1 = j0 + rows_per_scan
+            k0 = rows_per_scan * res_factor * scan_idx
+            k1 = k0 + rows_per_scan * res_factor
+            lonlat2xyz(lon_in_view[j0:j1, :], lat_in_view[j0:j1, :], xyz_in_view)
 
-        _compute_interpolated_xyz_scan(
-            res_factor, coordinates_view, xyz_in_view,
-            xyz_result_view)
+            _compute_interpolated_xyz_scan(
+                res_factor, coordinates_view, xyz_in_view,
+                xyz_result_view)
 
-        xyz2lonlat(xyz_result_view, new_lons_view[k0:k1], new_lats_view[k0:k1], low_lat_z=True)
+            xyz2lonlat(xyz_result_view, new_lons_view[k0:k1], new_lats_view[k0:k1], low_lat_z=True)
     return new_lons, new_lats
 
 

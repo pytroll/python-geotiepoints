@@ -200,24 +200,25 @@ cdef class MODISInterpolator:
         cdef floating[:, ::1] coarse_satz = satz1
         cdef floating[:, ::1] fine_lons = new_lons
         cdef floating[:, ::1] fine_lats = new_lats
-        self._interpolate_lons_lats(
-            scans,
-            coarse_lons,
-            coarse_lats,
-            coarse_satz,
-            x_view,
-            y_view,
-            a_track_view,
-            a_scan_view,
-            tmp_tiepoint_a_view,
-            tmp_tiepoint_b_view,
-            tmp_tiepoint_c_view,
-            tmp_tiepoint_d_view,
-            xyz_coarse_view,
-            xyz_fine_view,
-            fine_lons,
-            fine_lats,
-        )
+        with nogil:
+            self._interpolate_lons_lats(
+                scans,
+                coarse_lons,
+                coarse_lats,
+                coarse_satz,
+                x_view,
+                y_view,
+                a_track_view,
+                a_scan_view,
+                tmp_tiepoint_a_view,
+                tmp_tiepoint_b_view,
+                tmp_tiepoint_c_view,
+                tmp_tiepoint_d_view,
+                xyz_coarse_view,
+                xyz_fine_view,
+                fine_lons,
+                fine_lats,
+            )
         return new_lons, new_lats
 
     cdef tuple _get_coords(self):
@@ -228,7 +229,8 @@ cdef class MODISInterpolator:
             y = np.empty((self._coarse_scan_length * self._fine_pixels_per_coarse_pixel,), dtype=np.float32)
             x_view = x
             y_view = y
-            self._get_coords_1km(x_view, y_view)
+            with nogil:
+                self._get_coords_1km(x_view, y_view)
         else:
             x, y = self._get_coords_5km()
         return x, y
