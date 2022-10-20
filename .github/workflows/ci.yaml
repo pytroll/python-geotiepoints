@@ -82,8 +82,7 @@ jobs:
 
       - name: Coveralls Parallel
         # See https://github.com/AndreMiras/coveralls-python-action/pull/16
-        uses: miurahr/coveralls-python-action@patch-pyprject-toml
-#        uses: AndreMiras/coveralls-python-action@develop
+        uses: djhoese/coveralls-python-action@feature-cython-coverage
         with:
           flag-name: run-${{ matrix.test_number }}
           parallel: true
@@ -95,8 +94,7 @@ jobs:
     steps:
       - name: Coveralls Finished
         # See https://github.com/AndreMiras/coveralls-python-action/pull/16
-        uses: miurahr/coveralls-python-action@patch-pyprject-toml
-#        uses: AndreMiras/coveralls-python-action@develop
+        uses: djhoese/coveralls-python-action@feature-cython-coverage
         with:
           parallel-finished: true
 
