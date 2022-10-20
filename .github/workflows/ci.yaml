@@ -60,7 +60,7 @@ jobs:
         shell: bash -l {0}
         run: |
           pip install -e .
-          python setup.py build_ext --inplace --cython-coverage
+          python setup.py build_ext --inplace --cython-coverage --force
 
       - name: Run unit tests
         shell: bash -l {0}

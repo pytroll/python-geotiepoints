@@ -26,10 +26,11 @@
 
 import sys
 
-from setuptools import Extension, setup
+from setuptools import setup
 import versioneer
 import numpy as np
-from Cython.Build import cythonize
+from Cython.Build import cythonize, build_ext
+from Cython.Distutils import Extension
 
 requirements = ['numpy', 'scipy', 'pandas']
 test_requires = ['pytest', 'pytest-cov', 'h5py', 'xarray', 'dask', 'pyproj']
@@ -90,8 +91,9 @@ if cython_coverage:
     ])
     for ext in EXTENSIONS:
         ext.define_macros = define_macros
+        ext.cython_directives.update(cython_directives)
 
-cmdclass = versioneer.get_cmdclass()
+cmdclass = versioneer.get_cmdclass(cmdclass={"build_ext": build_ext})
 
 with open('README.md', 'r') as readme:
     README = readme.read()
@@ -118,7 +120,7 @@ if __name__ == "__main__":
           python_requires='>=3.7',
           cmdclass=cmdclass,
           install_requires=requirements,
-          ext_modules=cythonize(EXTENSIONS, compiler_directives=cython_directives),
+          ext_modules=EXTENSIONS,
           tests_require=test_requires,
           zip_safe=False
           )
