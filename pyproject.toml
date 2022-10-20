@@ -4,4 +4,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.coverage.run]
 relative_files = true
-plugins = "Cython.Coverage"
+plugins = ["Cython.Coverage"]
