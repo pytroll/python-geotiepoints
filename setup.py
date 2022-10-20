@@ -29,7 +29,7 @@ import sys
 from setuptools import setup
 import versioneer
 import numpy as np
-from Cython.Build import cythonize, build_ext
+from Cython.Build import build_ext
 from Cython.Distutils import Extension
 
 requirements = ['numpy', 'scipy', 'pandas']
