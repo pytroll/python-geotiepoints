@@ -479,17 +479,11 @@ cdef class MODISInterpolator:
         cdef Py_ssize_t row_repeat_offset, col_repeat_offset
         half_coarse_pixel_fine_offset = self._fine_pixels_per_coarse_pixel // 2
         for row_idx in range(input_arr.shape[0]):
-            row_offset = row_idx * self._fine_pixels_per_coarse_pixel
+            row_offset = row_idx * self._fine_pixels_per_coarse_pixel + half_coarse_pixel_fine_offset
             for col_idx in range(input_arr.shape[1]):
                 col_offset = col_idx * self._fine_pixels_per_coarse_pixel
                 tiepoint_value = input_arr[row_idx, col_idx]
-                for length_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
-                    row_repeat_offset = row_offset + length_repeat_cycle
-                    for width_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
-                        col_repeat_offset = col_offset + width_repeat_cycle
-                        # main "center" scan portion
-                        expanded_arr[row_repeat_offset + half_coarse_pixel_fine_offset,
-                                     col_repeat_offset] = tiepoint_value
+                self._expand_tiepoint_array_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
 
         row_idx = 0
         row_offset = row_idx * self._fine_pixels_per_coarse_pixel
