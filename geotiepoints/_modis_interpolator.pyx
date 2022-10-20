@@ -490,22 +490,30 @@ cdef class MODISInterpolator:
                             # copy of bottom half of the scan
                             expanded_arr[row_repeat_offset + self._fine_pixels_per_coarse_pixel,
                                          col_repeat_offset] = tiepoint_value
-                        if col_idx == input_arr.shape[1] - 1:
-                            # there is one less coarse column than needed by the fine resolution
-                            # copy last coarse column as the last fine coarse column
-                            # this last coarse column will be both the second to last and the last
-                            # fine resolution columns
-                            expanded_arr[row_repeat_offset + half_coarse_pixel_fine_offset,
-                                         col_repeat_offset + self._fine_pixels_per_coarse_pixel] = tiepoint_value
-                            # also need the top and bottom half copies
-                            if row_offset < half_coarse_pixel_fine_offset:
-                                # copy of top half of the scan
-                                expanded_arr[row_repeat_offset,
-                                             col_repeat_offset + self._fine_pixels_per_coarse_pixel] = tiepoint_value
-                            elif row_offset >= (((input_arr.shape[0] - 1) * self._fine_pixels_per_coarse_pixel) - half_coarse_pixel_fine_offset):
-                                # copy of bottom half of the scan
-                                expanded_arr[row_repeat_offset + self._fine_pixels_per_coarse_pixel,
-                                             col_repeat_offset + self._fine_pixels_per_coarse_pixel] = tiepoint_value
+        for row_idx in range(input_arr.shape[0]):
+            row_offset = row_idx * self._fine_pixels_per_coarse_pixel
+            col_idx = input_arr.shape[1] - 1
+            col_offset = col_idx * self._fine_pixels_per_coarse_pixel
+            tiepoint_value = input_arr[row_idx, col_idx]
+            for length_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
+                row_repeat_offset = row_offset + length_repeat_cycle
+                for width_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
+                    col_repeat_offset = col_offset + width_repeat_cycle
+                    # there is one less coarse column than needed by the fine resolution
+                    # copy last coarse column as the last fine coarse column
+                    # this last coarse column will be both the second to last and the last
+                    # fine resolution columns
+                    expanded_arr[row_repeat_offset + half_coarse_pixel_fine_offset,
+                                 col_repeat_offset + self._fine_pixels_per_coarse_pixel] = tiepoint_value
+                    # also need the top and bottom half copies
+                    if row_offset < half_coarse_pixel_fine_offset:
+                        # copy of top half of the scan
+                        expanded_arr[row_repeat_offset,
+                                     col_repeat_offset + self._fine_pixels_per_coarse_pixel] = tiepoint_value
+                    elif row_offset >= (((input_arr.shape[0] - 1) * self._fine_pixels_per_coarse_pixel) - half_coarse_pixel_fine_offset):
+                        # copy of bottom half of the scan
+                        expanded_arr[row_repeat_offset + self._fine_pixels_per_coarse_pixel,
+                                     col_repeat_offset + self._fine_pixels_per_coarse_pixel] = tiepoint_value
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
