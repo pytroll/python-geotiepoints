@@ -467,7 +467,7 @@ cdef class MODISInterpolator:
     @cython.initializedcheck(False)
     cdef void _expand_tiepoint_array_1km(self, floating[:, :] input_arr, floating[:, ::1] expanded_arr) nogil:
         self._expand_tiepoint_array_1km_main(input_arr, expanded_arr)
-        self._expand_tiepoint_array_1km_extra_column(input_arr, expanded_arr)
+        self._expand_tiepoint_array_1km_right_column(input_arr, expanded_arr)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
@@ -503,7 +503,7 @@ cdef class MODISInterpolator:
     @cython.cdivision(True)
     @cython.wraparound(False)
     @cython.initializedcheck(False)
-    cdef void _expand_tiepoint_array_1km_extra_column(
+    cdef void _expand_tiepoint_array_1km_right_column(
             self,
             floating[:, :] input_arr,
             floating[:, ::1] expanded_arr
@@ -519,14 +519,14 @@ cdef class MODISInterpolator:
             tiepoint_value = input_arr[row_idx, col_idx]
             self._expand_tiepoint_array_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
 
-        self._expand_tiepoint_array_1km_extra_top_row(input_arr, expanded_arr)
-        self._expand_tiepoint_array_1km_extra_bottom_row(input_arr, expanded_arr)
+        self._expand_tiepoint_array_1km_right_column_top_row(input_arr, expanded_arr)
+        self._expand_tiepoint_array_1km_right_column_bottom_row(input_arr, expanded_arr)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
     @cython.initializedcheck(False)
-    cdef void _expand_tiepoint_array_1km_extra_top_row(
+    cdef void _expand_tiepoint_array_1km_right_column_top_row(
             self,
             floating[:, :] input_arr,
             floating[:, ::1] expanded_arr
@@ -544,7 +544,7 @@ cdef class MODISInterpolator:
     @cython.cdivision(True)
     @cython.wraparound(False)
     @cython.initializedcheck(False)
-    cdef void _expand_tiepoint_array_1km_extra_bottom_row(
+    cdef void _expand_tiepoint_array_1km_right_column_bottom_row(
             self,
             floating[:, :] input_arr,
             floating[:, ::1] expanded_arr
