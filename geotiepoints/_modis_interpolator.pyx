@@ -483,21 +483,21 @@ cdef class MODISInterpolator:
             for col_idx in range(input_arr.shape[1]):
                 col_offset = col_idx * self._fine_pixels_per_coarse_pixel
                 tiepoint_value = input_arr[row_idx, col_idx]
-                self._expand_tiepoint_array_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
+                self._expand_tiepoint_array_1km_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
 
         row_idx = 0
         row_offset = row_idx * self._fine_pixels_per_coarse_pixel
         for col_idx in range(input_arr.shape[1]):
             col_offset = col_idx * self._fine_pixels_per_coarse_pixel
             tiepoint_value = input_arr[row_idx, col_idx]
-            self._expand_tiepoint_array_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
+            self._expand_tiepoint_array_1km_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
 
         row_idx = input_arr.shape[0] - 1
         row_offset = row_idx * self._fine_pixels_per_coarse_pixel + self._fine_pixels_per_coarse_pixel
         for col_idx in range(input_arr.shape[1]):
             col_offset = col_idx * self._fine_pixels_per_coarse_pixel
             tiepoint_value = input_arr[row_idx, col_idx]
-            self._expand_tiepoint_array_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
+            self._expand_tiepoint_array_1km_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
@@ -517,7 +517,7 @@ cdef class MODISInterpolator:
         for row_idx in range(input_arr.shape[0]):
             row_offset = row_idx * self._fine_pixels_per_coarse_pixel + half_coarse_pixel_fine_offset
             tiepoint_value = input_arr[row_idx, col_idx]
-            self._expand_tiepoint_array_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
+            self._expand_tiepoint_array_1km_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
 
         self._expand_tiepoint_array_1km_right_column_top_row(input_arr, expanded_arr)
         self._expand_tiepoint_array_1km_right_column_bottom_row(input_arr, expanded_arr)
@@ -538,7 +538,7 @@ cdef class MODISInterpolator:
         tiepoint_value = input_arr[row_idx, col_idx]
         row_offset = row_idx * self._fine_pixels_per_coarse_pixel
         col_offset = col_idx * self._fine_pixels_per_coarse_pixel + self._fine_pixels_per_coarse_pixel
-        self._expand_tiepoint_array_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
+        self._expand_tiepoint_array_1km_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
@@ -556,13 +556,13 @@ cdef class MODISInterpolator:
         tiepoint_value = input_arr[row_idx, col_idx]
         row_offset = row_idx * self._fine_pixels_per_coarse_pixel + self._fine_pixels_per_coarse_pixel
         col_offset = col_idx * self._fine_pixels_per_coarse_pixel + self._fine_pixels_per_coarse_pixel
-        self._expand_tiepoint_array_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
+        self._expand_tiepoint_array_1km_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
     @cython.initializedcheck(False)
-    cdef void _expand_tiepoint_array_with_repeat(
+    cdef void _expand_tiepoint_array_1km_with_repeat(
             self,
             floating tiepoint_value,
             floating[:, ::1] expanded_arr,
@@ -604,10 +604,7 @@ cdef class MODISInterpolator:
             for col_idx in range(input_arr.shape[1]):
                 col_offset = col_idx * self._fine_pixels_per_coarse_pixel + factor
                 tiepoint_value = input_arr[row_idx, col_idx]
-                for length_repeat_cycle in range(self._fine_pixels_per_coarse_pixel * 2):
-                    for width_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
-                        expanded_arr[row_offset + length_repeat_cycle,
-                                     col_offset + width_repeat_cycle] = tiepoint_value
+                self._expand_tiepoint_array_5km_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
@@ -623,16 +620,18 @@ cdef class MODISInterpolator:
         for row_idx in range(input_arr.shape[0]):
             row_offset = row_idx * self._fine_pixels_per_coarse_pixel * 2
             tiepoint_value = input_arr[row_idx, col_idx]
-            for length_repeat_cycle in range(self._fine_pixels_per_coarse_pixel * 2):
-                for width_repeat_cycle in range(factor):
-                    expanded_arr[row_offset + length_repeat_cycle,
-                                 col_offset + width_repeat_cycle] = tiepoint_value
+            self._expand_tiepoint_array_5km_with_factor_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
     @cython.initializedcheck(False)
-    cdef void _expand_tiepoint_array_5km_270_extra_column(self, floating[:, :] input_arr, floating[:, ::1] expanded_arr) nogil:
+    cdef void _expand_tiepoint_array_5km_270_extra_column(
+            self,
+            floating[:, :] input_arr,
+            floating[:, ::1] expanded_arr
+    ) nogil:
+        # need an extra coarse pixels column copied over between the main copied area and the right-most columns
         cdef floating tiepoint_value
         cdef Py_ssize_t row_idx, col_idx, length_repeat_cycle, width_repeat_cycle, row_offset, col_offset
         # partial rows/columns to repeat: 5km->1km => 2, 5km->500m => 4, 5km->250m => 8
@@ -642,18 +641,14 @@ cdef class MODISInterpolator:
         for row_idx in range(input_arr.shape[0]):
             row_offset = row_idx * self._fine_pixels_per_coarse_pixel * 2
             tiepoint_value = input_arr[row_idx, col_idx]
-            for length_repeat_cycle in range(self._fine_pixels_per_coarse_pixel * 2):
-                for width_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
-                    # need an extra coarse pixels column copied over
-                    # between the main copied area and the right-most columns
-                    expanded_arr[row_offset + length_repeat_cycle,
-                                 col_offset + width_repeat_cycle] = tiepoint_value
+            self._expand_tiepoint_array_5km_with_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
     @cython.initializedcheck(False)
     cdef void _expand_tiepoint_array_5km_right(self, floating[:, :] input_arr, floating[:, ::1] expanded_arr) nogil:
+        # add the right most portion (in all cases including 270 column case)
         cdef floating tiepoint_value
         cdef Py_ssize_t row_idx, col_idx, length_repeat_cycle, width_repeat_cycle, row_offset, col_offset
         # partial rows/columns to repeat: 5km->1km => 2, 5km->500m => 4, 5km->250m => 8
@@ -663,8 +658,40 @@ cdef class MODISInterpolator:
         for row_idx in range(input_arr.shape[0]):
             row_offset = row_idx * self._fine_pixels_per_coarse_pixel * 2
             tiepoint_value = input_arr[row_idx, col_idx]
-            for length_repeat_cycle in range(self._fine_pixels_per_coarse_pixel * 2):
-                for width_repeat_cycle in range(factor):
-                    # add the right most portion (in all cases including 270 column case)
-                    expanded_arr[row_offset + length_repeat_cycle,
-                                 col_offset + width_repeat_cycle] = tiepoint_value
+            self._expand_tiepoint_array_5km_with_factor_repeat(tiepoint_value, expanded_arr, row_offset, col_offset)
+
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    cdef void _expand_tiepoint_array_5km_with_repeat(
+            self,
+            floating tiepoint_value,
+            floating[:, ::1] expanded_arr,
+            Py_ssize_t row_offset,
+            Py_ssize_t col_offset,
+    ) nogil:
+        cdef Py_ssize_t length_repeat_cycle, width_repeat_cycle
+        for length_repeat_cycle in range(self._fine_pixels_per_coarse_pixel * 2):
+            for width_repeat_cycle in range(self._fine_pixels_per_coarse_pixel):
+                expanded_arr[row_offset + length_repeat_cycle,
+                             col_offset + width_repeat_cycle] = tiepoint_value
+
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    cdef void _expand_tiepoint_array_5km_with_factor_repeat(
+            self,
+            floating tiepoint_value,
+            floating[:, ::1] expanded_arr,
+            Py_ssize_t row_offset,
+            Py_ssize_t col_offset,
+    ) nogil:
+        cdef Py_ssize_t length_repeat_cycle, width_repeat_cycle
+        # partial rows/columns to repeat: 5km->1km => 2, 5km->500m => 4, 5km->250m => 8
+        cdef Py_ssize_t factor = self._fine_pixels_per_coarse_pixel // self._coarse_pixels_per_1km * 2
+        for length_repeat_cycle in range(self._fine_pixels_per_coarse_pixel * 2):
+            for width_repeat_cycle in range(factor):
+                expanded_arr[row_offset + length_repeat_cycle,
+                             col_offset + width_repeat_cycle] = tiepoint_value
