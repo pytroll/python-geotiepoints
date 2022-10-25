@@ -1,3 +1,14 @@
+## Version 1.5.0 (2022/10/25)
+
+### Pull Requests Merged
+
+#### Features added
+
+* [PR 38](https://github.com/pytroll/python-geotiepoints/pull/38) - Rewrite simple and tiepoint modis interpolation in cython
+
+In this release 1 pull request was closed.
+
+
 ## Version 1.4.1 (2022/06/08)
 
 ### Issues Closed
