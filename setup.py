@@ -106,7 +106,7 @@ if __name__ == "__main__":
           long_description_content_type='text/markdown',
           author='Adam Dybbroe, Martin Raspaud',
           author_email='martin.raspaud@smhi.se',
-          classifiers=["Development Status :: 5 - Producton/Stable",
+          classifiers=["Development Status :: 5 - Production/Stable",
                        "Intended Audience :: Science/Research",
                        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
                        "Operating System :: OS Independent",
