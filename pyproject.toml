@@ -1,7 +1,8 @@
 [build-system]
-requires = ["setuptools", "wheel", "oldest-supported-numpy", "Cython", "versioneer-518"]
+requires = ["setuptools", "wheel", "oldest-supported-numpy", "Cython", "versioneer"]
 build-backend = "setuptools.build_meta"
 
 [tool.coverage.run]
 relative_files = true
-
+plugins = ["Cython.Coverage"]
+omit = ["geotiepoints/version.py"]

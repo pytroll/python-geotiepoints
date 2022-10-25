@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for python-geotiepoints: MODIS examples."""
 
-import unittest
 import numpy as np
 import h5py
 import os
@@ -36,34 +35,25 @@ from geotiepoints import (modis5kmto1km, modis1kmto250m)
 from geotiepoints import get_scene_splits
 
 
-class TestUtils(unittest.TestCase):
-
-    """Class for unit testing the ancillary interpolation functions
-    """
-
-    def setUp(self):
-        pass
+class TestUtils:
+    """Class for unit testing the ancillary interpolation functions."""
 
     def test_get_numof_subscene_lines(self):
-        """Test getting the number of sub-scene lines dependent on the number
-        of CPUs and for various number of lines in a scan"""
+        """Test getting the number of sub-scene lines.
 
+        Function is dependent on the number of CPUs and for various number of
+        lines in a scan.
+        """
         ncpus = 3
-        scene_splits = get_scene_splits(1060,
-                                        10, ncpus)
+        scene_splits = get_scene_splits(1060, 10, ncpus)
+        assert list(scene_splits) == [350, 700, 1050]
 
 
-class TestMODIS(unittest.TestCase):
-
-    """Class for system testing the MODIS interpolation.
-    """
-
-    def setUp(self):
-        pass
+class TestMODIS:
+    """Class for system testing the MODIS interpolation."""
 
     def test_5_to_1(self):
-        """test the 5km to 1km interpolation facility
-        """
+        """Test the 5km to 1km interpolation facility."""
 
         with h5py.File(FILENAME_FULL) as h5f:
             glons = h5f['longitude'][:] / 1000.
@@ -75,12 +65,11 @@ class TestMODIS(unittest.TestCase):
 
         tlons, tlats = modis5kmto1km(lons, lats)
 
-        self.assert_(np.allclose(tlons, glons, atol=0.05))
-        self.assert_(np.allclose(tlats, glats, atol=0.05))
+        np.testing.assert_allclose(tlons, glons, atol=0.05)
+        np.testing.assert_allclose(tlats, glats, atol=0.05)
 
     def test_1000m_to_250m(self):
-        """test the 1 km to 250 meter interpolation facility
-        """
+        """Test the 1 km to 250 meter interpolation facility."""
 
         with h5py.File(FILENAME_250M_RESULT) as h5f:
             glons = h5f['longitude'][:] / 1000.
@@ -91,11 +80,9 @@ class TestMODIS(unittest.TestCase):
             lats = h5f['latitude'][:] / 1000.
 
         tlons, tlats = modis1kmto250m(lons, lats)
-
-        self.assert_(np.allclose(tlons, glons, atol=0.05))
-        self.assert_(np.allclose(tlats, glats, atol=0.05))
+        np.testing.assert_allclose(tlons, glons, atol=0.05)
+        np.testing.assert_allclose(tlats, glats, atol=0.05)
 
         tlons, tlats = modis1kmto250m(lons, lats, cores=4)
-
-        self.assert_(np.allclose(tlons, glons, atol=0.05))
-        self.assert_(np.allclose(tlats, glats, atol=0.05))
+        np.testing.assert_allclose(tlons, glons, atol=0.05)
+        np.testing.assert_allclose(tlats, glats, atol=0.05)

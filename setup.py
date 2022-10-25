@@ -26,10 +26,11 @@
 
 import sys
 
-from setuptools import Extension, setup
+from setuptools import setup
 import versioneer
 import numpy as np
-from Cython.Build import cythonize
+from Cython.Build import build_ext
+from Cython.Distutils import Extension
 
 requirements = ['numpy', 'scipy', 'pandas']
 test_requires = ['pytest', 'pytest-cov', 'h5py', 'xarray', 'dask', 'pyproj']
@@ -46,9 +47,53 @@ EXTENSIONS = [
         extra_compile_args=extra_compile_args,
         include_dirs=[np.get_include()],
     ),
+    Extension(
+        'geotiepoints._modis_interpolator',
+        sources=['geotiepoints/_modis_interpolator.pyx'],
+        extra_compile_args=extra_compile_args,
+        include_dirs=[np.get_include()],
+    ),
+    Extension(
+        'geotiepoints._simple_modis_interpolator',
+        sources=['geotiepoints/_simple_modis_interpolator.pyx'],
+        extra_compile_args=extra_compile_args,
+        include_dirs=[np.get_include()],
+    ),
+    Extension(
+        'geotiepoints._modis_utils',
+        sources=['geotiepoints/_modis_utils.pyx'],
+        extra_compile_args=extra_compile_args,
+        include_dirs=[np.get_include()],
+    ),
 ]
 
-cmdclass = versioneer.get_cmdclass()
+
+try:
+    sys.argv.remove("--cython-coverage")
+    cython_coverage = True
+except ValueError:
+    cython_coverage = False
+
+
+cython_directives = {
+    "language_level": "3",
+}
+define_macros = []
+if cython_coverage:
+    print("Enabling directives/macros for Cython coverage support")
+    cython_directives.update({
+        "linetrace": True,
+        "profile": True,
+    })
+    define_macros.extend([
+        ("CYTHON_TRACE", "1"),
+        ("CYTHON_TRACE_NOGIL", "1"),
+    ])
+    for ext in EXTENSIONS:
+        ext.define_macros = define_macros
+        ext.cython_directives.update(cython_directives)
+
+cmdclass = versioneer.get_cmdclass(cmdclass={"build_ext": build_ext})
 
 with open('README.md', 'r') as readme:
     README = readme.read()
@@ -61,12 +106,12 @@ if __name__ == "__main__":
           long_description_content_type='text/markdown',
           author='Adam Dybbroe, Martin Raspaud',
           author_email='martin.raspaud@smhi.se',
-          classifiers=["Development Status :: 4 - Beta",
+          classifiers=["Development Status :: 5 - Producton/Stable",
                        "Intended Audience :: Science/Research",
-                       "License :: OSI Approved :: GNU General Public License v3 " +
-                       "or later (GPLv3+)",
+                       "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
                        "Operating System :: OS Independent",
                        "Programming Language :: Python",
+                       "Programming Language :: Cython",
                        "Topic :: Scientific/Engineering"],
           url="https://github.com/pytroll/python-geotiepoints",
           packages=['geotiepoints'],
@@ -75,7 +120,7 @@ if __name__ == "__main__":
           python_requires='>=3.7',
           cmdclass=cmdclass,
           install_requires=requirements,
-          ext_modules=cythonize(EXTENSIONS),
+          ext_modules=EXTENSIONS,
           tests_require=test_requires,
           zip_safe=False
           )
