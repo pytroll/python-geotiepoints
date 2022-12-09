@@ -1,3 +1,14 @@
+## Version 1.5.1 (2022/12/09)
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 43](https://github.com/pytroll/python-geotiepoints/pull/43) - Fix deprecation for numpy array equality
+
+In this release 1 pull request was closed.
+
+
 ## Version 1.5.0 (2022/10/25)
 
 ### Pull Requests Merged
