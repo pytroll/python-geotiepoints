@@ -236,7 +236,7 @@ class Interpolator(object):
     def _interp(self):
         """Interpolate the cartesian coordinates.
         """
-        if np.all(self.hrow_indices == self.row_indices):
+        if np.array_equal(self.hrow_indices, self.row_indices):
             return self._interp1d()
 
         xpoints, ypoints = np.meshgrid(self.hrow_indices,
