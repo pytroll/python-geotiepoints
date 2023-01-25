@@ -80,13 +80,11 @@ class Interpolator:
 
     Uses numpy and scipy.
 
-    The constructor takes in the tiepointed data as *data*, the
-    *tiepoint_grid* and the desired *final_grid*. As optional arguments, one
-    can provide *kx_* and *ky_* as interpolation orders (in x and y directions
-    respectively), and the *chunksize* if the data has to be handled by pieces
-    along the y axis (this affects how the extrapolator behaves). If
-    *chunksize* is set, don't forget to adjust the interpolation orders
-    accordingly: the interpolation is indeed done globaly (not chunkwise).
+    The constructor takes in the tiepointed data as *data*, the *tiepoint_grid* and the desired *final_grid*. As
+    optional arguments, one can provide *kx_* and *ky_* as interpolation orders (in x and y directions respectively),
+    and the *chunksize* if the data has to be handled by pieces along the y axis (this affects how the extrapolator
+    behaves). If *chunksize* is set, don't forget to adjust the interpolation orders accordingly: the interpolation
+    is indeed done globaly (not chunkwise).
     """
 
     def __init__(self, data, tiepoint_grid, final_grid,
