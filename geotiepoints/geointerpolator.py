@@ -18,7 +18,8 @@
 """Geographical interpolation (lon/lats)."""
 
 import numpy as np
-from geotiepoints.interpolator import Interpolator
+from geotiepoints.interpolator import Interpolator, MultipleGridInterpolator
+
 
 EARTH_RADIUS = 6370997.0
 
@@ -91,7 +92,6 @@ def xyz2lonlat(x__, y__, z__, radius=EARTH_RADIUS, thr=0.8, low_lat_z=True):
     return lons, lats
 
 
-from geotiepoints.interpolator import MultipleGridInterpolator
 class GeoGridInterpolator(MultipleGridInterpolator):
     """Interpolate geographical coordinates from a regular grid of tie points."""
 

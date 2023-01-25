@@ -24,34 +24,34 @@ from unittest import mock
 from geotiepoints.interpolator import Interpolator
 from geotiepoints.interpolator import SingleGridInterpolator
 
-
-TIES_EXP1 = np.array([[-2.00000000e+00,  -4.00000000e-01,   3.60000000e+00,
-                       7.60000000e+00,   1.16000000e+01,   1.56000000e+01,
+TIES_EXP1 = np.array([[-2.00000000e+00, -4.00000000e-01, 3.60000000e+00,
+                       7.60000000e+00, 1.16000000e+01, 1.56000000e+01,
                        1.64000000e+01],
-                      [-1.60000000e+00,   0.00000000e+00,   4.00000000e+00,
-                       8.00000000e+00,   1.20000000e+01,   1.60000000e+01,
+                      [-1.60000000e+00, 0.00000000e+00, 4.00000000e+00,
+                       8.00000000e+00, 1.20000000e+01, 1.60000000e+01,
                        1.68000000e+01],
-                      [-6.00000000e-01,   1.00000000e+00,   5.00000000e+00,
-                       9.00000000e+00,   1.30000000e+01,   1.70000000e+01,
+                      [-6.00000000e-01, 1.00000000e+00, 5.00000000e+00,
+                       9.00000000e+00, 1.30000000e+01, 1.70000000e+01,
                        1.78000000e+01],
-                      [-2.00000000e-01,   1.40000000e+00,   5.40000000e+00,
-                       9.40000000e+00,   1.34000000e+01,   1.74000000e+01,
+                      [-2.00000000e-01, 1.40000000e+00, 5.40000000e+00,
+                       9.40000000e+00, 1.34000000e+01, 1.74000000e+01,
                        1.82000000e+01],
-                      [4.44089210e-16,   1.60000000e+00,   5.60000000e+00,
-                       9.60000000e+00,   1.36000000e+01,   1.76000000e+01,
+                      [4.44089210e-16, 1.60000000e+00, 5.60000000e+00,
+                       9.60000000e+00, 1.36000000e+01, 1.76000000e+01,
                        1.84000000e+01],
-                      [4.00000000e-01,   2.00000000e+00,   6.00000000e+00,
-                       1.00000000e+01,   1.40000000e+01,   1.80000000e+01,
+                      [4.00000000e-01, 2.00000000e+00, 6.00000000e+00,
+                       1.00000000e+01, 1.40000000e+01, 1.80000000e+01,
                        1.88000000e+01],
-                      [1.40000000e+00,   3.00000000e+00,   7.00000000e+00,
-                       1.10000000e+01,   1.50000000e+01,   1.90000000e+01,
+                      [1.40000000e+00, 3.00000000e+00, 7.00000000e+00,
+                       1.10000000e+01, 1.50000000e+01, 1.90000000e+01,
                        1.98000000e+01],
-                      [1.80000000e+00,   3.40000000e+00,   7.40000000e+00,
-                       1.14000000e+01,   1.54000000e+01,   1.94000000e+01,
+                      [1.80000000e+00, 3.40000000e+00, 7.40000000e+00,
+                       1.14000000e+01, 1.54000000e+01, 1.94000000e+01,
                        2.02000000e+01]])
 
 
 class TestInterpolator(unittest.TestCase):
+    """Test the interpolator."""
 
     # def test_fill_borders(self):
     #     lons = np.arange(20).reshape((4, 5), order="F")
@@ -71,6 +71,7 @@ class TestInterpolator(unittest.TestCase):
     #                                 np.array([0,  2,  7, 12, 17, 22, 23])))
 
     def test_extrapolate_cols(self):
+        """Test extrapolation of the columns."""
         lons = np.arange(10).reshape((2, 5), order="F")
         lats = np.arange(10).reshape((2, 5), order="C")
         lines = np.array([2, 7])
@@ -79,10 +80,11 @@ class TestInterpolator(unittest.TestCase):
         hcols = np.arange(24)
         satint = Interpolator((lons, lats), (lines, cols), (hlines, hcols))
         self.assertTrue(np.allclose(satint._extrapolate_cols(satint.tie_data[0]),
-                                    np.array([[-0.8,  0.,  2.,  4.,  6.,  8.,  8.4],
-                                              [0.2,  1.,  3.,  5.,  7.,  9.,  9.4]])))
+                                    np.array([[-0.8, 0., 2., 4., 6., 8., 8.4],
+                                              [0.2, 1., 3., 5., 7., 9., 9.4]])))
 
     def test_fill_col_borders(self):
+        """Test filling the column borders."""
         lons = np.arange(10).reshape((2, 5), order="F")
         lats = np.arange(10).reshape((2, 5), order="C")
         lines = np.array([2, 7])
@@ -92,12 +94,13 @@ class TestInterpolator(unittest.TestCase):
         satint = Interpolator((lons, lats), (lines, cols), (hlines, hcols))
         satint._fill_col_borders()
         self.assertTrue(np.allclose(satint.tie_data[0],
-                                    np.array([[-0.8,  0.,  2.,  4.,  6.,  8.,  8.4],
-                                              [0.2,  1.,  3.,  5.,  7.,  9.,  9.4]])))
+                                    np.array([[-0.8, 0., 2., 4., 6., 8., 8.4],
+                                              [0.2, 1., 3., 5., 7., 9., 9.4]])))
         self.assertTrue(np.allclose(satint.col_indices,
-                                    np.array([0,  2,  7, 12, 17, 22, 23])))
+                                    np.array([0, 2, 7, 12, 17, 22, 23])))
 
     def test_extrapolate_rows(self):
+        """Test extrapolation of rows."""
         lons = np.arange(10).reshape((2, 5), order="F")
         lats = np.arange(10).reshape((2, 5), order="C")
         lines = np.array([2, 7])
@@ -110,12 +113,13 @@ class TestInterpolator(unittest.TestCase):
         self.assertTrue(np.allclose(satint._extrapolate_rows(lons,
                                                              lines,
                                                              first_idx, last_idx),
-                                    np.array([[-0.4,  1.6,  3.6,  5.6,  7.6],
-                                              [0.,  2.,  4.,  6.,  8.],
-                                              [1.,  3.,  5.,  7.,  9.],
-                                              [1.4,  3.4,  5.4,  7.4,  9.4]])))
+                                    np.array([[-0.4, 1.6, 3.6, 5.6, 7.6],
+                                              [0., 2., 4., 6., 8.],
+                                              [1., 3., 5., 7., 9.],
+                                              [1.4, 3.4, 5.4, 7.4, 9.4]])))
 
     def test_results_in_c_order(self):
+        """Test that the results are in C order."""
         lons = np.arange(10).reshape((2, 5), order="F")
         lats = np.arange(10).reshape((2, 5), order="C")
         lines = np.array([2, 7])
@@ -129,6 +133,7 @@ class TestInterpolator(unittest.TestCase):
 
 @pytest.fixture
 def grid_interpolator():
+    """Return an instance of SingleGridInterpolator for testing."""
     xpoints = np.array([0, 3, 7, 15])
     ypoints = np.array([0, 3, 7, 15, 31])
     data = np.array([[0, 1, 0, 1],
@@ -139,9 +144,12 @@ def grid_interpolator():
 
     return SingleGridInterpolator((ypoints, xpoints), data)
 
-class TestGridInterpolator:
+
+class TestSingleGridInterpolator:
+    """Test for the SingleGridInterpolator."""
 
     def setup_method(self):
+        """Set up the tests."""
         self.expected = np.array([[0.00000000e+00, 5.91666667e-01, 9.09722222e-01,
                                    1.00000000e+00, 9.08333333e-01, 6.80555556e-01,
                                    3.62500000e-01, 1.11022302e-16, -3.61111111e-01,
@@ -342,7 +350,6 @@ class TestGridInterpolator:
 
         res = grid_interpolator.interpolate((fine_y, fine_x), method="cubic")
         np.testing.assert_allclose(res, self.expected)
-
 
     def test_interpolate_slices(self, grid_interpolator):
         """Test that interpolation from slices is working."""
