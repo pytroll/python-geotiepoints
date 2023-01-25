@@ -19,8 +19,10 @@
 import unittest
 
 import numpy as np
+import pytest
+from pyresample.geometry import SwathDefinition
 
-from geotiepoints.geointerpolator import GeoInterpolator
+from geotiepoints.geointerpolator import GeoInterpolator, GeoGridInterpolator
 
 TIES_EXP1 = np.array([[6384905.78040055,  6381081.08333225,  6371519.34066148,
                        6328950.00792935,  6253610.69157758,  6145946.19489936,
@@ -102,12 +104,7 @@ TIES_EXP7 = np.array([[6372937.31273379,  6370997.,  6366146.21816553,
 
 
 class TestGeoInterpolator(unittest.TestCase):
-
-    """Class for unit testing the ancillary interpolation functions
-    """
-
-    def setUp(self):
-        pass
+    """Class for unit testing the ancillary interpolation functions."""
 
     def test_fillborders(self):
         lons = np.arange(20).reshape((4, 5), order="F")
@@ -183,3 +180,76 @@ class TestGeoInterpolator(unittest.TestCase):
                                    TIES_EXP6)
         np.testing.assert_allclose(satint.row_indices,
                                    np.array([0,  2,  7,  9, 10, 12, 17, 19]) / 5.0)
+
+
+TIE_LONS = np.array([[1, 2, 3, 4],
+                     [1, 2, 3, 4],
+                     [1, 2, 3, 4],
+                     [1, 2, 3, 4],
+                     [1, 2, 3, 4]])
+
+TIE_LATS = np.array([[1, 1, 1, 1],
+                     [2, 2, 2, 2],
+                     [3, 3, 3, 3],
+                     [4, 4, 4, 4],
+                     [5, 5, 5, 5]])
+
+
+class TestGeoGridInterpolator:
+    """Test the GeoGridInterpolator"""
+
+    @pytest.mark.parametrize("args", ((TIE_LONS, TIE_LATS),
+                                      [SwathDefinition(TIE_LONS, TIE_LATS)]
+                                      ))
+    def test_geogrid_interpolation(self, args):
+        """Test that the interpolator works with both explicit tie-point arrays and swath definition objects."""
+        x_points = np.array([0, 1, 3, 7])
+        y_points = np.array([0, 1, 3, 7, 15])
+
+        interpolator = GeoGridInterpolator((y_points, x_points), *args)
+
+        fine_x_points = np.arange(8)
+        fine_y_points = np.arange(16)
+
+        lons, lats = interpolator.interpolate((fine_y_points, fine_x_points))
+
+        lons_expected = np.array([1., 2., 2.5, 3., 3.25, 3.5, 3.75, 4.])
+        lats_expected = np.array([1., 2., 2.5, 3., 3.25, 3.5, 3.75, 4., 4.125,
+                                  4.25, 4.375, 4.5, 4.625, 4.75, 4.875, 5.])
+
+        np.testing.assert_allclose(lons[0, :], lons_expected, rtol=5e-5)
+        np.testing.assert_allclose(lats[:, 0], lats_expected, rtol=5e-5)
+
+
+    def test_geogrid_interpolation_counts_its_arguments(self):
+        """Test that an arbitrary number of argument is not allowed in the interpolator."""
+        with pytest.raises(ValueError):
+            _ = GeoGridInterpolator((None, None), None, None, None)
+
+    def test_geogrid_interpolation_to_shape(self):
+        """Test that the interpolator works with both explicit tie-point arrays and swath definition objects."""
+        x_points = np.array([0, 1, 3, 7])
+        y_points = np.array([0, 1, 3, 7, 15])
+
+        interpolator = GeoGridInterpolator((y_points, x_points), TIE_LONS, TIE_LATS)
+
+        lons, lats = interpolator.interpolate_to_shape((16, 8))
+
+        lons_expected = np.array([1., 2., 2.5, 3., 3.25, 3.5, 3.75, 4.])
+        lats_expected = np.array([1., 2., 2.5, 3., 3.25, 3.5, 3.75, 4., 4.125,
+                                  4.25, 4.375, 4.5, 4.625, 4.75, 4.875, 5.])
+
+        np.testing.assert_allclose(lons[0, :], lons_expected, rtol=5e-5)
+        np.testing.assert_allclose(lats[:, 0], lats_expected, rtol=5e-5)
+
+    def test_geogrid_interpolation_can_extrapolate(self):
+        """Test that the interpolator can also extrapolate given the right parameters."""
+        x_points = np.array([0, 1, 3, 7])
+        y_points = np.array([0, 1, 3, 7, 15])
+
+        interpolator = GeoGridInterpolator((y_points, x_points), TIE_LONS, TIE_LATS,
+                                           bounds_error=False, fill_value=None)
+
+        lons, lats = interpolator.interpolate_to_shape((16, 16), method="cubic")
+
+        assert lons.shape == (16, 16)
