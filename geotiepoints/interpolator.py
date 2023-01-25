@@ -270,6 +270,7 @@ class SingleGridInterpolator:
         """Interpolate the value points to the *fine_points* grid.
 
         Args:
+            fine_points: the points on the target grid to use, as one dimensional vectors for each dimension.
             method: the method to use for interpolation as described in RegularGridInterpolator's documentation.
                     Default is "linear".
             chunks: If not None, a lazy (dask-based) interpolation will be performed using the chunk sizes specified.
