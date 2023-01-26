@@ -18,7 +18,8 @@
 """Geographical interpolation (lon/lats)."""
 
 import numpy as np
-from geotiepoints.interpolator import Interpolator
+from geotiepoints.interpolator import Interpolator, MultipleGridInterpolator
+
 
 EARTH_RADIUS = 6370997.0
 
@@ -83,10 +84,34 @@ def xyz2lonlat(x__, y__, z__, radius=EARTH_RADIUS, thr=0.8, low_lat_z=True):
         # if we are at low latitudes - small z, then get the
         # latitudes only from z. If we are at high latitudes (close to the poles)
         # then derive the latitude using x and y:
-        lat_mask_cond = np.logical_and(
-            np.less(z__, thr * radius),
-            np.greater(z__, -1. * thr * radius))
-        lat_z_only = 90 - np.rad2deg(np.arccos(z__ / radius))
+        normalized_z = z__ / radius
+        lat_mask_cond = abs(normalized_z) < thr
+        lat_z_only = 90 - np.rad2deg(np.arccos(normalized_z))
         lats = np.where(lat_mask_cond, lat_z_only, lats)
 
     return lons, lats
+
+
+class GeoGridInterpolator(MultipleGridInterpolator):
+    """Interpolate geographical coordinates from a regular grid of tie points."""
+
+    def __init__(self, tie_points, *data, **kwargs):
+        """Set up the interpolator."""
+        if len(data) == 1:
+            xyz = data[0].get_cartesian_coords()
+            data = [xyz[:, :, 0], xyz[:, :, 1], xyz[:, :, 2]]
+        elif len(data) == 2:
+            data = lonlat2xyz(*data)
+        else:
+            raise ValueError("Either pass lon/lats or a pyresample definition.")
+        super().__init__(tie_points, *data, **kwargs)
+
+    def interpolate(self, fine_points, **kwargs):
+        """Interpolate to *fine_points*."""
+        x, y, z = super().interpolate(fine_points, **kwargs)
+        return xyz2lonlat(x, y, z)
+
+    def interpolate_to_shape(self, shape, **kwargs):
+        """Interpolate to a given *shape*."""
+        fine_points = [np.arange(size) for size in shape]
+        return self.interpolate(fine_points, **kwargs)

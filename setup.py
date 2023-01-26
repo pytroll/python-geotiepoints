@@ -21,8 +21,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Setting up the geo_interpolator project.
-"""
+"""Setting up the geo_interpolator project."""
 
 import sys
 
@@ -33,7 +32,7 @@ from Cython.Build import build_ext
 from Cython.Distutils import Extension
 
 requirements = ['numpy', 'scipy', 'pandas']
-test_requires = ['pytest', 'pytest-cov', 'h5py', 'xarray', 'dask', 'pyproj']
+test_requires = ['pytest', 'pytest-cov', 'h5py', 'xarray', 'dask', 'pyproj', "pyresample"]
 
 if sys.platform.startswith("win"):
     extra_compile_args = []

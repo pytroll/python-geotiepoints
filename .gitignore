@@ -6,6 +6,7 @@
 dist
 build
 eggs
+.eggs
 parts
 bin
 var
@@ -28,3 +29,9 @@ pip-log.txt
 
 # Don't include the C files in the repository
 geotiepoints/*.c
+
+# pycharm
+.idea
+
+# vscode
+.vscode

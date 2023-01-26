@@ -20,15 +20,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Generic interpolation routines.
-"""
+"""Generic interpolation routines."""
+
 import numpy as np
-from scipy.interpolate import RectBivariateSpline, splev, splrep
+from scipy.interpolate import RectBivariateSpline, splev, splrep, RegularGridInterpolator
 
 
 def generic_modis5kmto1km(*data5km):
-    """Getting 1km data for modis from 5km tiepoints.
-    """
+    """Get 1km data for modis from 5km tiepoints."""
     cols5km = np.arange(2, 1354, 5)
     cols1km = np.arange(1354)
     lines = data5km[0].shape[0] * 5
@@ -51,7 +50,7 @@ def generic_modis5kmto1km(*data5km):
 
 
 def _linear_extrapolate(pos, data, xev):
-    """
+    """Perform linear extrapolation.
 
     >>> import numpy as np
     >>> pos = np.array([1, 2])
@@ -69,27 +68,23 @@ def _linear_extrapolate(pos, data, xev):
         raise ValueError("len(pos) and the number of lines of data"
                          " must be 2.")
 
-    return data[1] + ((xev - pos[1]) / (1.0 * (pos[0] - pos[1])) *
-                      (data[0] - data[1]))
+    return data[1] + ((xev - pos[1]) / (1.0 * (pos[0] - pos[1])) * (data[0] - data[1]))
 
 
-class Interpolator(object):
+class Interpolator:
+    """Handles interpolation of data from a grid of tie points.
 
-    """
-    Handles interpolation of data from a grid of tie points.  It is preferable
-    to have tie-points out till the edges if the tiepoint grid, but a method is
-    provided to extrapolate linearly the tiepoints to the borders of the
+    It is preferable to have tie-points out till the edges if the tiepoint grid,
+    but a method is provided to extrapolate linearly the tiepoints to the borders of the
     grid. The extrapolation is done automatically if it seems necessary.
 
     Uses numpy and scipy.
 
-    The constructor takes in the tiepointed data as *data*, the
-    *tiepoint_grid* and the desired *final_grid*. As optional arguments, one
-    can provide *kx_* and *ky_* as interpolation orders (in x and y directions
-    respectively), and the *chunksize* if the data has to be handled by pieces
-    along the y axis (this affects how the extrapolator behaves). If
-    *chunksize* is set, don't forget to adjust the interpolation orders
-    accordingly: the interpolation is indeed done globaly (not chunkwise).
+    The constructor takes in the tiepointed data as *data*, the *tiepoint_grid* and the desired *final_grid*. As
+    optional arguments, one can provide *kx_* and *ky_* as interpolation orders (in x and y directions respectively),
+    and the *chunksize* if the data has to be handled by pieces along the y axis (this affects how the extrapolator
+    behaves). If *chunksize* is set, don't forget to adjust the interpolation orders accordingly: the interpolation
+    is indeed done globaly (not chunkwise).
     """
 
     def __init__(self, data, tiepoint_grid, final_grid,
@@ -108,10 +103,7 @@ class Interpolator(object):
         self.kx_, self.ky_ = kx_, ky_
 
     def fill_borders(self, *args):
-        """Extrapolate tiepoint lons and lats to fill in the border of the
-        chunks.
-        """
-
+        """Extrapolate tiepoint lons and lats to fill in the border of the chunks."""
         to_run = []
         cases = {"y": self._fill_row_borders,
                  "x": self._fill_col_borders}
@@ -125,11 +117,7 @@ class Interpolator(object):
             fun()
 
     def _extrapolate_cols(self, data, first=True, last=True):
-        """Extrapolate the column of data, to get the first and last together
-        with the data.
-
-        """
-
+        """Extrapolate the column of data, to get the first and last together with the data."""
         if first:
             pos = self.col_indices[:2]
             first_column = _linear_extrapolate(pos,
@@ -155,9 +143,7 @@ class Interpolator(object):
             return data
 
     def _fill_col_borders(self):
-        """Add the first and last column to the data by extrapolation.
-        """
-
+        """Add the first and last column to the data by extrapolation."""
         first = True
         last = True
         if self.col_indices[0] == self.hcol_indices[0]:
@@ -179,10 +165,7 @@ class Interpolator(object):
                                                np.array([self.hcol_indices[-1]])))
 
     def _extrapolate_rows(self, data, row_indices, first_index, last_index):
-        """Extrapolate the rows of data, to get the first and last together
-        with the data.
-        """
-
+        """Extrapolate the rows of data, to get the first and last together with the data."""
         pos = row_indices[:2]
         first_row = _linear_extrapolate(pos,
                                         (data[0, :], data[1, :]),
@@ -196,21 +179,19 @@ class Interpolator(object):
                           np.expand_dims(last_row, 0)))
 
     def _fill_row_borders(self):
-        """Add the first and last rows to the data by extrapolation.
-        """
+        """Add the first and last rows to the data by extrapolation."""
         lines = len(self.hrow_indices)
         chunk_size = self.chunk_size or lines
         factor = len(self.hrow_indices) / len(self.row_indices)
 
         tmp_data = []
-        for num in range(len(self.tie_data)):
+        for _num in range(len(self.tie_data)):
             tmp_data.append([])
         row_indices = []
 
         for index in range(0, lines, chunk_size):
             indices = np.logical_and(self.row_indices >= index / factor,
-                                     self.row_indices < (index
-                                                         + chunk_size) / factor)
+                                     self.row_indices < (index + chunk_size) / factor)
             ties = np.argwhere(indices).squeeze()
             tiepos = self.row_indices[indices].squeeze()
 
@@ -226,16 +207,14 @@ class Interpolator(object):
 
             row_indices.append(np.array([self.hrow_indices[index]]))
             row_indices.append(tiepos)
-            row_indices.append(np.array([self.hrow_indices[index
-                                                           + chunk_size - 1]]))
+            row_indices.append(np.array([self.hrow_indices[index + chunk_size - 1]]))
 
         for num in range(len(self.tie_data)):
             self.tie_data[num] = np.vstack(tmp_data[num])
         self.row_indices = np.concatenate(row_indices)
 
     def _interp(self):
-        """Interpolate the cartesian coordinates.
-        """
+        """Interpolate the cartesian coordinates."""
         if np.array_equal(self.hrow_indices, self.row_indices):
             return self._interp1d()
 
@@ -254,8 +233,7 @@ class Interpolator(object):
             self.new_data[num] = new_data_.reshape(xpoints.shape).T.copy(order='C')
 
     def _interp1d(self):
-        """Interpolate in one dimension.
-        """
+        """Interpolate in one dimension."""
         lines = len(self.hrow_indices)
 
         for num, data in enumerate(self.tie_data):
@@ -269,8 +247,104 @@ class Interpolator(object):
                     self.hcol_indices, tck, der=0)
 
     def interpolate(self):
-        """Do the interpolation, and return resulting longitudes and latitudes.
-        """
+        """Do the interpolation, and return resulting longitudes and latitudes."""
         self._interp()
 
         return self.new_data
+
+
+class SingleGridInterpolator:
+    """An interpolator for a single 2d data array."""
+
+    def __init__(self, points, values, **kwargs):
+        """Set up the interpolator.
+
+        *kwargs* are passed to the underlying RegularGridInterpolator instance.
+        So for example, to allow extrapolation, the kwargs can be `bounds_error=False, fill_value=None`.
+        """
+        self.interpolator = RegularGridInterpolator(points, values, **kwargs)
+        self.points = points
+        self.values = values
+
+    def interpolate(self, fine_points, method="linear", chunks=None):
+        """Interpolate the value points to the *fine_points* grid.
+
+        Args:
+            fine_points: the points on the target grid to use, as one dimensional vectors for each dimension.
+            method: the method to use for interpolation as described in RegularGridInterpolator's documentation.
+                    Default is "linear".
+            chunks: If not None, a lazy (dask-based) interpolation will be performed using the chunk sizes specified.
+                    The result will be a dask array in this case. Defaults to None.
+        """
+        if chunks is not None:
+            res = self.interpolate_dask(fine_points, method=method, chunks=chunks)
+        else:
+            res = self.interpolate_numpy(fine_points, method=method)
+
+        return res
+
+    def interpolate_dask(self, fine_points, method, chunks):
+        """Interpolate (lazily) to a dask array."""
+        from dask.base import tokenize
+        import dask.array as da
+        v_fine_points, h_fine_points = fine_points
+        shape = len(v_fine_points), len(h_fine_points)
+
+        try:
+            v_chunk_size, h_chunk_size = chunks
+        except TypeError:
+            v_chunk_size, h_chunk_size = chunks, chunks
+
+        vchunks = range(0, shape[0], v_chunk_size)
+        hchunks = range(0, shape[1], h_chunk_size)
+
+        token = tokenize(v_chunk_size, h_chunk_size, self.points, self.values, fine_points, method)
+        name = 'interpolate-' + token
+
+        dskx = {(name, i, j): (self.interpolate_slices,
+                               (slice(vcs, min(vcs + v_chunk_size, shape[0])),
+                                slice(hcs, min(hcs + h_chunk_size, shape[1]))),
+                               method
+                               )
+                for i, vcs in enumerate(vchunks)
+                for j, hcs in enumerate(hchunks)
+                }
+
+        res = da.Array(dskx, name, shape=list(shape),
+                       chunks=(v_chunk_size, h_chunk_size),
+                       dtype=self.values.dtype)
+        return res
+
+    def interpolate_numpy(self, fine_points, method="linear"):
+        """Interpolate to a numpy array."""
+        fine_x, fine_y = np.meshgrid(*fine_points, indexing='ij')
+        return self.interpolator((fine_x, fine_y), method=method)
+
+    def interpolate_slices(self, fine_points, method="linear"):
+        """Interpolate using slices.
+
+        *fine_points* are a tuple of slices for the y and x dimensions
+        """
+        slice_y, slice_x = fine_points
+        points_y = np.arange(slice_y.start, slice_y.stop)
+        points_x = np.arange(slice_x.start, slice_x.stop)
+        fine_points = points_y, points_x
+
+        return self.interpolate_numpy(fine_points, method=method)
+
+
+class MultipleGridInterpolator:
+    """Interpolator that works on multiple data arrays."""
+
+    def __init__(self, tie_points, *data, **kwargs):
+        """Set up the interpolator from the multiple `data` arrays."""
+        self.interpolators = []
+        for values in data:
+            self.interpolators.append(SingleGridInterpolator(tie_points, values, **kwargs))
+
+    def interpolate(self, fine_points, **kwargs):
+        """Interpolate the data.
+
+        The keyword arguments will be passed on to SingleGridInterpolator's interpolate function.
+        """
+        return (interpolator.interpolate(fine_points, **kwargs) for interpolator in self.interpolators)
