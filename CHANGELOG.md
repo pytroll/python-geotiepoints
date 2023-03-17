@@ -1,3 +1,19 @@
+## Version 1.6.0 (2023/03/17)
+
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 45](https://github.com/pytroll/python-geotiepoints/pull/45) - Fix VII interpolator compatibility with future versions of xarray
+
+#### Features added
+
+* [PR 44](https://github.com/pytroll/python-geotiepoints/pull/44) - Add interpolators based on scipy's RegularGridInterpolator
+
+In this release 2 pull requests were closed.
+
+
 ## Version 1.5.1 (2022/12/09)
 
 ### Pull Requests Merged
