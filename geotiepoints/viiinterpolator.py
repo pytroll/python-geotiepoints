@@ -65,18 +65,18 @@ def tie_points_interpolation(data_on_tie_points, scan_alt_tie_points, tie_points
     n_pixel_alt = (n_tie_alt - 1) * tie_points_factor
 
     # Create the grids used for interpolation across the track
-    tie_grid_act = da.arange(0, n_pixel_act + 1, tie_points_factor)
-    pixel_grid_act = da.arange(0, n_pixel_act)
+    tie_grid_act = np.arange(0, n_pixel_act + 1, tie_points_factor)
+    pixel_grid_act = np.arange(0, n_pixel_act)
 
     # Create the grids used for the interpolation along the track (must not include the spurious points between scans)
-    tie_grid_alt = da.arange(0, n_pixel_alt + 1, tie_points_factor)
+    tie_grid_alt = np.arange(0, n_pixel_alt + 1, tie_points_factor)
     n_pixel_alt_per_scan = (scan_alt_tie_points - 1) * tie_points_factor
     pixel_grid_alt = []
 
     for j_scan in range(n_scans):
         start_index_scan = j_scan * scan_alt_tie_points * tie_points_factor
-        pixel_grid_alt.append(da.arange(start_index_scan, start_index_scan + n_pixel_alt_per_scan))
-    pixel_grid_alt = da.concatenate(pixel_grid_alt)
+        pixel_grid_alt.append(np.arange(start_index_scan, start_index_scan + n_pixel_alt_per_scan))
+    pixel_grid_alt = np.concatenate(pixel_grid_alt)
 
     # Loop on all arrays
     data_on_pixel_points = []
