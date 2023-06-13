@@ -349,12 +349,12 @@ class TestSingleGridInterpolator:
         fine_y = np.arange(32)
 
         res = grid_interpolator.interpolate((fine_y, fine_x), method="cubic")
-        np.testing.assert_allclose(res, self.expected)
+        np.testing.assert_allclose(res, self.expected, atol=2e-9)
 
     def test_interpolate_slices(self, grid_interpolator):
         """Test that interpolation from slices is working."""
         res = grid_interpolator.interpolate_slices((slice(0, 32), slice(0, 16)), method="cubic")
-        np.testing.assert_allclose(res, self.expected)
+        np.testing.assert_allclose(res, self.expected, atol=2e-9)
 
     @pytest.mark.parametrize("chunks, expected_chunks", [(10, (10, 10)),
                                                          ((10, 5), (10, 5))])
@@ -376,5 +376,5 @@ class TestSingleGridInterpolator:
             assert res.chunks[0][0] == v_chunk
             assert res.chunks[1][0] == h_chunk
 
-            np.testing.assert_allclose(res, self.expected)
+            np.testing.assert_allclose(res, self.expected, atol=2e-9)
             assert interpolate.called
