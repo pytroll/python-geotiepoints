@@ -30,12 +30,12 @@ jobs:
       - name: Setup Conda Environment
         uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: "latest"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          use-mamba: true
           python-version: ${{ matrix.python-version }}
-          mamba-version: "*"
-          channels: conda-forge,defaults
-          environment-file: continuous_integration/environment.yaml
           activate-environment: test-environment
+          environment-file: continuous_integration/environment.yaml
 
       - name: Install unstable dependencies
         if: matrix.experimental == true
@@ -81,8 +81,7 @@ jobs:
           env_vars: OS,PYTHON_VERSION,UNSTABLE
 
       - name: Coveralls Parallel
-        # See https://github.com/AndreMiras/coveralls-python-action/pull/16
-        uses: djhoese/coveralls-python-action@feature-cython-coverage
+        uses: AndreMiras/coveralls-python-action@develop
         with:
           flag-name: run-${{ matrix.test_number }}
           parallel: true
@@ -93,8 +92,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Coveralls Finished
-        # See https://github.com/AndreMiras/coveralls-python-action/pull/16
-        uses: djhoese/coveralls-python-action@feature-cython-coverage
+        uses: AndreMiras/coveralls-python-action@develop
         with:
           parallel-finished: true
 
