@@ -1,3 +1,4 @@
+# cython: language_level=3, boundscheck=False, cdivision=True, wraparound=False, initializedcheck=False, nonecheck=False
 cimport cython
 
 from ._modis_utils cimport floating
@@ -7,6 +8,7 @@ cimport numpy as np
 import numpy as np
 from scipy.ndimage import map_coordinates
 
+np.import_array()
 
 def interpolate_geolocation_cartesian(
         np.ndarray[floating, ndim=2] lon_array,
@@ -69,7 +71,7 @@ def interpolate_geolocation_cartesian(
 cdef void _compute_yx_coordinate_arrays(
         unsigned int res_factor,
         floating[:, :, ::1] coordinates,
-) nogil:
+) noexcept nogil:
     cdef Py_ssize_t i, j
     for j in range(coordinates.shape[1]):
         for i in range(coordinates.shape[2]):
@@ -85,7 +87,7 @@ cdef void _compute_interpolated_xyz_scan(
         floating[:, :, ::1] coordinates_view,
         floating[:, :, ::1] xyz_input_view,
         floating[:, :, ::1] xyz_result_view,
-) nogil:
+) noexcept nogil:
     cdef Py_ssize_t comp_index
     cdef floating[:, :] input_view, result_view
     with gil:
@@ -137,7 +139,7 @@ cdef void _call_map_coordinates(
 cdef void _extrapolate_xyz_rightmost_columns(
         floating[:, :] result_view,
         int num_columns,
-) nogil:
+) noexcept nogil:
     cdef Py_ssize_t row_idx, col_offset
     cdef floating last_interp_col_diff
     for row_idx in range(result_view.shape[0]):
@@ -155,7 +157,7 @@ cdef void _extrapolate_xyz_rightmost_columns(
 cdef void _interpolate_xyz_250(
         floating[:, :] result_view,
         floating[:, :, ::1] coordinates_view,
-) nogil:
+) noexcept nogil:
     cdef Py_ssize_t col_idx
     cdef floating m, b
     cdef floating[:] result_col_view
@@ -194,7 +196,7 @@ cdef void _interpolate_xyz_250(
 cdef void _interpolate_xyz_500(
         floating[:, :] result_view,
         floating[:, :, ::1] coordinates_view,
-) nogil:
+) noexcept nogil:
     cdef Py_ssize_t col_idx
     cdef floating m, b
     for col_idx in range(result_view.shape[1]):
@@ -231,7 +233,7 @@ cdef inline floating _calc_slope_250(
         floating[:] result_view,
         floating[:, ::1] y,
         Py_ssize_t offset,
-) nogil:
+) noexcept nogil:
     return (result_view[offset + 3] - result_view[offset]) / \
            (y[offset + 3, 0] - y[offset, 0])
 
@@ -257,7 +259,7 @@ cdef inline floating _calc_slope_500(
         floating[:] result_view,
         floating[:, ::1] y,
         Py_ssize_t offset,
-) nogil:
+) noexcept nogil:
     return (result_view[offset + 1] - result_view[offset]) / \
            (y[offset + 1, 0] - y[offset, 0])
 
@@ -271,5 +273,5 @@ cdef inline floating _calc_offset_500(
         floating[:, ::1] y,
         floating m,
         Py_ssize_t offset,
-) nogil:
+) noexcept nogil:
     return result_view[offset + 1] - m * y[offset + 1, 0]

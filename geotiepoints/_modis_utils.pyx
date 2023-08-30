@@ -1,9 +1,12 @@
+# cython: language_level=3, boundscheck=False, cdivision=True, wraparound=False, initializedcheck=False, nonecheck=False
 from functools import wraps
 
 cimport cython
 cimport numpy as np
 from libc.math cimport asin, sin, cos, sqrt, acos, M_PI
 import numpy as np
+
+np.import_array()
 
 try:
     import dask.array as da
@@ -20,14 +23,11 @@ except ImportError:
 DEF EARTH_RADIUS = 6370997.0
 
 
-@cython.boundscheck(False)
-@cython.cdivision(True)
-@cython.wraparound(False)
 cdef void lonlat2xyz(
         floating[:, ::1] lons,
         floating[:, ::1] lats,
         floating[:, :, ::1] xyz,
-) nogil:
+) noexcept nogil:
     """Convert lons and lats to cartesian coordinates."""
     cdef Py_ssize_t i, j, k
     cdef floating lon_rad, lat_rad
@@ -40,15 +40,12 @@ cdef void lonlat2xyz(
             xyz[i, j, 2] = EARTH_RADIUS * sin(lat_rad)
 
 
-@cython.boundscheck(False)
-@cython.cdivision(True)
-@cython.wraparound(False)
 cdef void xyz2lonlat(
         floating[:, :, ::1] xyz,
         floating[:, ::1] lons,
         floating[:, ::1] lats,
         bint low_lat_z=True,
-        floating thr=0.8) nogil:
+        floating thr=0.8) noexcept nogil:
     """Get longitudes from cartesian coordinates."""
     cdef Py_ssize_t i, j
     cdef np.float64_t x, y, z
@@ -68,17 +65,15 @@ cdef void xyz2lonlat(
                 lats[i, j] = _sign(z) * (90 - rad2deg(asin(sqrt(x ** 2 + y ** 2) / EARTH_RADIUS)))
 
 
-cdef inline int _sign(floating x) nogil:
+cdef inline int _sign(floating x) noexcept nogil:
     return 1 if x > 0 else (-1 if x < 0 else 0)
 
 
-@cython.cdivision(True)
-cdef inline floating rad2deg(floating x) nogil:
+cdef inline floating rad2deg(floating x) noexcept nogil:
     return x * (180.0 / M_PI)
 
 
-@cython.cdivision(True)
-cdef inline floating deg2rad(floating x) nogil:
+cdef inline floating deg2rad(floating x) noexcept nogil:
     return x * (M_PI / 180.0)
 
 
@@ -173,7 +168,7 @@ def _rechunk_dask_arrays_if_needed(args, rows_per_scan: int):
     row_chunks = first_arr.chunks[0]
     col_chunks = first_arr.chunks[1]
     num_rows = first_arr.shape[0]
-    num_cols = first_arr.shape[-1]
+    num_cols = first_arr.shape[1]
     good_row_chunks = all(x % rows_per_scan == 0 for x in row_chunks)
     good_col_chunks = len(col_chunks) == 1 and col_chunks[0] != num_cols
     all_orig_chunks = [arr.chunks for arr in args if hasattr(arr, "chunks")]

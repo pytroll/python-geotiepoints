@@ -25,7 +25,7 @@
 
 import sys
 
-from setuptools import setup
+from setuptools import setup, find_packages
 import versioneer
 import numpy as np
 from Cython.Build import build_ext
@@ -77,7 +77,7 @@ except ValueError:
 cython_directives = {
     "language_level": "3",
 }
-define_macros = []
+define_macros = [("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")]
 if cython_coverage:
     print("Enabling directives/macros for Cython coverage support")
     cython_directives.update({
@@ -88,9 +88,9 @@ if cython_coverage:
         ("CYTHON_TRACE", "1"),
         ("CYTHON_TRACE_NOGIL", "1"),
     ])
-    for ext in EXTENSIONS:
-        ext.define_macros = define_macros
-        ext.cython_directives.update(cython_directives)
+for ext in EXTENSIONS:
+    ext.define_macros = define_macros
+    ext.cython_directives.update(cython_directives)
 
 cmdclass = versioneer.get_cmdclass(cmdclass={"build_ext": build_ext})
 
@@ -113,10 +113,8 @@ if __name__ == "__main__":
                        "Programming Language :: Cython",
                        "Topic :: Scientific/Engineering"],
           url="https://github.com/pytroll/python-geotiepoints",
-          packages=['geotiepoints'],
-          # packages=find_packages(),
-          setup_requires=['numpy', 'cython'],
-          python_requires='>=3.7',
+          packages=find_packages(),
+          python_requires='>=3.8',
           cmdclass=cmdclass,
           install_requires=requirements,
           ext_modules=EXTENSIONS,

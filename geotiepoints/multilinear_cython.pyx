@@ -1,18 +1,14 @@
+# cython: language_level=3, boundscheck=False, cdivision=True, wraparound=False, initializedcheck=False, nonecheck=False
 
-# generation options
-
-# some helper functions
-
-from libc.math cimport fmin, fmax, floor
 cimport cython
 from cython.parallel import prange,parallel
+from cython cimport floating
 
 cimport numpy as np
 import numpy as np
 
-ctypedef fused floating:
-    float
-    double
+np.import_array()
+
 
 def multilinear_interpolation(floating[:] smin, floating[:] smax, long[:] orders, floating[:,::1] values, floating[:,::1] s):
 
@@ -48,18 +44,12 @@ def multilinear_interpolation(floating[:] smin, floating[:] smax, long[:] orders
 
     return np.array(result,dtype=dtype)
 
-@cython.boundscheck(False)
-@cython.cdivision(True)
-@cython.wraparound(False)
+
 cdef multilinear_interpolation_1d(floating[:] smin, floating[:] smax,
                                   long[:] orders, floating[:] V,
                                   int n_s, floating[:,::1] s, floating[:] output):
 
-    cdef int d = 1
-
     cdef int i
-
-
     cdef floating lam_0, s_0, sn_0, snt_0
     cdef int order_0 = orders[0]
     cdef int q_0
@@ -88,18 +78,11 @@ cdef multilinear_interpolation_1d(floating[:] smin, floating[:] smax,
             output[i] = (1-lam_0)*(v_0) + (lam_0)*(v_1)
 
 
-@cython.boundscheck(False)
-@cython.cdivision(True)
-@cython.wraparound(False)
 cdef multilinear_interpolation_2d(floating[:] smin, floating[:] smax,
                                   long[:] orders, floating[:] V,
                                   int n_s, floating[:,::1] s, floating[:] output):
 
-    cdef int d = 2
-
     cdef int i
-
-
     cdef floating lam_0, s_0, sn_0, snt_0
     cdef floating lam_1, s_1, sn_1, snt_1
     cdef int order_0 = orders[0]
@@ -140,18 +123,10 @@ cdef multilinear_interpolation_2d(floating[:] smin, floating[:] smax,
             output[i] = (1-lam_0)*((1-lam_1)*(v_00) + (lam_1)*(v_01)) + (lam_0)*((1-lam_1)*(v_10) + (lam_1)*(v_11))
 
 
-@cython.boundscheck(False)
-@cython.cdivision(True)
-@cython.wraparound(False)
 cdef multilinear_interpolation_3d(floating[:] smin, floating[:] smax,
                                   long[:] orders, floating[:] V,
                                   int n_s, floating[:,::1] s, floating[:] output):
-
-    cdef int d = 3
-
     cdef int i
-
-
     cdef floating lam_0, s_0, sn_0, snt_0
     cdef floating lam_1, s_1, sn_1, snt_1
     cdef floating lam_2, s_2, sn_2, snt_2
@@ -208,18 +183,11 @@ cdef multilinear_interpolation_3d(floating[:] smin, floating[:] smax,
             output[i] = (1-lam_0)*((1-lam_1)*((1-lam_2)*(v_000) + (lam_2)*(v_001)) + (lam_1)*((1-lam_2)*(v_010) + (lam_2)*(v_011))) + (lam_0)*((1-lam_1)*((1-lam_2)*(v_100) + (lam_2)*(v_101)) + (lam_1)*((1-lam_2)*(v_110) + (lam_2)*(v_111)))
 
 
-@cython.boundscheck(False)
-@cython.cdivision(True)
-@cython.wraparound(False)
 cdef multilinear_interpolation_4d(floating[:] smin, floating[:] smax,
                                   long[:] orders, floating[:] V,
                                   int n_s, floating[:,::1] s, floating[:] output):
 
-    cdef int d = 4
-
     cdef int i
-
-
     cdef floating lam_0, s_0, sn_0, snt_0
     cdef floating lam_1, s_1, sn_1, snt_1
     cdef floating lam_2, s_2, sn_2, snt_2
@@ -300,18 +268,10 @@ cdef multilinear_interpolation_4d(floating[:] smin, floating[:] smax,
             output[i] = (1-lam_0)*((1-lam_1)*((1-lam_2)*((1-lam_3)*(v_0000) + (lam_3)*(v_0001)) + (lam_2)*((1-lam_3)*(v_0010) + (lam_3)*(v_0011))) + (lam_1)*((1-lam_2)*((1-lam_3)*(v_0100) + (lam_3)*(v_0101)) + (lam_2)*((1-lam_3)*(v_0110) + (lam_3)*(v_0111)))) + (lam_0)*((1-lam_1)*((1-lam_2)*((1-lam_3)*(v_1000) + (lam_3)*(v_1001)) + (lam_2)*((1-lam_3)*(v_1010) + (lam_3)*(v_1011))) + (lam_1)*((1-lam_2)*((1-lam_3)*(v_1100) + (lam_3)*(v_1101)) + (lam_2)*((1-lam_3)*(v_1110) + (lam_3)*(v_1111))))
 
 
-@cython.boundscheck(False)
-@cython.cdivision(True)
-@cython.wraparound(False)
 cdef multilinear_interpolation_5d(floating[:] smin, floating[:] smax,
                                   long[:] orders, floating[:] V,
                                   int n_s, floating[:,::1] s, floating[:] output):
-
-    cdef int d = 5
-
     cdef int i
-
-
     cdef floating lam_0, s_0, sn_0, snt_0
     cdef floating lam_1, s_1, sn_1, snt_1
     cdef floating lam_2, s_2, sn_2, snt_2
