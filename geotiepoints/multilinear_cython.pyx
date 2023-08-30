@@ -12,42 +12,42 @@ np.import_array()
 
 def multilinear_interpolation(floating[:] smin, floating[:] smax, long[:] orders, floating[:,::1] values, floating[:,::1] s):
 
-    cdef int d = np.size(s,0)
-    cdef int n_s = np.size(s,1)
-    cdef int n_v = np.size(values,0)
+    cdef Py_ssize_t d = s.shape[0]
+    cdef Py_ssize_t n_s = s.shape[1]
+    cdef Py_ssize_t n_v = values.shape[0]
 
     if floating is float:
         dtype = np.single
     else:
         dtype = np.double
 
-    cdef floating[:,::1] result = np.zeros((n_v,n_s), dtype=dtype)
+    cdef np.ndarray[floating, ndim=2] result_arr = np.zeros((n_v, n_s), dtype=dtype)
+    cdef floating[:, ::1] result = result_arr
     cdef floating[:] vals
     cdef floating[:] res
 
+    if d > 4:
+        raise Exception("Can't interpolate in dimension strictly greater than 5")
 
-    for i in range(n_v):
-        vals = values[i,:]
-        res = result[i,:]
-        if False:
-            pass
-        elif d==1:
-            multilinear_interpolation_1d(smin, smax, orders, vals, n_s, s, res)
-        elif d==2:
-            multilinear_interpolation_2d(smin, smax, orders, vals, n_s, s, res)
-        elif d==3:
-            multilinear_interpolation_3d(smin, smax, orders, vals, n_s, s, res)
-        elif d==4:
-            multilinear_interpolation_4d(smin, smax, orders, vals, n_s, s, res)
-        else:
-            raise Exception("Can't interpolate in dimension strictly greater than 5")
+    with nogil:
+        for i in range(n_v):
+            vals = values[i, :]
+            res = result[i, :]
+            if d == 1:
+                multilinear_interpolation_1d(smin, smax, orders, vals, n_s, s, res)
+            elif d == 2:
+                multilinear_interpolation_2d(smin, smax, orders, vals, n_s, s, res)
+            elif d == 3:
+                multilinear_interpolation_3d(smin, smax, orders, vals, n_s, s, res)
+            elif d == 4:
+                multilinear_interpolation_4d(smin, smax, orders, vals, n_s, s, res)
 
-    return np.array(result,dtype=dtype)
+    return result_arr
 
 
-cdef multilinear_interpolation_1d(floating[:] smin, floating[:] smax,
-                                  long[:] orders, floating[:] V,
-                                  int n_s, floating[:,::1] s, floating[:] output):
+cdef void multilinear_interpolation_1d(floating[:] smin, floating[:] smax,
+                                       long[:] orders, floating[:] V,
+                                       int n_s, floating[:,::1] s, floating[:] output) noexcept nogil:
 
     cdef int i
     cdef floating lam_0, s_0, sn_0, snt_0
@@ -55,7 +55,7 @@ cdef multilinear_interpolation_1d(floating[:] smin, floating[:] smax,
     cdef int q_0
     cdef floating v_0
     cdef floating v_1
-    with nogil, parallel():
+    with parallel():
         for i in prange(n_s):
 
             # (s_1, ..., s_d) : evaluation point
@@ -78,9 +78,9 @@ cdef multilinear_interpolation_1d(floating[:] smin, floating[:] smax,
             output[i] = (1-lam_0)*(v_0) + (lam_0)*(v_1)
 
 
-cdef multilinear_interpolation_2d(floating[:] smin, floating[:] smax,
-                                  long[:] orders, floating[:] V,
-                                  int n_s, floating[:,::1] s, floating[:] output):
+cdef void multilinear_interpolation_2d(floating[:] smin, floating[:] smax,
+                                       long[:] orders, floating[:] V,
+                                       int n_s, floating[:,::1] s, floating[:] output) noexcept nogil:
 
     cdef int i
     cdef floating lam_0, s_0, sn_0, snt_0
@@ -94,7 +94,7 @@ cdef multilinear_interpolation_2d(floating[:] smin, floating[:] smax,
     cdef floating v_01
     cdef floating v_10
     cdef floating v_11
-    with nogil, parallel():
+    with parallel():
         for i in prange(n_s):
 
             # (s_1, ..., s_d) : evaluation point
@@ -123,9 +123,9 @@ cdef multilinear_interpolation_2d(floating[:] smin, floating[:] smax,
             output[i] = (1-lam_0)*((1-lam_1)*(v_00) + (lam_1)*(v_01)) + (lam_0)*((1-lam_1)*(v_10) + (lam_1)*(v_11))
 
 
-cdef multilinear_interpolation_3d(floating[:] smin, floating[:] smax,
-                                  long[:] orders, floating[:] V,
-                                  int n_s, floating[:,::1] s, floating[:] output):
+cdef void multilinear_interpolation_3d(floating[:] smin, floating[:] smax,
+                                       long[:] orders, floating[:] V,
+                                       int n_s, floating[:,::1] s, floating[:] output) noexcept nogil:
     cdef int i
     cdef floating lam_0, s_0, sn_0, snt_0
     cdef floating lam_1, s_1, sn_1, snt_1
@@ -146,7 +146,7 @@ cdef multilinear_interpolation_3d(floating[:] smin, floating[:] smax,
     cdef floating v_101
     cdef floating v_110
     cdef floating v_111
-    with nogil, parallel():
+    with parallel():
         for i in prange(n_s):
 
             # (s_1, ..., s_d) : evaluation point
@@ -183,9 +183,9 @@ cdef multilinear_interpolation_3d(floating[:] smin, floating[:] smax,
             output[i] = (1-lam_0)*((1-lam_1)*((1-lam_2)*(v_000) + (lam_2)*(v_001)) + (lam_1)*((1-lam_2)*(v_010) + (lam_2)*(v_011))) + (lam_0)*((1-lam_1)*((1-lam_2)*(v_100) + (lam_2)*(v_101)) + (lam_1)*((1-lam_2)*(v_110) + (lam_2)*(v_111)))
 
 
-cdef multilinear_interpolation_4d(floating[:] smin, floating[:] smax,
-                                  long[:] orders, floating[:] V,
-                                  int n_s, floating[:,::1] s, floating[:] output):
+cdef void multilinear_interpolation_4d(floating[:] smin, floating[:] smax,
+                                       long[:] orders, floating[:] V,
+                                       int n_s, floating[:,::1] s, floating[:] output) noexcept nogil:
 
     cdef int i
     cdef floating lam_0, s_0, sn_0, snt_0
@@ -219,7 +219,7 @@ cdef multilinear_interpolation_4d(floating[:] smin, floating[:] smax,
     cdef floating v_1101
     cdef floating v_1110
     cdef floating v_1111
-    with nogil, parallel():
+    with parallel():
         for i in prange(n_s):
 
             # (s_1, ..., s_d) : evaluation point
@@ -268,9 +268,9 @@ cdef multilinear_interpolation_4d(floating[:] smin, floating[:] smax,
             output[i] = (1-lam_0)*((1-lam_1)*((1-lam_2)*((1-lam_3)*(v_0000) + (lam_3)*(v_0001)) + (lam_2)*((1-lam_3)*(v_0010) + (lam_3)*(v_0011))) + (lam_1)*((1-lam_2)*((1-lam_3)*(v_0100) + (lam_3)*(v_0101)) + (lam_2)*((1-lam_3)*(v_0110) + (lam_3)*(v_0111)))) + (lam_0)*((1-lam_1)*((1-lam_2)*((1-lam_3)*(v_1000) + (lam_3)*(v_1001)) + (lam_2)*((1-lam_3)*(v_1010) + (lam_3)*(v_1011))) + (lam_1)*((1-lam_2)*((1-lam_3)*(v_1100) + (lam_3)*(v_1101)) + (lam_2)*((1-lam_3)*(v_1110) + (lam_3)*(v_1111))))
 
 
-cdef multilinear_interpolation_5d(floating[:] smin, floating[:] smax,
-                                  long[:] orders, floating[:] V,
-                                  int n_s, floating[:,::1] s, floating[:] output):
+cdef void multilinear_interpolation_5d(floating[:] smin, floating[:] smax,
+                                       long[:] orders, floating[:] V,
+                                       int n_s, floating[:,::1] s, floating[:] output) noexcept nogil:
     cdef int i
     cdef floating lam_0, s_0, sn_0, snt_0
     cdef floating lam_1, s_1, sn_1, snt_1
@@ -323,7 +323,7 @@ cdef multilinear_interpolation_5d(floating[:] smin, floating[:] smax,
     cdef floating v_11101
     cdef floating v_11110
     cdef floating v_11111
-    with nogil, parallel():
+    with parallel():
         for i in prange(n_s):
 
             # (s_1, ..., s_d) : evaluation point
