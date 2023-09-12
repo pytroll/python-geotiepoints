@@ -82,11 +82,11 @@ cdef inline floating _compute_zeta(floating phi) noexcept nogil:
     return asin((R + H) * sin(phi) / R)
 
 
-cdef inline floating[:, :] _get_upper_left_corner(floating[:, ::1] arr) nogil:
+cdef inline floating[:, :] _get_upper_left_corner(floating[:, ::1] arr) noexcept nogil:
     return arr[:arr.shape[0] - 1, :arr.shape[1] - 1]
 
 
-cdef inline floating[:, :] _get_upper_right_corner(floating[:, ::1] arr) nogil:
+cdef inline floating[:, :] _get_upper_right_corner(floating[:, ::1] arr) noexcept nogil:
     return arr[:arr.shape[0] - 1, 1:]
 
 
@@ -357,10 +357,10 @@ cdef class MODISInterpolator:
         cdef Py_ssize_t k
         cdef floating[:, :] comp_a_view, comp_b_view, comp_c_view, comp_d_view
         for k in range(3):  # xyz
-            comp_a_view = xyz_view[:-1, :-1, k]  # upper left
-            comp_b_view = xyz_view[:-1, 1:, k]  # upper right
+            comp_a_view = xyz_view[:xyz_view.shape[0] - 1, :xyz_view.shape[1] - 1, k]  # upper left
+            comp_b_view = xyz_view[:xyz_view.shape[0] - 1, 1:, k]  # upper right
             comp_c_view = xyz_view[1:, 1:, k]  # lower right
-            comp_d_view = xyz_view[1:, :-1, k]  # lower left
+            comp_d_view = xyz_view[1:, :xyz_view.shape[1] - 1, k]  # lower left
             self._expand_tiepoint_array(comp_a_view, data_tiepoint_a_view)
             self._expand_tiepoint_array(comp_b_view, data_tiepoint_b_view)
             self._expand_tiepoint_array(comp_c_view, data_tiepoint_c_view)
