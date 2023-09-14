@@ -21,7 +21,7 @@ def multilinear_interpolation(floating[:] smin, floating[:] smax, long[:] orders
     else:
         dtype = np.double
 
-    cdef np.ndarray[floating, ndim=2] result_arr = np.zeros((n_v, n_s), dtype=dtype)
+    cdef np.ndarray[floating, ndim=2] result_arr = np.empty((n_v, n_s), dtype=dtype)
     cdef floating[:, ::1] result = result_arr
     cdef floating[:] vals
     cdef floating[:] res
