@@ -1,31 +1,22 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-# Copyright (c) 2012-2018 PyTroll community
-
-# Author(s):
-
-#   Adam Dybbroe <adam.dybbroe@smhi.se>
-#   Martin Raspaud <martin.raspaud@smhi.se>
-
+# Copyright (c) 2012-2023 Python-geotiepoints developers
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 """Setting up the geo_interpolator project."""
 
 import sys
 
-from setuptools import setup
+from setuptools import setup, find_packages
 import versioneer
 import numpy as np
 from Cython.Build import build_ext
@@ -77,7 +68,7 @@ except ValueError:
 cython_directives = {
     "language_level": "3",
 }
-define_macros = []
+define_macros = [("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")]
 if cython_coverage:
     print("Enabling directives/macros for Cython coverage support")
     cython_directives.update({
@@ -88,9 +79,9 @@ if cython_coverage:
         ("CYTHON_TRACE", "1"),
         ("CYTHON_TRACE_NOGIL", "1"),
     ])
-    for ext in EXTENSIONS:
-        ext.define_macros = define_macros
-        ext.cython_directives.update(cython_directives)
+for ext in EXTENSIONS:
+    ext.define_macros = define_macros
+    ext.cython_directives.update(cython_directives)
 
 cmdclass = versioneer.get_cmdclass(cmdclass={"build_ext": build_ext})
 
@@ -113,10 +104,8 @@ if __name__ == "__main__":
                        "Programming Language :: Cython",
                        "Topic :: Scientific/Engineering"],
           url="https://github.com/pytroll/python-geotiepoints",
-          packages=['geotiepoints'],
-          # packages=find_packages(),
-          setup_requires=['numpy', 'cython'],
-          python_requires='>=3.7',
+          packages=find_packages(),
+          python_requires='>=3.8',
           cmdclass=cmdclass,
           install_requires=requirements,
           ext_modules=EXTENSIONS,

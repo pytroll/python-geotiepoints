@@ -17,8 +17,7 @@ def mlinspace(smin, smax, orders):
 
 
 class MultilinearInterpolator:
-
-    '''Multilinear interpolation
+    """Multilinear interpolation.
 
     Methods
     -------
@@ -55,14 +54,14 @@ class MultilinearInterpolator:
 
     interpolated_values = interp(random_points)
     exact_values = f(random_points)
-    '''
+    """
 
     __grid__ = None
 
     def __init__(self, smin, smax, orders, values=None, dtype=np.float64):
-        self.smin = np.array(smin, dtype=dtype)
-        self.smax = np.array(smax, dtype=dtype)
-        self.orders = np.array(orders, dtype=np.int_)
+        self.smin = np.array(smin, dtype=dtype, copy=False)
+        self.smax = np.array(smax, dtype=dtype, copy=False)
+        self.orders = np.array(orders, dtype=np.int_, copy=False)
         self.d = len(orders)
         self.dtype = dtype
         if values is not None:
