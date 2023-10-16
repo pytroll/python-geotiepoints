@@ -16,5 +16,5 @@ dependencies:
   - h5py
   - pytest
   - pytest-cov
-  - pyproj
+  - pyproj >=3.0
   - pyresample
