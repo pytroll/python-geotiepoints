@@ -12,7 +12,6 @@ dependencies:
   - pyyaml
   - coveralls
   - coverage
-  - codecov
   - scipy
   - h5py
   - pytest
