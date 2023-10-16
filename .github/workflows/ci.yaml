@@ -7,7 +7,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental }}
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         os: ["windows-latest", "ubuntu-latest", "macos-latest"]
         python-version: ["3.8", "3.9", "3.10"]
@@ -33,6 +33,7 @@ jobs:
           miniforge-variant: Mambaforge
           miniforge-version: latest
           use-mamba: true
+          channel-priority: strict
           python-version: ${{ matrix.python-version }}
           activate-environment: test-environment
           environment-file: continuous_integration/environment.yaml

@@ -247,7 +247,7 @@ cdef inline floating _calc_offset_250(
         floating[:, ::1] y,
         floating m,
         Py_ssize_t offset,
-) nogil:
+) noexcept nogil:
     return result_view[offset + 3] - m * y[offset + 3, 0]
 
 

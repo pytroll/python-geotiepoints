@@ -4,18 +4,15 @@ channels:
 dependencies:
   - xarray
   - dask
-  - distributed
-  - toolz
   - Cython
   - sphinx
   - pillow
   - pyyaml
   - coveralls
   - coverage
-  - codecov
   - scipy
   - h5py
   - pytest
   - pytest-cov
-  - pyproj
+  - pyproj >=3
   - pyresample
