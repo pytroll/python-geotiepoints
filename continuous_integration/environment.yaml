@@ -4,8 +4,6 @@ channels:
 dependencies:
   - xarray
   - dask
-  - distributed
-  - toolz
   - Cython
   - sphinx
   - pillow
@@ -16,5 +14,5 @@ dependencies:
   - h5py
   - pytest
   - pytest-cov
-  - pyproj >=3.0
+  - pyproj
   - pyresample
