@@ -105,7 +105,7 @@ if __name__ == "__main__":
                        "Topic :: Scientific/Engineering"],
           url="https://github.com/pytroll/python-geotiepoints",
           packages=find_packages(),
-          python_requires='>=3.8',
+          python_requires='>=3.9',
           cmdclass=cmdclass,
           install_requires=requirements,
           ext_modules=EXTENSIONS,
