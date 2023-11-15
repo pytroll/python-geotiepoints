@@ -284,17 +284,6 @@ class SingleGridInterpolator:
         token = tokenize(chunks, self.points, self.values, fine_points, method)
         name = 'interpolate-' + token
 
-        def _enumerate_chunk_slices(chunks):
-            """Enumerate chunks with slices."""
-            for position in np.ndindex(tuple(map(len, (chunks)))):
-                slices = []
-                for pos, chunk in zip(position, chunks):
-                    chunk_size = chunk[pos]
-                    offset = sum(chunk[:pos])
-                    slices.append(slice(offset, offset + chunk_size))
-
-                yield (position, slices)
-
         dskx = {(name, ) + position: (self.interpolate_slices,
                                       slices,
                                       method)
@@ -321,6 +310,18 @@ class SingleGridInterpolator:
         fine_points = points_y, points_x
 
         return self.interpolate_numpy(fine_points, method=method)
+
+
+def _enumerate_chunk_slices(chunks):
+    """Enumerate chunks with slices."""
+    for position in np.ndindex(tuple(map(len, (chunks)))):
+        slices = []
+        for pos, chunk in zip(position, chunks):
+            chunk_size = chunk[pos]
+            offset = sum(chunk[:pos])
+            slices.append(slice(offset, offset + chunk_size))
+
+        yield (position, slices)
 
 
 class MultipleGridInterpolator:
