@@ -261,7 +261,7 @@ class TestGeoGridInterpolator:
 
     def test_chunked_geogrid_interpolation(self):
         """Test that the interpolator works with both explicit tie-point arrays and swath definition objects."""
-        import dask
+        dask = pytest.importorskip("dask")
 
         x_points = np.array([0, 1, 3, 7])
         y_points = np.array([0, 1, 3, 7, 15])

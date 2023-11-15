@@ -140,7 +140,8 @@ def grid_interpolator():
                      [2, 2, 2, 1],
                      [0, 3, 3, 3],
                      [1, 2, 1, 2],
-                     [4, 4, 4, 4]])
+                     [4, 4, 4, 4]],
+                    dtype=np.float64)
 
     return SingleGridInterpolator((ypoints, xpoints), data)
 
@@ -378,3 +379,21 @@ class TestSingleGridInterpolator:
 
             np.testing.assert_allclose(res, self.expected, atol=2e-9)
             assert interpolate.called
+
+    def test_interpolate_preserves_dtype(self):
+        """Test that interpolation is preserving the dtype."""
+        xpoints = np.array([0, 3, 7, 15])
+        ypoints = np.array([0, 3, 7, 15, 31])
+        data = np.array([[0, 1, 0, 1],
+                        [2, 2, 2, 1],
+                        [0, 3, 3, 3],
+                        [1, 2, 1, 2],
+                        [4, 4, 4, 4]],
+                        dtype=np.float32)
+
+        grid_interpolator = SingleGridInterpolator((ypoints, xpoints), data)
+        fine_x = np.arange(16)
+        fine_y = np.arange(32)
+
+        res = grid_interpolator.interpolate((fine_y, fine_x), method="cubic")
+        assert res.dtype == data.dtype
