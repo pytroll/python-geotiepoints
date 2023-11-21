@@ -1,3 +1,30 @@
+## Version 1.7.0 (2023/11/21)
+
+### Issues Closed
+
+* [Issue 56](https://github.com/pytroll/python-geotiepoints/issues/56) - Upgrade to Cython 3.0 and check annotations ([PR 57](https://github.com/pytroll/python-geotiepoints/pull/57) by [@djhoese](https://github.com/djhoese))
+* [Issue 47](https://github.com/pytroll/python-geotiepoints/issues/47) - Help wanted: verify the interpolation of MERSI-2 1000M GEO to 250M GEO
+* [Issue 23](https://github.com/pytroll/python-geotiepoints/issues/23) - Docstring headers still include authors.
+* [Issue 21](https://github.com/pytroll/python-geotiepoints/issues/21) - Interpolation of MODIS lat/lons is incorrect
+* [Issue 18](https://github.com/pytroll/python-geotiepoints/issues/18) - Make the interpolators dask-compatible
+
+In this release 5 issues were closed.
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 60](https://github.com/pytroll/python-geotiepoints/pull/60) - Add missing noexcept on cython function
+* [PR 46](https://github.com/pytroll/python-geotiepoints/pull/46) - Fix tests on i386 architectures
+
+#### Features added
+
+* [PR 61](https://github.com/pytroll/python-geotiepoints/pull/61) - Fix geogrid chunking to accept "auto" and to preserve dtype
+* [PR 57](https://github.com/pytroll/python-geotiepoints/pull/57) - Upgrade to Cython 3+ in building ([56](https://github.com/pytroll/python-geotiepoints/issues/56))
+
+In this release 4 pull requests were closed.
+
+
 ## Version 1.6.0 (2023/03/17)
 
 
