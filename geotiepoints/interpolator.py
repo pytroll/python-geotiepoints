@@ -210,9 +210,6 @@ class Interpolator:
         if np.array_equal(self.hrow_indices, self.row_indices):
             return self._interp1d()
 
-        xpoints, ypoints = np.meshgrid(self.hrow_indices,
-                                       self.hcol_indices)
-
         for num, data in enumerate(self.tie_data):
             spl = RectBivariateSpline(self.row_indices,
                                       self.col_indices,
@@ -221,8 +218,7 @@ class Interpolator:
                                       kx=self.kx_,
                                       ky=self.ky_)
 
-            new_data_ = spl.ev(xpoints.ravel(), ypoints.ravel())
-            self.new_data[num] = new_data_.reshape(xpoints.shape).T.copy(order='C')
+            self.new_data[num] = spl(self.hrow_indices, self.hcol_indices, grid=True)
 
     def _interp1d(self):
         """Interpolate in one dimension."""
@@ -279,38 +275,29 @@ class SingleGridInterpolator:
         """Interpolate (lazily) to a dask array."""
         from dask.base import tokenize
         import dask.array as da
+        from dask.array.core import normalize_chunks
         v_fine_points, h_fine_points = fine_points
         shape = len(v_fine_points), len(h_fine_points)
 
-        try:
-            v_chunk_size, h_chunk_size = chunks
-        except TypeError:
-            v_chunk_size, h_chunk_size = chunks, chunks
+        chunks = normalize_chunks(chunks, shape, dtype=self.values.dtype)
 
-        vchunks = range(0, shape[0], v_chunk_size)
-        hchunks = range(0, shape[1], h_chunk_size)
-
-        token = tokenize(v_chunk_size, h_chunk_size, self.points, self.values, fine_points, method)
+        token = tokenize(chunks, self.points, self.values, fine_points, method)
         name = 'interpolate-' + token
 
-        dskx = {(name, i, j): (self.interpolate_slices,
-                               (slice(vcs, min(vcs + v_chunk_size, shape[0])),
-                                slice(hcs, min(hcs + h_chunk_size, shape[1]))),
-                               method
-                               )
-                for i, vcs in enumerate(vchunks)
-                for j, hcs in enumerate(hchunks)
-                }
+        dskx = {(name, ) + position: (self.interpolate_slices,
+                                      slices,
+                                      method)
+                for position, slices in _enumerate_chunk_slices(chunks)}
 
         res = da.Array(dskx, name, shape=list(shape),
-                       chunks=(v_chunk_size, h_chunk_size),
+                       chunks=chunks,
                        dtype=self.values.dtype)
         return res
 
     def interpolate_numpy(self, fine_points, method="linear"):
         """Interpolate to a numpy array."""
         fine_x, fine_y = np.meshgrid(*fine_points, indexing='ij')
-        return self.interpolator((fine_x, fine_y), method=method)
+        return self.interpolator((fine_x, fine_y), method=method).astype(self.values.dtype)
 
     def interpolate_slices(self, fine_points, method="linear"):
         """Interpolate using slices.
@@ -323,6 +310,18 @@ class SingleGridInterpolator:
         fine_points = points_y, points_x
 
         return self.interpolate_numpy(fine_points, method=method)
+
+
+def _enumerate_chunk_slices(chunks):
+    """Enumerate chunks with slices."""
+    for position in np.ndindex(tuple(map(len, (chunks)))):
+        slices = []
+        for pos, chunk in zip(position, chunks):
+            chunk_size = chunk[pos]
+            offset = sum(chunk[:pos])
+            slices.append(slice(offset, offset + chunk_size))
+
+        yield (position, slices)
 
 
 class MultipleGridInterpolator:

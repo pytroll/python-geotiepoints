@@ -246,6 +246,40 @@ class TestGeoGridInterpolator:
         np.testing.assert_allclose(lons[0, :], lons_expected, rtol=5e-5)
         np.testing.assert_allclose(lats[:, 0], lats_expected, rtol=5e-5)
 
+    def test_geogrid_interpolation_preserves_dtype(self):
+        """Test that the interpolator works with both explicit tie-point arrays and swath definition objects."""
+        x_points = np.array([0, 1, 3, 7])
+        y_points = np.array([0, 1, 3, 7, 15])
+
+        interpolator = GeoGridInterpolator((y_points, x_points),
+                                           TIE_LONS.astype(np.float32), TIE_LATS.astype(np.float32))
+
+        lons, lats = interpolator.interpolate_to_shape((16, 8))
+
+        assert lons.dtype == np.float32
+        assert lats.dtype == np.float32
+
+    def test_chunked_geogrid_interpolation(self):
+        """Test that the interpolator works with both explicit tie-point arrays and swath definition objects."""
+        dask = pytest.importorskip("dask")
+
+        x_points = np.array([0, 1, 3, 7])
+        y_points = np.array([0, 1, 3, 7, 15])
+
+        interpolator = GeoGridInterpolator((y_points, x_points),
+                                           TIE_LONS.astype(np.float32), TIE_LATS.astype(np.float32))
+
+        lons, lats = interpolator.interpolate_to_shape((16, 8), chunks=4)
+
+        assert lons.chunks == ((4, 4, 4, 4), (4, 4))
+        assert lats.chunks == ((4, 4, 4, 4), (4, 4))
+
+        with dask.config.set({"array.chunk-size": 64}):
+
+            lons, lats = interpolator.interpolate_to_shape((16, 8), chunks="auto")
+            assert lons.chunks == ((4, 4, 4, 4), (4, 4))
+            assert lats.chunks == ((4, 4, 4, 4), (4, 4))
+
     def test_geogrid_interpolation_can_extrapolate(self):
         """Test that the interpolator can also extrapolate given the right parameters."""
         x_points = np.array([0, 1, 3, 7])
