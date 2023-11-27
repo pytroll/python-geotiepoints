@@ -79,9 +79,9 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: wheels
-          path: dist
+          path: wheelhouse
       - name: Publish package to Test PyPI
-        if: github.event.action != 'published' && github.event_name == 'push'
+        if: github.event.action != 'published'
         uses: pypa/gh-action-pypi-publish@v1.8.10
         with:
           user: __token__
