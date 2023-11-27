@@ -66,28 +66,6 @@ jobs:
           name: wheels
           path: ./wheelhouse/*.whl
 
-  upload_test_pypi:
-    needs: [build_sdist, build_wheels]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download sdist artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: sdist
-          path: dist
-      - name: Download wheels artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: wheels
-          path: dist
-      - name: Publish package to PyPI
-        if: github.event.action != 'published'
-        uses: pypa/gh-action-pypi-publish@v1.8.10
-        with:
-          user: __token__
-          password: ${{ secrets.test_pypi_password }}
-          repository_url: https://test.pypi.org/legacy/
-
   upload_to_pypi:
     needs: [build_sdist, build_wheels]
     runs-on: ubuntu-latest
@@ -103,7 +81,7 @@ jobs:
           name: wheels
           path: dist
       - name: Publish package to Test PyPI
-        if: github.event.action != 'published' && github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/v')
+        if: github.event.action != 'published' && github.event_name == 'push'
         uses: pypa/gh-action-pypi-publish@v1.8.10
         with:
           user: __token__
