@@ -1,3 +1,15 @@
+## Version 1.7.1 (2023/11/28)
+
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 62](https://github.com/pytroll/python-geotiepoints/pull/62) - Fix python versions in deploy ci
+
+In this release 1 pull request was closed.
+
+
 ## Version 1.7.0 (2023/11/21)
 
 ### Issues Closed
