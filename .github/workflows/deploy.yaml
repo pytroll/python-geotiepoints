@@ -22,7 +22,7 @@ jobs:
           python -m build -s
 
       - name: Upload sdist to build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: sdist
           path: dist/*.tar.gz
@@ -61,7 +61,7 @@ jobs:
           CIBW_ARCHS: "${{ matrix.cibw_archs }}"
           CIBW_TEST_SKIP: "*_arm64 *_universal2:arm64"
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: wheels
           path: ./wheelhouse/*.whl
