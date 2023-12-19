@@ -65,7 +65,7 @@ jobs:
           CIBW_ARCHS: "${{ matrix.cibw_archs }}"
           CIBW_TEST_SKIP: "*_arm64 *_universal2:arm64"
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.artifact_name }}
           path: ./wheelhouse/*.whl
