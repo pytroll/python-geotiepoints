@@ -1,5 +1,19 @@
-## Version 1.7.1 (2023/11/28)
+## Version 1.7.2 (2024/02/14)
 
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 63](https://github.com/pytroll/python-geotiepoints/pull/63) - Deploy to test pypi only on tags
+
+#### Features added
+
+* [PR 70](https://github.com/pytroll/python-geotiepoints/pull/70) - Build wheels with numpy 2
+
+In this release 2 pull requests were closed.
+
+
+## Version 1.7.1 (2023/11/28)
 
 ### Pull Requests Merged
 
