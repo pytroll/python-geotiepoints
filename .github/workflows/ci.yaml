@@ -45,6 +45,7 @@ jobs:
           python -m pip install versioneer; \
           python -m pip install \
           -f https://pypi.anaconda.org/scientific-python-nightly-wheels/simple/ \
+          --trusted-host pypi.anaconda.org \
           --no-deps --pre --upgrade \
           matplotlib \
           numpy \
