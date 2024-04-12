@@ -42,7 +42,7 @@ jobs:
         if: matrix.experimental == true
         shell: bash -l {0}
         run: |
-          python -m pip install versioneer; \
+          python -m pip install versioneer pkgconfig; \
           conda uninstall --force-remove -y scipy h5py; \
           python -m pip install \
           -f https://pypi.anaconda.org/scientific-python-nightly-wheels/simple/ \
