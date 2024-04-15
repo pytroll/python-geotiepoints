@@ -20,6 +20,8 @@ import numpy as np
 import h5py
 import os
 
+import pytest
+
 FILENAME_250M_RESULT = os.path.join(
     os.path.dirname(__file__), '../../testdata/250m_lonlat_section_result.h5')
 FILENAME_250M_INPUT = os.path.join(
@@ -68,8 +70,12 @@ class TestMODIS:
         np.testing.assert_allclose(tlons, glons, atol=0.05)
         np.testing.assert_allclose(tlats, glats, atol=0.05)
 
-    def test_1000m_to_250m(self):
+    @pytest.mark.parametrize("ncores", [None, 4])
+    def test_1000m_to_250m(self, ncores):
         """Test the 1 km to 250 meter interpolation facility."""
+        if ncores:
+            import multiprocessing as mp
+            mp.set_start_method("spawn", force=True)
 
         with h5py.File(FILENAME_250M_RESULT) as h5f:
             glons = h5f['longitude'][:] / 1000.
@@ -79,10 +85,7 @@ class TestMODIS:
             lons = h5f['longitude'][:] / 1000.
             lats = h5f['latitude'][:] / 1000.
 
-        tlons, tlats = modis1kmto250m(lons, lats)
-        np.testing.assert_allclose(tlons, glons, atol=0.05)
-        np.testing.assert_allclose(tlats, glats, atol=0.05)
-
-        tlons, tlats = modis1kmto250m(lons, lats, cores=4)
+        kwargs = {"cores": ncores} if ncores is not None else {}
+        tlons, tlats = modis1kmto250m(lons, lats, **kwargs)
         np.testing.assert_allclose(tlons, glons, atol=0.05)
         np.testing.assert_allclose(tlats, glats, atol=0.05)
