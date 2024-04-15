@@ -43,7 +43,7 @@ jobs:
         shell: bash -l {0}
         run: |
           python -m pip install versioneer pkgconfig setuptools-scm; \
-          conda uninstall --force-remove -y scipy h5py pyresample pykdtree; \
+          conda uninstall --force-remove -y scipy h5py pyresample pykdtree pandas xarray; \
           python -m pip install \
           -f https://pypi.anaconda.org/scientific-python-nightly-wheels/simple/ \
           --trusted-host pypi.anaconda.org \
