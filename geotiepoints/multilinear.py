@@ -59,9 +59,9 @@ class MultilinearInterpolator:
     __grid__ = None
 
     def __init__(self, smin, smax, orders, values=None, dtype=np.float64):
-        self.smin = np.array(smin, dtype=dtype, copy=False)
-        self.smax = np.array(smax, dtype=dtype, copy=False)
-        self.orders = np.array(orders, dtype=np.int_, copy=False)
+        self.smin = np.asarray(smin, dtype=dtype)
+        self.smax = np.asarray(smax, dtype=dtype)
+        self.orders = np.asarray(orders, dtype=np.int_)
         self.d = len(orders)
         self.dtype = dtype
         if values is not None:
