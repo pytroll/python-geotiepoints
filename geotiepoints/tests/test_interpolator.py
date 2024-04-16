@@ -349,12 +349,12 @@ class TestSingleGridInterpolator:
         fine_x = np.arange(16)
         fine_y = np.arange(32)
 
-        res = grid_interpolator.interpolate((fine_y, fine_x), method="cubic")
+        res = grid_interpolator.interpolate((fine_y, fine_x), method="cubic_legacy")
         np.testing.assert_allclose(res, self.expected, atol=2e-9)
 
     def test_interpolate_slices(self, grid_interpolator):
         """Test that interpolation from slices is working."""
-        res = grid_interpolator.interpolate_slices((slice(0, 32), slice(0, 16)), method="cubic")
+        res = grid_interpolator.interpolate_slices((slice(0, 32), slice(0, 16)), method="cubic_legacy")
         np.testing.assert_allclose(res, self.expected, atol=2e-9)
 
     @pytest.mark.parametrize("chunks, expected_chunks", [(10, (10, 10)),
@@ -369,7 +369,7 @@ class TestSingleGridInterpolator:
         with mock.patch.object(grid_interpolator,
                                "interpolate_numpy",
                                wraps=grid_interpolator.interpolate_numpy) as interpolate:
-            res = grid_interpolator.interpolate((fine_y, fine_x), method="cubic", chunks=chunks)
+            res = grid_interpolator.interpolate((fine_y, fine_x), method="cubic_legacy", chunks=chunks)
             assert not interpolate.called
 
             assert isinstance(res, da.Array)
@@ -395,5 +395,5 @@ class TestSingleGridInterpolator:
         fine_x = np.arange(16)
         fine_y = np.arange(32)
 
-        res = grid_interpolator.interpolate((fine_y, fine_x), method="cubic")
+        res = grid_interpolator.interpolate((fine_y, fine_x), method="cubic_legacy")
         assert res.dtype == data.dtype

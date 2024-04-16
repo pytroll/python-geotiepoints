@@ -70,7 +70,7 @@ class TestMultilinearInterpolator(unittest.TestCase):
         smax = [1, 1]
         orders = [5, 5]
 
-        f = lambda x: np.row_stack([
+        f = lambda x: np.vstack([
             np.sqrt(x[0, :]**2 + x[1, :]**2),
             np.power(x[0, :]**3 + x[1, :]**3, 1.0 / 3.0)
         ])

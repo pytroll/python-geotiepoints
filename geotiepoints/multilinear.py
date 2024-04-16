@@ -13,7 +13,7 @@ def mlinspace(smin, smax, orders):
     else:
         meshes = np.meshgrid(
             *[np.linspace(smin[i], smax[i], orders[i]) for i in range(len(orders))], indexing='ij')
-        return np.row_stack([l.flatten() for l in meshes])
+        return np.vstack([l.flatten() for l in meshes])
 
 
 class MultilinearInterpolator:
@@ -44,8 +44,8 @@ class MultilinearInterpolator:
     smax = [1,1]
     orders = [5,5]
 
-    f = lambda x: np.row_stack([np.sqrt( x[0,:]**2 + x[1,:]**2 ), 
-                                np.power( x[0,:]**3 + x[1,:]**3, 1.0/3.0 )])
+    f = lambda x: np.vstack([np.sqrt( x[0,:]**2 + x[1,:]**2 ),
+                             np.power( x[0,:]**3 + x[1,:]**3, 1.0/3.0 )])
 
     interp = MultilinearInterpolator(smin,smax,orders)
     interp.set_values( f(interp.grid) )
@@ -59,9 +59,9 @@ class MultilinearInterpolator:
     __grid__ = None
 
     def __init__(self, smin, smax, orders, values=None, dtype=np.float64):
-        self.smin = np.array(smin, dtype=dtype, copy=False)
-        self.smax = np.array(smax, dtype=dtype, copy=False)
-        self.orders = np.array(orders, dtype=np.int_, copy=False)
+        self.smin = np.asarray(smin, dtype=dtype)
+        self.smax = np.asarray(smax, dtype=dtype)
+        self.orders = np.asarray(orders, dtype=np.int_)
         self.d = len(orders)
         self.dtype = dtype
         if values is not None:
