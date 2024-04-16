@@ -1,3 +1,14 @@
+## Version 1.7.3 (2024/04/15)
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 74](https://github.com/pytroll/python-geotiepoints/pull/74) - Build wheels with numpy 2.0rc1 and fix scipy 1.13.0 compatibility
+
+In this release 1 pull request was closed.
+
+
 ## Version 1.7.2 (2024/02/14)
 
 ### Pull Requests Merged
