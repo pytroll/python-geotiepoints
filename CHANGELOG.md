@@ -1,3 +1,14 @@
+## Version 1.7.4 (2024/06/26)
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 76](https://github.com/pytroll/python-geotiepoints/pull/76) - Fix numpy 2 dtype issues
+
+In this release 1 pull request was closed.
+
+
 ## Version 1.7.3 (2024/04/15)
 
 ### Pull Requests Merged
