@@ -10,7 +10,7 @@ import numpy as np
 np.import_array()
 
 
-def multilinear_interpolation(floating[:] smin, floating[:] smax, long[:] orders, floating[:,::1] values, floating[:,::1] s):
+def multilinear_interpolation(floating[:] smin, floating[:] smax, int[:] orders, floating[:,::1] values, floating[:,::1] s):
 
     cdef Py_ssize_t d = s.shape[0]
     cdef Py_ssize_t n_s = s.shape[1]
@@ -46,7 +46,7 @@ def multilinear_interpolation(floating[:] smin, floating[:] smax, long[:] orders
 
 
 cdef void multilinear_interpolation_1d(floating[:] smin, floating[:] smax,
-                                       long[:] orders, floating[:] V,
+                                       int[:] orders, floating[:] V,
                                        int n_s, floating[:,::1] s, floating[:] output) noexcept nogil:
 
     cdef int i
@@ -79,7 +79,7 @@ cdef void multilinear_interpolation_1d(floating[:] smin, floating[:] smax,
 
 
 cdef void multilinear_interpolation_2d(floating[:] smin, floating[:] smax,
-                                       long[:] orders, floating[:] V,
+                                       int[:] orders, floating[:] V,
                                        int n_s, floating[:,::1] s, floating[:] output) noexcept nogil:
 
     cdef int i
@@ -124,7 +124,7 @@ cdef void multilinear_interpolation_2d(floating[:] smin, floating[:] smax,
 
 
 cdef void multilinear_interpolation_3d(floating[:] smin, floating[:] smax,
-                                       long[:] orders, floating[:] V,
+                                       int[:] orders, floating[:] V,
                                        int n_s, floating[:,::1] s, floating[:] output) noexcept nogil:
     cdef int i
     cdef floating lam_0, s_0, sn_0, snt_0
@@ -184,7 +184,7 @@ cdef void multilinear_interpolation_3d(floating[:] smin, floating[:] smax,
 
 
 cdef void multilinear_interpolation_4d(floating[:] smin, floating[:] smax,
-                                       long[:] orders, floating[:] V,
+                                       int[:] orders, floating[:] V,
                                        int n_s, floating[:,::1] s, floating[:] output) noexcept nogil:
 
     cdef int i
@@ -269,7 +269,7 @@ cdef void multilinear_interpolation_4d(floating[:] smin, floating[:] smax,
 
 
 cdef void multilinear_interpolation_5d(floating[:] smin, floating[:] smax,
-                                       long[:] orders, floating[:] V,
+                                       int[:] orders, floating[:] V,
                                        int n_s, floating[:,::1] s, floating[:] output) noexcept nogil:
     cdef int i
     cdef floating lam_0, s_0, sn_0, snt_0
