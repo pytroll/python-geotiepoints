@@ -59,7 +59,6 @@ jobs:
           git+https://github.com/h5py/h5py \
           git+https://github.com/storpipfugl/pykdtree \
           git+https://github.com/pytroll/pyresample \
-          git+https://github.com/zarr-developers/zarr \
           git+https://github.com/pydata/bottleneck \
           git+https://github.com/pydata/xarray;
 
