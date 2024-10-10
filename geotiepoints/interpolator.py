@@ -14,6 +14,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Generic interpolation routines."""
 
+from abc import ABC, abstractmethod
+from functools import partial
 import numpy as np
 from scipy.interpolate import RectBivariateSpline, splev, splrep, RegularGridInterpolator
 
@@ -241,37 +243,36 @@ class Interpolator:
         return self.new_data
 
 
-class SingleGridInterpolator:
-    """An interpolator for a single 2d data array."""
+class AbstractSingleInterpolator(ABC):
+    """An abstract interpolator for a single 2d data array."""
 
-    def __init__(self, points, values, **kwargs):
+    def __init__(self, points, values, scipy_interpolator, **interpolator_init_kwargs):
         """Set up the interpolator.
 
-        *kwargs* are passed to the underlying RegularGridInterpolator instance.
+        *kwargs* are passed to the underlying scipy interpolator instance.
         So for example, to allow extrapolation, the kwargs can be `bounds_error=False, fill_value=None`.
         """
-        self.interpolator = RegularGridInterpolator(points, values, **kwargs)
+        self.interpolator = scipy_interpolator(points, values, **interpolator_init_kwargs)
         self.points = points
         self.values = values
 
-    def interpolate(self, fine_points, method="linear", chunks=None):
+    def interpolate(self, fine_points, chunks=None, **interpolator_call_kwargs):
         """Interpolate the value points to the *fine_points* grid.
 
         Args:
             fine_points: the points on the target grid to use, as one dimensional vectors for each dimension.
-            method: the method to use for interpolation as described in RegularGridInterpolator's documentation.
-                    Default is "linear".
             chunks: If not None, a lazy (dask-based) interpolation will be performed using the chunk sizes specified.
                     The result will be a dask array in this case. Defaults to None.
+            interpolator_kwargs: The keyword arguments to pass to the underlying scipy interpolator.
         """
         if chunks is not None:
-            res = self.interpolate_dask(fine_points, method=method, chunks=chunks)
+            res = self.interpolate_dask(fine_points, chunks=chunks, **interpolator_call_kwargs)
         else:
-            res = self.interpolate_numpy(fine_points, method=method)
+            res = self.interpolate_numpy(fine_points, **interpolator_call_kwargs)
 
         return res
 
-    def interpolate_dask(self, fine_points, method, chunks):
+    def interpolate_dask(self, fine_points, chunks, **interpolator_call_kwargs):
         """Interpolate (lazily) to a dask array."""
         from dask.base import tokenize
         import dask.array as da
@@ -281,12 +282,13 @@ class SingleGridInterpolator:
 
         chunks = normalize_chunks(chunks, shape, dtype=self.values.dtype)
 
-        token = tokenize(chunks, self.points, self.values, fine_points, method)
+        token = tokenize(chunks, self.points, self.values, fine_points, interpolator_call_kwargs)
         name = 'interpolate-' + token
 
-        dskx = {(name, ) + position: (self.interpolate_slices,
-                                      slices,
-                                      method)
+        interpolate_slices = partial(self.interpolate_slices, **interpolator_call_kwargs)
+
+        dskx = {(name, ) + position: (interpolate_slices,
+                                      slices)
                 for position, slices in _enumerate_chunk_slices(chunks)}
 
         res = da.Array(dskx, name, shape=list(shape),
@@ -294,12 +296,12 @@ class SingleGridInterpolator:
                        dtype=self.values.dtype)
         return res
 
-    def interpolate_numpy(self, fine_points, method="linear"):
+    @abstractmethod
+    def interpolate_numpy(self, fine_points, **interpolator_call_kwargs):
         """Interpolate to a numpy array."""
-        fine_x, fine_y = np.meshgrid(*fine_points, indexing='ij')
-        return self.interpolator((fine_x, fine_y), method=method).astype(self.values.dtype)
+        raise NotImplementedError
 
-    def interpolate_slices(self, fine_points, method="linear"):
+    def interpolate_slices(self, fine_points, **interpolator_call_kwargs):
         """Interpolate using slices.
 
         *fine_points* are a tuple of slices for the y and x dimensions
@@ -309,7 +311,7 @@ class SingleGridInterpolator:
         points_x = np.arange(slice_x.start, slice_x.stop)
         fine_points = points_y, points_x
 
-        return self.interpolate_numpy(fine_points, method=method)
+        return self.interpolate_numpy(fine_points, **interpolator_call_kwargs)
 
 
 def _enumerate_chunk_slices(chunks):
@@ -324,14 +326,41 @@ def _enumerate_chunk_slices(chunks):
         yield (position, slices)
 
 
-class MultipleGridInterpolator:
-    """Interpolator that works on multiple data arrays."""
+class SingleGridInterpolator(AbstractSingleInterpolator):
+    """A regular grid interpolator for a single 2d data array."""
 
-    def __init__(self, tie_points, *data, **kwargs):
+    def __init__(self, *args, **interpolator_init_kwargs):
+        """Set up the grid interpolator."""
+        super().__init__(*args, scipy_interpolator=RegularGridInterpolator, **interpolator_init_kwargs)
+
+    def interpolate_numpy(self, fine_points, **interpolator_call_kwargs):
+        """Interpolate to a numpy array."""
+        fine_x, fine_y = np.meshgrid(*fine_points, indexing='ij')
+        return self.interpolator((fine_x, fine_y), **interpolator_call_kwargs).astype(self.values.dtype)
+
+
+class SingleSplineInterpolator(AbstractSingleInterpolator):
+    """An spline interpolator for a single 2d data array."""
+
+    def __init__(self, points, values, **interpolator_init_kwargs):
+        """Set up the spline interpolator."""
+        self.interpolator = RectBivariateSpline(*points, values, **interpolator_init_kwargs)
+        self.points = points
+        self.values = values
+
+    def interpolate_numpy(self, fine_points, **interpolator_call_kwargs):
+        """Interpolate to a numpy array."""
+        return self.interpolator(*fine_points, **interpolator_call_kwargs).astype(self.values.dtype)
+
+
+class AbstractMultipleInterpolator(ABC):  # noqa: B024
+    """Abstract interpolator that works on mulitple arrays."""
+
+    def __init__(self, interpolator, tie_points, *data, **interpolator_init_kwargs):
         """Set up the interpolator from the multiple `data` arrays."""
         self.interpolators = []
         for values in data:
-            self.interpolators.append(SingleGridInterpolator(tie_points, values, **kwargs))
+            self.interpolators.append(interpolator(tie_points, values, **interpolator_init_kwargs))
 
     def interpolate(self, fine_points, **kwargs):
         """Interpolate the data.
@@ -339,3 +368,24 @@ class MultipleGridInterpolator:
         The keyword arguments will be passed on to SingleGridInterpolator's interpolate function.
         """
         return (interpolator.interpolate(fine_points, **kwargs) for interpolator in self.interpolators)
+
+    def interpolate_to_shape(self, shape, **interpolator_call_kwargs):
+        """Interpolate to a given *shape*."""
+        fine_points = [np.arange(size) for size in shape]
+        return self.interpolate(fine_points, **interpolator_call_kwargs)
+
+
+class MultipleGridInterpolator(AbstractMultipleInterpolator):
+    """Grid interpolator that works on multiple data arrays."""
+
+    def __init__(self, tie_points, *data, **interpolator_init_kwargs):
+        """Set up the interpolator from the multiple `data` arrays."""
+        super().__init__(SingleGridInterpolator, tie_points, *data, **interpolator_init_kwargs)
+
+
+class MultipleSplineInterpolator(AbstractMultipleInterpolator):
+    """Spline interpolator that works on multiple data arrays."""
+
+    def __init__(self, tie_points, *data, **interpolator_init_kwargs):
+        """Set up the interpolator from the multiple `data` arrays."""
+        super().__init__(SingleSplineInterpolator, tie_points, *data, **interpolator_init_kwargs)

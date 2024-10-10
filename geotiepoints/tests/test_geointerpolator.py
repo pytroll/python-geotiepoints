@@ -22,7 +22,7 @@ import numpy as np
 import pytest
 from pyresample.geometry import SwathDefinition
 
-from geotiepoints.geointerpolator import GeoInterpolator, GeoGridInterpolator
+from geotiepoints.geointerpolator import GeoInterpolator, GeoGridInterpolator, GeoSplineInterpolator
 
 TIES_EXP1 = np.array([[6384905.78040055, 6381081.08333225, 6371519.34066148,
                        6328950.00792935, 6253610.69157758, 6145946.19489936,
@@ -291,3 +291,79 @@ class TestGeoGridInterpolator:
         lons, lats = interpolator.interpolate_to_shape((16, 16), method="cubic")
 
         assert lons.shape == (16, 16)
+
+
+class TestGeoSplineInterpolator:
+    """Test the GeoGridInterpolator."""
+
+    @pytest.mark.parametrize("args", ((TIE_LONS, TIE_LATS),
+                                      [SwathDefinition(TIE_LONS, TIE_LATS)]
+                                      ))
+    def test_geospline_interpolation(self, args):
+        """Test that the interpolator works with both explicit tie-point arrays and swath definition objects."""
+        x_points = np.array([0, 1, 3, 7])
+        y_points = np.array([0, 1, 3, 7, 15])
+
+        interpolator = GeoSplineInterpolator((y_points, x_points), *args, kx=1, ky=1)
+
+        fine_x_points = np.arange(8)
+        fine_y_points = np.arange(16)
+
+        lons, lats = interpolator.interpolate((fine_y_points, fine_x_points))
+
+        lons_expected = np.array([1., 2., 2.5, 3., 3.25, 3.5, 3.75, 4.])
+        lats_expected = np.array([1., 2., 2.5, 3., 3.25, 3.5, 3.75, 4., 4.125,
+                                  4.25, 4.375, 4.5, 4.625, 4.75, 4.875, 5.])
+
+        np.testing.assert_allclose(lons[0, :], lons_expected, rtol=5e-5)
+        np.testing.assert_allclose(lats[:, 0], lats_expected, rtol=5e-5)
+
+    def test_geospline_interpolation_to_shape(self):
+        """Test that the interpolator works with both explicit tie-point arrays and swath definition objects."""
+        x_points = np.array([0, 1, 3, 7])
+        y_points = np.array([0, 1, 3, 7, 15])
+
+        interpolator = GeoSplineInterpolator((y_points, x_points), TIE_LONS, TIE_LATS, kx=1, ky=1)
+
+        lons, lats = interpolator.interpolate_to_shape((16, 8))
+
+        lons_expected = np.array([1., 2., 2.5, 3., 3.25, 3.5, 3.75, 4.])
+        lats_expected = np.array([1., 2., 2.5, 3., 3.25, 3.5, 3.75, 4., 4.125,
+                                  4.25, 4.375, 4.5, 4.625, 4.75, 4.875, 5.])
+
+        np.testing.assert_allclose(lons[0, :], lons_expected, rtol=5e-5)
+        np.testing.assert_allclose(lats[:, 0], lats_expected, rtol=5e-5)
+
+    def test_geospline_interpolation_preserves_dtype(self):
+        """Test that the interpolator works with both explicit tie-point arrays and swath definition objects."""
+        x_points = np.array([0, 1, 3, 7])
+        y_points = np.array([0, 1, 3, 7, 15])
+
+        interpolator = GeoGridInterpolator((y_points, x_points),
+                                           TIE_LONS.astype(np.float32), TIE_LATS.astype(np.float32))
+
+        lons, lats = interpolator.interpolate_to_shape((16, 8))
+
+        assert lons.dtype == np.float32
+        assert lats.dtype == np.float32
+
+    def test_chunked_geospline_interpolation(self):
+        """Test that the interpolator works with both explicit tie-point arrays and swath definition objects."""
+        dask = pytest.importorskip("dask")
+
+        x_points = np.array([0, 1, 3, 7])
+        y_points = np.array([0, 1, 3, 7, 15])
+
+        interpolator = GeoGridInterpolator((y_points, x_points),
+                                           TIE_LONS.astype(np.float32), TIE_LATS.astype(np.float32))
+
+        lons, lats = interpolator.interpolate_to_shape((16, 8), chunks=4)
+
+        assert lons.chunks == ((4, 4, 4, 4), (4, 4))
+        assert lats.chunks == ((4, 4, 4, 4), (4, 4))
+
+        with dask.config.set({"array.chunk-size": 64}):
+
+            lons, lats = interpolator.interpolate_to_shape((16, 8), chunks="auto")
+            assert lons.chunks == ((4, 4, 4, 4), (4, 4))
+            assert lats.chunks == ((4, 4, 4, 4), (4, 4))

@@ -18,7 +18,7 @@
 """Geographical interpolation (lon/lats)."""
 
 import numpy as np
-from geotiepoints.interpolator import Interpolator, MultipleGridInterpolator
+from geotiepoints.interpolator import Interpolator, MultipleGridInterpolator, MultipleSplineInterpolator
 
 
 EARTH_RADIUS = 6370997.0
@@ -92,26 +92,38 @@ def xyz2lonlat(x__, y__, z__, radius=EARTH_RADIUS, thr=0.8, low_lat_z=True):
     return lons, lats
 
 
-class GeoGridInterpolator(MultipleGridInterpolator):
-    """Interpolate geographical coordinates from a regular grid of tie points."""
+def _work_with_lonlats(klass):
+    """Adapt MultipleInterpolator classes to work with geographical coordinates."""
 
-    def __init__(self, tie_points, *data, **kwargs):
-        """Set up the interpolator."""
-        if len(data) == 1:
-            xyz = data[0].get_cartesian_coords()
-            data = [xyz[:, :, 0], xyz[:, :, 1], xyz[:, :, 2]]
-        elif len(data) == 2:
-            data = lonlat2xyz(*data)
-        else:
-            raise ValueError("Either pass lon/lats or a pyresample definition.")
-        super().__init__(tie_points, *data, **kwargs)
+    class GeoKlass(klass):
 
-    def interpolate(self, fine_points, **kwargs):
-        """Interpolate to *fine_points*."""
-        x, y, z = super().interpolate(fine_points, **kwargs)
-        return xyz2lonlat(x, y, z)
+        def __init__(self, tie_points, *data, **interpolator_init_kwargs):
+            """Set up the interpolator."""
+            data = to_xyz(data)
+            super().__init__(tie_points, *data, **interpolator_init_kwargs)
 
-    def interpolate_to_shape(self, shape, **kwargs):
-        """Interpolate to a given *shape*."""
-        fine_points = [np.arange(size) for size in shape]
-        return self.interpolate(fine_points, **kwargs)
+        def interpolate(self, fine_points, **interpolator_call_kwargs):
+            """Interpolate to *fine_points*."""
+            x, y, z = super().interpolate(fine_points, **interpolator_call_kwargs)
+            return xyz2lonlat(x, y, z)
+
+    return GeoKlass
+
+
+def to_xyz(data):
+    """Convert data to cartesian.
+
+    Data can be a class with a `get_cartesian_coords` method, or a tuple of (lon, lat) arrays.
+    """
+    if len(data) == 1:
+        xyz = data[0].get_cartesian_coords()
+        data = [xyz[:, :, 0], xyz[:, :, 1], xyz[:, :, 2]]
+    elif len(data) == 2:
+        data = lonlat2xyz(*data)
+    else:
+        raise ValueError("Either pass lon/lats or a pyresample definition.")
+    return data
+
+
+GeoGridInterpolator = _work_with_lonlats(MultipleGridInterpolator)
+GeoSplineInterpolator = _work_with_lonlats(MultipleSplineInterpolator)
