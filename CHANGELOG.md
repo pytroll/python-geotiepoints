@@ -1,3 +1,20 @@
+## Version 1.7.5 (2024/10/12)
+
+### Issues Closed
+
+* [Issue 79](https://github.com/pytroll/python-geotiepoints/issues/79) - Test failure with scipy 1.13.x
+
+In this release 1 issue was closed.
+
+### Pull Requests Merged
+
+#### Features added
+
+* [PR 85](https://github.com/pytroll/python-geotiepoints/pull/85) - Add a spline interpolator for 2d arrays
+
+In this release 1 pull request was closed.
+
+
 ## Version 1.7.4 (2024/06/26)
 
 ### Pull Requests Merged
