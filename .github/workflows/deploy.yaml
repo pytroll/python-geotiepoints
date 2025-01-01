@@ -101,14 +101,14 @@ jobs:
           path: dist
       - name: Publish package to Test PyPI
         if: github.event.action != 'published' && github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/v')
-        uses: pypa/gh-action-pypi-publish@v1.12.2
+        uses: pypa/gh-action-pypi-publish@v1.12.3
         with:
           user: __token__
           password: ${{ secrets.test_pypi_password }}
           repository_url: https://test.pypi.org/legacy/
       - name: Publish package to PyPI
         if: github.event.action == 'published'
-        uses: pypa/gh-action-pypi-publish@v1.12.2
+        uses: pypa/gh-action-pypi-publish@v1.12.3
         with:
           user: __token__
           password: ${{ secrets.pypi_password }}
