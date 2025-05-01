@@ -40,10 +40,10 @@ jobs:
           - os: macos-latest
             cibw_archs: "x86_64 arm64"
             artifact_name: "mac"
-          - os: "ubuntu-20.04"
+          - os: "ubuntu-latest"
             cibw_archs: "aarch64"
             artifact_name: "ubuntu-aarch"
-          - os: "ubuntu-20.04"
+          - os: "ubuntu-latest"
             cibw_archs: "x86_64"
             artifact_name: "ubuntu-x86_64"
 
