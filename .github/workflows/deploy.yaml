@@ -61,9 +61,9 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.0.0
         env:
-          CIBW_SKIP: "cp36-* cp37-* cp38-* pp* *-manylinux_i686 *-musllinux_i686 *-musllinux_aarch64 *-win32"
+          CIBW_SKIP: "cp38-* *-manylinux_i686 *-musllinux_i686 *-musllinux_aarch64 *-win32"
           CIBW_ARCHS: "${{ matrix.cibw_archs }}"
-          CIBW_TEST_SKIP: "*_arm64 *_universal2:arm64"
+          CIBW_TEST_SKIP: "*_arm64"
 
       - uses: actions/upload-artifact@v4
         with:
