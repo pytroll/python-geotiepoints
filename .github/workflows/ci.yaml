@@ -31,10 +31,12 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           miniforge-version: latest
-          channel-priority: strict
-          python-version: ${{ matrix.python-version }}
+          python-version: "${{ matrix.python-version }}"
           activate-environment: test-environment
           environment-file: continuous_integration/environment.yaml
+          channels: conda-forge
+          conda-remove-defaults: true
+          channel-priority: strict
 
       - name: Install unstable dependencies
         if: matrix.experimental == true
@@ -81,7 +83,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           flags: unittests
-          file: ./coverage.xml
+          files: ./coverage.xml
           env_vars: OS,PYTHON_VERSION,UNSTABLE
 
       - name: Coveralls Parallel
