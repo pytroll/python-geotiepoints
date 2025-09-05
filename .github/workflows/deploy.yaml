@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Create sdist
         shell: bash -l {0}
@@ -48,7 +48,7 @@ jobs:
             artifact_name: "ubuntu-x86_64"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: |
           git fetch --prune --unshallow
 
