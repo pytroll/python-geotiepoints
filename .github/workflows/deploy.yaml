@@ -1,6 +1,5 @@
 name: Deploy sdist and wheels
 
-
 on:
   push:
   pull_request:
@@ -40,10 +39,10 @@ jobs:
           - os: macos-latest
             cibw_archs: "x86_64 arm64"
             artifact_name: "mac"
-          - os: "ubuntu-latest"
+          - os: "ubuntu-24.04-arm"
             cibw_archs: "aarch64"
             artifact_name: "ubuntu-aarch"
-          - os: "ubuntu-latest"
+          - os: "ubuntu-24.04"
             cibw_archs: "x86_64"
             artifact_name: "ubuntu-x86_64"
 
