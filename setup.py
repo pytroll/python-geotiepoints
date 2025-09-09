@@ -110,7 +110,7 @@ if __name__ == "__main__":
           license_files=["LICENSE.txt"],
           url="https://github.com/pytroll/python-geotiepoints",
           packages=find_packages(),
-          python_requires='>=3.10',
+          python_requires='>=3.11',
           cmdclass=cmdclass,
           install_requires=requirements,
           ext_modules=EXTENSIONS,
