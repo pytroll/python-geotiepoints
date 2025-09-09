@@ -10,10 +10,10 @@ jobs:
       fail-fast: false
       matrix:
         os: ["windows-latest", "ubuntu-latest", "macos-latest"]
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
         experimental: [false]
         include:
-          - python-version: "3.12"
+          - python-version: "3.13"
             os: "ubuntu-latest"
             experimental: true
 
@@ -72,12 +72,6 @@ jobs:
         shell: bash -l {0}
         run: |
           pytest --cov=geotiepoints geotiepoints/tests --cov-report=xml --cov-report=
-
-      # FIXME: These fail
-#      - name: Test website
-#        shell: bash -l {0}
-#        run: |
-#          cd doc && mkdir doctest && sphinx-build -E -n -b doctest ./source ./doctest && cd ..
 
       - name: Upload unittest coverage to Codecov
         uses: codecov/codecov-action@v5
