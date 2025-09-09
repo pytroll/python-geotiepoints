@@ -73,12 +73,6 @@ jobs:
         run: |
           pytest --cov=geotiepoints geotiepoints/tests --cov-report=xml --cov-report=
 
-      # FIXME: These fail
-#      - name: Test website
-#        shell: bash -l {0}
-#        run: |
-#          cd doc && mkdir doctest && sphinx-build -E -n -b doctest ./source ./doctest && cd ..
-
       - name: Upload unittest coverage to Codecov
         uses: codecov/codecov-action@v5
         with:

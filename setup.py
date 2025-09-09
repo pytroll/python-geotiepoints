@@ -23,7 +23,7 @@ from Cython.Build import build_ext
 from Cython.Distutils import Extension
 
 requirements = ['numpy', 'scipy', 'pandas']
-test_requires = ['pytest', 'pytest-cov', 'h5py', 'xarray', 'dask', 'pyproj', "pyresample"]
+test_requires = ['pytest', 'pytest-cov', 'h5py', 'xarray', 'dask[array]', 'pyproj', "pyresample"]
 
 if sys.platform.startswith("win"):
     extra_compile_args = []
@@ -114,6 +114,8 @@ if __name__ == "__main__":
           cmdclass=cmdclass,
           install_requires=requirements,
           ext_modules=EXTENSIONS,
-          tests_require=test_requires,
+          extras_require={
+              "tests": test_requires,
+          },
           zip_safe=False
           )
