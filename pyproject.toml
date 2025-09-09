@@ -1,8 +1,15 @@
 [build-system]
-requires = ["setuptools", "wheel", "numpy>=2.0.0rc1,<3", "Cython>=3", "versioneer"]
+requires = ["setuptools", "wheel", "numpy>=2.0.0,<3", "Cython>=3.1.2", "versioneer[toml]"]
 build-backend = "setuptools.build_meta"
 
 [tool.coverage.run]
 relative_files = true
 plugins = ["Cython.Coverage"]
 omit = ["geotiepoints/version.py"]
+
+[tool.versioneer]
+VCS = "git"
+style = "pep440"
+versionfile_source = "geotiepoints/version.py"
+versionfile_build = "geotiepoints/version.py"
+tag_prefix = "v"

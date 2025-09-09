@@ -35,3 +35,6 @@ geotiepoints/*.c
 
 # vscode
 .vscode
+
+# shouldn't be commited, auto-generated on installation
+geotiepoints/version.py

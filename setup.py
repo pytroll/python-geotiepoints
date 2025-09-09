@@ -67,6 +67,7 @@ except ValueError:
 
 cython_directives = {
     "language_level": "3",
+    "freethreading_compatible": True,
 }
 define_macros = [("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")]
 if cython_coverage:
@@ -96,13 +97,17 @@ if __name__ == "__main__":
           long_description_content_type='text/markdown',
           author='Adam Dybbroe, Martin Raspaud',
           author_email='martin.raspaud@smhi.se',
-          classifiers=["Development Status :: 5 - Production/Stable",
-                       "Intended Audience :: Science/Research",
-                       "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-                       "Operating System :: OS Independent",
-                       "Programming Language :: Python",
-                       "Programming Language :: Cython",
-                       "Topic :: Scientific/Engineering"],
+          classifiers=[
+              "Development Status :: 5 - Production/Stable",
+              "Intended Audience :: Science/Research",
+              "Operating System :: OS Independent",
+              "Programming Language :: Python",
+              "Programming Language :: Cython",
+              "Topic :: Scientific/Engineering",
+              "Programming Language :: Python :: Free Threading :: 1 - Unstable",
+          ],
+          license="GPL-3.0-or-later",
+          license_files=["LICENSE.txt"],
           url="https://github.com/pytroll/python-geotiepoints",
           packages=find_packages(),
           python_requires='>=3.10',
