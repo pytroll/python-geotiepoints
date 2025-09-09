@@ -8,9 +8,9 @@ build:
     post_checkout:
       - git fetch --tags
     pre_install:
-      - git update-index --assume-unchanged rtd_requirements.txt doc/conf.py
+      - git update-index --assume-unchanged rtd_requirements.txt doc/source/conf.py
 sphinx:
-  configuration: doc/conf.py
+  configuration: doc/source/conf.py
   fail_on_warning: true
 python:
   install:
