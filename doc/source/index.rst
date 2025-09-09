@@ -11,7 +11,7 @@ package should be generic enough to be used for any kind of data.
 
 The source code of the module can be found on the github_ page.
 
-.. _github: http://github.com/adybbroe/python-geotiepoints
+.. _github: http://github.com/pytroll/python-geotiepoints
 
 .. contents::
 
@@ -24,7 +24,7 @@ You can install the latest version of python-geotiepoints with pip::
 
 Alternatively, you can download the source code from github_::
 
-   git clone git://github.com/adybbroe/python-geotiepoints.git
+   git clone git://github.com/pytroll/python-geotiepoints.git
 
 and then run::
 

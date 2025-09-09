@@ -1,0 +1,8 @@
+xarray
+dask[array]
+pyresample
+pyproj
+sphinx
+sphinxcontrib-apidoc
+pytest
+
