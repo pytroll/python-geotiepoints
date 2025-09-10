@@ -1,3 +1,24 @@
+## Version 1.8.0 (2025/09/10)
+
+### Issues Closed
+
+* [Issue 37](https://github.com/pytroll/python-geotiepoints/issues/37) - Issues with interpolation on a Sentinel Tie Point Grid. 
+
+In this release 1 issue was closed.
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 103](https://github.com/pytroll/python-geotiepoints/pull/103) - Fix gcc compiler warnings in MODIS interpolator
+
+#### Features added
+
+* [PR 102](https://github.com/pytroll/python-geotiepoints/pull/102) - Add free-threading compatibility and drop Python 3.10 support
+
+In this release 2 pull requests were closed.
+
+
 ## Version 1.7.5 (2024/10/12)
 
 ### Issues Closed
