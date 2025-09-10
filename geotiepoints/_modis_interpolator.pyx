@@ -214,12 +214,12 @@ cdef class MODISInterpolator:
     ) noexcept nogil:
         cdef unsigned int scan_idx
         cdef int i
-        cdef int fine_idx
-        cdef int half_scan_length = self._fine_pixels_per_coarse_pixel // 2
+        cdef unsigned int fine_idx
+        cdef unsigned int half_scan_length = self._fine_pixels_per_coarse_pixel // 2
         cdef unsigned int fine_pixels_per_scan = self._coarse_scan_length * self._fine_pixels_per_coarse_pixel
         for fine_idx in range(fine_pixels_per_scan):
             if fine_idx < half_scan_length:
-                y_view[fine_idx] = -half_scan_length + 0.5 + fine_idx
+                y_view[fine_idx] = 0.5 + fine_idx - half_scan_length
             elif fine_idx >= fine_pixels_per_scan - half_scan_length:
                 y_view[fine_idx] = (self._fine_pixels_per_coarse_pixel + 0.5) + (half_scan_length - (fine_pixels_per_scan - fine_idx))
             else:
