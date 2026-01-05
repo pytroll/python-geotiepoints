@@ -16,3 +16,4 @@ dependencies:
   - pytest-cov
   - pyproj >=3
   - pyresample
+  - setuptools
