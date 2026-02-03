@@ -1,3 +1,20 @@
+## Version 1.9.0 (2026/02/03)
+
+### Issues Closed
+
+* [Issue 105](https://github.com/pytroll/python-geotiepoints/issues/105) - Relicense to Apache Version 2 ([PR 114](https://github.com/pytroll/python-geotiepoints/pull/114) by [@djhoese](https://github.com/djhoese))
+
+In this release 1 issue was closed.
+
+### Pull Requests Merged
+
+#### Features added
+
+* [PR 114](https://github.com/pytroll/python-geotiepoints/pull/114) - Relicense to Apache Version 2.0 ([105](https://github.com/pytroll/python-geotiepoints/issues/105))
+
+In this release 1 pull request was closed.
+
+
 ## Version 1.8.0 (2025/09/10)
 
 ### Issues Closed
