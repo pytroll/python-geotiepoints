@@ -57,7 +57,6 @@ jobs:
           CIBW_SKIP: "cp39-* cp310-* *-manylinux_i686 *-musllinux_i686 *-musllinux_aarch64 *-win32"
           CIBW_ARCHS: "${{ matrix.arch }}"
           CIBW_TEST_SKIP: "*_arm64"
-          CIBW_ENABLE: cpython-freethreading
 
       - uses: actions/upload-artifact@v7
         with:
