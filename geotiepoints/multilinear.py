@@ -7,8 +7,7 @@ from geotiepoints.multilinear_cython import multilinear_interpolation
 
 def mlinspace(smin, smax, orders):
     if len(orders) == 1:
-        res = np.atleast_2d(
-            np.linspace(np.array(smin), np.array(smax), np.array(orders)))
+        res = np.atleast_2d(np.linspace(smin[0], smax[0], orders[0]))
         return res.copy()  # workaround for strange bug
     else:
         meshes = np.meshgrid(

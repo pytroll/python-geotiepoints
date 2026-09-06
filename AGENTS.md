@@ -115,8 +115,15 @@ graph without computing.
   `_simple_modis_interpolator` re-acquires the GIL to call `scipy.ndimage.map_coordinates`.
 - `_modis_utils.xyz2lonlat` deliberately upcasts to float64 internally even for float32 input
   ("64-bit precision matters apparently").
+- **`multilinear_cython.pyx`'s `prange`/`parallel()` loops are live**, one per kernel (1-D through
+  5-D). `setup.py` compiles that extension — and only that extension — with OpenMP; see "Build, test,
+  lint". Every temporary is assigned inside the `parallel()` block so Cython privatises it per thread,
+  and the only write is `output[i]` at the loop index, so results are thread-count independent.
+  Anything assigned inside a `parallel()` block becomes thread-private, which is easy to trip over
+  when adding a variable that is meant to be shared.
 - Free-threading support is intentional: `freethreading_compatible=True` in `setup.py`, cp314t wheels,
-  and a `Free Threading :: 1 - Unstable` classifier.
+  and a `Free Threading :: 1 - Unstable` classifier. OpenMP is independent of the GIL, so libgomp and
+  `freethreading_compatible=True` coexist fine.
 - `_simple_modis_interpolator.pyx` redundantly re-applies the file-level directives as per-function
   decorators; `_modis_interpolator.pyx` does not.
 
@@ -132,6 +139,17 @@ make -C doc doctest
 
 `--cython-coverage` is a **custom `setup.py` flag** that adds the `linetrace`/`profile` directives and
 `CYTHON_TRACE` macros; without it Cython line coverage is empty.
+
+`multilinear_cython` is built with OpenMP whenever it is available. The `USE_OMP` environment variable
+controls this and defaults to `probe`, which picks `/openmp` for MSVC, `-fopenmp`/`-lgomp` for
+gcc/conda, and `-Xpreprocessor -fopenmp`/`-lomp` for macOS clang after locating libomp via
+`brew ls --verbose libomp` or `port contents libomp`. It also accepts `gcc`/`clang`/`msvc`, and
+`USE_OMP=0` forces a serial build — useful for A/B testing and as an escape hatch when a platform
+misbehaves. A failed probe degrades to a serial build rather than failing, so watch for the
+`Will use ... for OpenMP.` line in build logs. The other three extensions are **deliberately** built
+without OpenMP so they don't gain a needless libgomp dependency; `ldd` on the built `.so` files is the
+quickest way to confirm this. The macOS wheel job installs libomp via `CIBW_BEFORE_ALL_MACOS` and
+cibuildwheel's `delocate` bundles `libomp.dylib` into the wheel.
 
 - Tests load HDF5 fixtures by path relative to the test file (`../../testdata/`), so they only work
   from a source checkout, never from an installed wheel.
@@ -159,9 +177,8 @@ Verified as of this writing; fix them only when the task calls for it.
 - `_modis_utils.pyx:178` — the error message hardcodes "(10 rows per scan)" regardless of resolution.
 - `_modis_interpolator.pyx:4` imports `scanline_mapblocks` from `.simple_modis_interpolator` rather than
   from `._modis_utils` where it is defined, coupling the two MODIS front-ends for no reason.
-- `multilinear_cython.pyx` uses `prange`, but `setup.py` compiles with only `-O3` and no
-  `-fopenmp`/`/openmp`, so those loops are serial. `multilinear_interpolation_5d` is unreachable — the
-  dispatcher raises for `d > 4`.
+- The 5-D multilinear path (`multilinear_interpolation_5d`) was unreachable until recently and is
+  **experimental**: it now has scipy-comparison coverage in `test_multilinear.py` but no production use.
 - **Three Earth radii**: `6370997.0` (`__init__.py`, `geointerpolator.py`, `_modis_utils.pyx`),
   `6370.997` km (`_modis_interpolator.pyx`), `6371008.7714` (`viiinterpolator.py`).
 - `AbstractMultipleInterpolator.interpolate` (inherited by both `Multiple*Interpolator` classes)

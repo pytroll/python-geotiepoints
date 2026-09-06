@@ -2,6 +2,8 @@
 
 import unittest
 import numpy as np
+import pytest
+from scipy.interpolate import RegularGridInterpolator
 
 from geotiepoints.multilinear import MultilinearInterpolator
 
@@ -70,6 +72,44 @@ class TestMultilinearInterpolator(unittest.TestCase):
     def tearDown(self):
         """Clean up"""
         return
+
+
+def _reference_function(x):
+    """Smooth function of the ``d`` coordinates in the rows of ``x``."""
+    return np.sum(np.sin(x + np.arange(x.shape[0])[:, None]), axis=0)
+
+
+@pytest.mark.parametrize("d", [1, 2, 3, 4, 5])
+def test_multilinear_matches_scipy(d):
+    """Compare each dimensionality of the Cython kernels against scipy."""
+    smin = [-1.0] * d
+    smax = [1.0] * d
+    orders = [4] * d
+
+    interp = MultilinearInterpolator(smin, smax, orders)
+    interp.set_values(np.atleast_2d(_reference_function(interp.grid)))
+
+    axes = [np.linspace(smin[i], smax[i], orders[i]) for i in range(d)]
+    scipy_interp = RegularGridInterpolator(
+        axes, interp.values[0].reshape(orders), method="linear")
+
+    rng = np.random.default_rng(1234)
+    # in-bounds points only: outside the grid the Cython kernels extrapolate
+    # linearly, which is an intentional difference from scipy's handling
+    points = rng.uniform(-1.0, 1.0, (d, 500))
+
+    result = interp(points)
+    expected = scipy_interp(points.T)
+
+    np.testing.assert_allclose(result[0], expected, rtol=1e-12, atol=1e-12)
+
+
+def test_multilinear_too_many_dimensions():
+    """A 6-D input is rejected with a message that matches the guard."""
+    interp = MultilinearInterpolator([-1.0] * 6, [1.0] * 6, [4] * 6)
+    interp.set_values(np.zeros((1, 4 ** 6)))
+    with pytest.raises(Exception, match="strictly greater than 5"):
+        interp(np.zeros((6, 3)))
 
 
 def suite():
