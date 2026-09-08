@@ -125,8 +125,8 @@ graph without computing.
 ```bash
 pip install -e .
 python setup.py build_ext --inplace --cython-coverage --force   # required before running tests
-pytest geotiepoints/tests
-pytest --cov=geotiepoints geotiepoints/tests --cov-report=xml   # what CI runs
+pytest                                                    # whole package, doctests included
+pytest --cov=geotiepoints geotiepoints --cov-report=xml   # what CI runs
 make -C doc doctest
 ```
 
@@ -135,7 +135,21 @@ make -C doc doctest
 
 - Tests load HDF5 fixtures by path relative to the test file (`../../testdata/`), so they only work
   from a source checkout, never from an installed wheel.
-- There is **no `conftest.py` and no pytest configuration at all** — no markers, no ini options.
+- There is **no `conftest.py`**. All pytest configuration lives in `[tool.pytest.ini_options]` in
+  `pyproject.toml` (mirroring trollimage): `--doctest-modules` plus `-ra --showlocals
+  --strict-markers --strict-config`, `xfail_strict`, `filterwarnings = ["error"]`, and
+  `testpaths = ["geotiepoints"]`. So a bare `pytest` runs the unit tests *and* every module
+  docstring. No markers. Two consequences worth knowing:
+  - Passing an explicit path (e.g. `pytest geotiepoints/tests`) overrides `testpaths` and skips the
+    package doctests.
+  - **Warnings are errors**, with one scoped exception: the `invalid value encountered in
+    arcsin/arccos` `RuntimeWarning` from `geotiepoints.geointerpolator`. `xyz2lonlat` is *meant* to
+    return NaN for coordinates that interpolation or extrapolation puts off the sphere -- an invalid
+    pixel should stay visibly invalid rather than be clipped to a plausible-looking lat/lon -- while
+    callers (Satpy readers) keep processing the rest of the swath. Do not "fix" that NaN.
+  - `warnings.catch_warnings(record=True)` inherits the error filter and will raise instead of
+    recording, so it needs an explicit `warnings.simplefilter("always")` inside the context (see
+    `test_modisinterpolator.test_sat_angle_based_interp`).
 - `test_simple_modis_interpolator.py` imports its loaders and `assert_geodetic_distance` from
   `test_modisinterpolator.py`. Preserve that cross-module dependency.
 - `testdata/create_modis_test_data.py` regenerates fixtures but needs `pyhdf` plus a real MOD03 file;
@@ -145,6 +159,8 @@ make -C doc doctest
 - CI: ubuntu/macos/windows × Python 3.11/3.12/3.13, plus an experimental nightly-dependency job.
   `python_requires >= 3.11`.
 - There is no `[project]` table — package metadata still lives in `setup.py`.
+- `doc/source/conf.py` mocks nothing; the docs (and RTD, via `pip install .`) need the real package
+  and its dependencies importable, which is what makes the `index.rst` doctests runnable.
 - `geotiepoints/version.py` is versioneer-generated; never edit it. Release steps are in `RELEASING.md`.
 
 ## Known defects and traps
