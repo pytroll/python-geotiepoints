@@ -27,7 +27,9 @@ Non-obvious details:
   is a plain class. *Gen 2* is `AbstractSingleInterpolator` → `SingleGridInterpolator` /
   `SingleSplineInterpolator` and `AbstractMultipleInterpolator` → `MultipleGridInterpolator` /
   `MultipleSplineInterpolator`: functional, no mutation, and they accept `chunks=` for lazy dask
-  output. **New work belongs in Gen 2.**
+  output. **New work belongs in Gen 2.** `AbstractMultipleInterpolator.interpolate` — and so
+  `interpolate_to_shape`, both `Multiple*Interpolator` classes, and the `Geo*Interpolator` classes
+  built on them — returns a **tuple**, one array per input array, in input order.
 - **`GeoGridInterpolator` and `GeoSplineInterpolator` are built dynamically** by the
   `_work_with_lonlats(klass)` class factory (`geointerpolator.py:78`). Grepping for the class body only
   finds `GeoKlass`; the names are bound at `geointerpolator.py:111-112`.
@@ -164,13 +166,9 @@ Verified as of this writing; fix them only when the task calls for it.
   dispatcher raises for `d > 4`.
 - **Three Earth radii**: `6370997.0` (`__init__.py`, `geointerpolator.py`, `_modis_utils.pyx`),
   `6370.997` km (`_modis_interpolator.pyx`), `6371008.7714` (`viiinterpolator.py`).
-- `AbstractMultipleInterpolator.interpolate` (inherited by both `Multiple*Interpolator` classes)
-  returns a **generator**, not a tuple.
 - `simple_modis_interpolator.interpolate_geolocation_cartesian`'s docstring documents a `res_factor`
   argument that no longer exists.
 - `DEF` compile-time constants (`DEF R`, `DEF H`, `DEF EARTH_RADIUS`) are deprecated in Cython 3.
-- `interpolator.py`'s `Interpolator` docstring describes `kx_`/`ky_` as orders "in x and y", but
-  `_interp` passes `kx=self.kx_` to the *row* (first) axis of `RectBivariateSpline`.
 
 ## Roadmap
 
