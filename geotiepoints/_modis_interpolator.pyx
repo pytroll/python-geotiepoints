@@ -1,15 +1,21 @@
 # cython: language_level=3, boundscheck=False, cdivision=True, wraparound=False, initializedcheck=False, nonecheck=False
 cimport cython
 from ._modis_utils cimport lonlat2xyz, xyz2lonlat, floating, deg2rad
-from .simple_modis_interpolator import scanline_mapblocks
+from ._modis_utils import scanline_mapblocks
 
 from libc.math cimport asin, sin, cos, sqrt
 cimport numpy as np
 import numpy as np
 
-DEF R = 6370.997
-# Aqua altitude in km
-DEF H = 709.0
+cdef extern from *:
+    """
+    #define R 6370.997
+    /* Aqua altitude in km */
+    #define H 709.0
+    """
+    const double R
+    # Aqua altitude in km
+    const double H
 
 np.import_array()
 
@@ -563,14 +569,14 @@ cdef class MODISInterpolator:
             self,
             floating[:, :] input_arr,
             floating[:, ::1] expanded_arr,
-            Py_ssize_t course_col_idx,
+            Py_ssize_t coarse_col_idx,
             Py_ssize_t fine_col_idx,
     ) noexcept nogil:
         cdef floating tiepoint_value
         cdef Py_ssize_t row_idx, row_offset
         for row_idx in range(input_arr.shape[0]):
             row_offset = row_idx * self._fine_pixels_per_coarse_pixel * 2
-            tiepoint_value = input_arr[row_idx, course_col_idx]
+            tiepoint_value = input_arr[row_idx, coarse_col_idx]
             self._expand_tiepoint_array_5km_with_repeat(
                 tiepoint_value,
                 expanded_arr,

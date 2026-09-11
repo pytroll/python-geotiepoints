@@ -20,7 +20,11 @@ except ImportError:
     xr = None
 
 
-DEF EARTH_RADIUS = 6370997.0
+cdef extern from *:
+    """
+    #define EARTH_RADIUS 6370997.0
+    """
+    const double EARTH_RADIUS
 
 
 cdef void lonlat2xyz(
@@ -100,7 +104,7 @@ def scanline_mapblocks(func):
         if coarse_resolution is None or fine_resolution is None:
             raise ValueError("'coarse_resolution' and 'fine_resolution' are required keyword arguments.")
         first_arr = [arr for arr in args if hasattr(arr, "ndim")][0]
-        if first_arr.ndim != 2 or first_arr.ndim != 2:
+        if any(arr.ndim != 2 for arr in args if hasattr(arr, "ndim")):
             raise ValueError("Expected 2D input arrays.")
         if hasattr(first_arr, "compute"):
             # assume it is dask or xarray with dask, ensure proper chunk size
@@ -170,12 +174,12 @@ def _rechunk_dask_arrays_if_needed(args, rows_per_scan: int):
     num_rows = first_arr.shape[0]
     num_cols = first_arr.shape[1]
     good_row_chunks = all(x % rows_per_scan == 0 for x in row_chunks)
-    good_col_chunks = len(col_chunks) == 1 and col_chunks[0] != num_cols
+    good_col_chunks = len(col_chunks) == 1 and col_chunks[0] == num_cols
     all_orig_chunks = [arr.chunks for arr in args if hasattr(arr, "chunks")]
 
     if num_rows % rows_per_scan != 0:
         raise ValueError("Input longitude/latitude data does not consist of "
-                         "whole scans (10 rows per scan).")
+                         f"whole scans ({rows_per_scan} rows per scan).")
     all_same_chunks = all(
         all_orig_chunks[0] == some_chunks
         for some_chunks in all_orig_chunks[1:]
@@ -183,7 +187,7 @@ def _rechunk_dask_arrays_if_needed(args, rows_per_scan: int):
     if good_row_chunks and good_col_chunks and all_same_chunks:
         return args
 
-    new_row_chunks = (row_chunks[0] // rows_per_scan) * rows_per_scan
+    new_row_chunks = max(1, row_chunks[0] // rows_per_scan) * rows_per_scan
     new_args = [arr.rechunk((new_row_chunks, -1)) if hasattr(arr, "chunks") else arr for arr in args]
     return new_args
 
