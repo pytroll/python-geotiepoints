@@ -26,8 +26,10 @@ def multilinear_interpolation(floating[:] smin, floating[:] smax, long[:] orders
     cdef floating[:] vals
     cdef floating[:] res
 
-    if d > 4:
+    if d > 5:
         raise Exception("Can't interpolate in dimension strictly greater than 5")
+    if d < 1:
+        raise Exception("Can't interpolate in dimension less than 1")
 
     with nogil:
         for i in range(n_v):
@@ -41,6 +43,10 @@ def multilinear_interpolation(floating[:] smin, floating[:] smax, long[:] orders
                 multilinear_interpolation_3d(smin, smax, orders, vals, n_s, s, res)
             elif d == 4:
                 multilinear_interpolation_4d(smin, smax, orders, vals, n_s, s, res)
+            elif d == 5:
+                # EXPERIMENTAL: this kernel was unreachable until now (the dispatcher
+                # raised for d > 4) and has had no coverage. See test_multilinear.py.
+                multilinear_interpolation_5d(smin, smax, orders, vals, n_s, s, res)
 
     return result_arr
 
