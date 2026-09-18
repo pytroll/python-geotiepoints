@@ -2,6 +2,21 @@
 requires = ["setuptools", "wheel", "numpy>=2.0.0,<3", "Cython>=3.1.2", "versioneer[toml]"]
 build-backend = "setuptools.build_meta"
 
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config", "--doctest-modules"]
+xfail_strict = true
+filterwarnings = [
+    "error",
+    # xyz2lonlat: coordinates that interpolation/extrapolation puts off the sphere make the
+    # arcsin/arccos argument exceed 1. NaN is the intended result there -- an invalid pixel should
+    # be visible as NaN rather than silently corrected -- and callers (Satpy readers) must keep
+    # processing the rest of the swath, so the accompanying RuntimeWarning is not an error.
+    "ignore:invalid value encountered in arc(sin|cos):RuntimeWarning:geotiepoints.geointerpolator",
+]
+log_cli_level = "info"
+testpaths = ["geotiepoints"]
+
 [tool.coverage.run]
 relative_files = true
 plugins = ["Cython.Coverage"]

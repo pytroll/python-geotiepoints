@@ -30,8 +30,10 @@ def interpolate_geolocation_cartesian(lon_array, lat_array, coarse_resolution, f
             The input data is expected to represent 1000m geolocation.
         lat_array: Latitude data as a 2D numpy, dask, or xarray DataArray object.
             The input data is expected to represent 1000m geolocation.
-        res_factor (int): Expansion factor for the function. Should be 2 for
-            500m output or 4 for 250m output.
+        coarse_resolution (int): Resolution in meters of the input arrays.
+            Keyword-only; consumed by the ``scanline_mapblocks`` decorator.
+        fine_resolution (int): Resolution in meters of the output arrays.
+            Keyword-only; consumed by the ``scanline_mapblocks`` decorator.
 
     Returns:
         A two-element tuple (lon, lat).

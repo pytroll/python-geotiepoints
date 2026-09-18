@@ -60,7 +60,10 @@ class TestMultilinearInterpolator(unittest.TestCase):
         ])
 
         interp = MultilinearInterpolator(smin, smax, orders)
-        interp.set_values(f(interp.grid))
+        with np.errstate(invalid="ignore"):
+            # x**3 + y**3 is negative over part of the grid; the resulting NaNs are
+            # baked into the expected RES1 values.
+            interp.set_values(f(interp.grid))
 
         result = interp(ARR1)
         # exact_values = f(ARR1)

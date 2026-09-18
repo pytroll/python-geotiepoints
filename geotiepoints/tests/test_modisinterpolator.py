@@ -126,6 +126,7 @@ def test_sat_angle_based_interp(input_func, exp_func, interp_func, dist_max, exp
 
     # when working with dask arrays, we shouldn't compute anything
     with dask.config.set(scheduler=CustomScheduler(0)), warnings.catch_warnings(record=True) as warns:
+        warnings.simplefilter("always")
         lons, lats = interp_func(lon1, lat1, satz1)
     has_5km_warning = any("may result in poor quality" in str(w.message) for w in warns)
     if exp_5km_warning:
