@@ -61,10 +61,12 @@ class Interpolator:
     Uses numpy and scipy.
 
     The constructor takes in the tiepointed data as *data*, the *tiepoint_grid* and the desired *final_grid*. As
-    optional arguments, one can provide *kx_* and *ky_* as interpolation orders (in x and y directions respectively),
-    and the *chunksize* if the data has to be handled by pieces along the y axis (this affects how the extrapolator
-    behaves). If *chunksize* is set, don't forget to adjust the interpolation orders accordingly: the interpolation
-    is indeed done globaly (not chunkwise).
+    optional arguments, one can provide *kx_* and *ky_* as interpolation orders. Note that *kx_* applies to the
+    first (row) axis of the tiepoint grid, the along-track or y direction, and *ky_* to the second (column) axis,
+    the across-track or x direction. One can also provide the *chunksize* if the data
+    has to be handled by pieces along the y axis (this affects how the extrapolator behaves). If *chunksize* is
+    set, don't forget to adjust the interpolation orders accordingly: the interpolation is indeed done globaly
+    (not chunkwise).
     """
 
     def __init__(self, data, tiepoint_grid, final_grid,
@@ -352,8 +354,13 @@ class AbstractMultipleInterpolator(ABC):  # noqa: B024
         """Interpolate the data.
 
         The keyword arguments will be passed on to SingleGridInterpolator's interpolate function.
+
+        Returns:
+            A tuple with one interpolated array per input data array, in input order.
         """
-        return (interpolator.interpolate(fine_points, **kwargs) for interpolator in self.interpolators)
+        return tuple(
+            interpolator.interpolate(fine_points, **kwargs) for interpolator in self.interpolators
+        )
 
     def interpolate_to_shape(self, shape, **interpolator_call_kwargs):
         """Interpolate to a given *shape*."""

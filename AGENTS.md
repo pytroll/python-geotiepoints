@@ -27,7 +27,9 @@ Non-obvious details:
   is a plain class. *Gen 2* is `AbstractSingleInterpolator` → `SingleGridInterpolator` /
   `SingleSplineInterpolator` and `AbstractMultipleInterpolator` → `MultipleGridInterpolator` /
   `MultipleSplineInterpolator`: functional, no mutation, and they accept `chunks=` for lazy dask
-  output. **New work belongs in Gen 2.**
+  output. **New work belongs in Gen 2.** `AbstractMultipleInterpolator.interpolate` — and so
+  `interpolate_to_shape`, both `Multiple*Interpolator` classes, and the `Geo*Interpolator` classes
+  built on them — returns a **tuple**, one array per input array, in input order.
 - **`GeoGridInterpolator` and `GeoSplineInterpolator` are built dynamically** by the
   `_work_with_lonlats(klass)` class factory (`geointerpolator.py:78`). Grepping for the class body only
   finds `GeoKlass`; the names are bound at `geointerpolator.py:111-112`.
@@ -177,10 +179,6 @@ Verified as of this writing; fix them only when the task calls for it.
   `_modis_utils.pyx`) and `6370.997` km (`_modis_interpolator.pyx`) are the same value in different
   units; `6371008.7714` (`viiinterpolator.py`) is the IUGG mean radius, a genuinely different number,
   so unifying it would change `viiinterpolator` results. Deliberate, not an oversight.
-- `AbstractMultipleInterpolator.interpolate` (inherited by both `Multiple*Interpolator` classes)
-  returns a **generator**, not a tuple.
-- `interpolator.py`'s `Interpolator` docstring describes `kx_`/`ky_` as orders "in x and y", but
-  `_interp` passes `kx=self.kx_` to the *row* (first) axis of `RectBivariateSpline`.
 
 ## Roadmap
 

@@ -19,11 +19,14 @@ class GeoInterpolator(Interpolator):
 
     The constructor takes in the tiepointed data as *data*, the
     *tiepoint_grid* and the desired *final_grid*. As optional arguments, one
-    can provide *kx_* and *ky_* as interpolation orders (in x and y directions
-    respectively), and the *chunksize* if the data has to be handled by pieces
-    along the y axis (this affects how the extrapolator behaves). If
-    *chunksize* is set, don't forget to adjust the interpolation orders
-    accordingly: the interpolation is indeed done globaly (not chunkwise).
+    can provide *kx_* and *ky_* as interpolation orders. Note that *kx_*
+    applies to the first (row) axis of the tiepoint grid, the along-track or y
+    direction, and *ky_* to the second (column) axis, the across-track or x
+    direction. One can also provide the *chunksize* if the data has to be
+    handled by pieces along the y axis (this affects how the extrapolator
+    behaves). If *chunksize* is set, don't forget to adjust the interpolation
+    orders accordingly: the interpolation is indeed done globaly (not
+    chunkwise).
 
     """
 
