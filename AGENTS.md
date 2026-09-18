@@ -106,7 +106,7 @@ graph without computing.
   `# cython: language_level=3, boundscheck=False, cdivision=True, wraparound=False, initializedcheck=False, nonecheck=False`
 - **`wraparound=False` means negative indexing is banned** and silently wrong if used. There are past
   bugfix commits for exactly this. The sole exception is `_get_coords_5km`, explicitly annotated
-  `@cython.wraparound(True)` (`_modis_interpolator.pyx:231`) so it can use `x[-2]`, `x[-7]`.
+  `@cython.wraparound(True)` (`_modis_interpolator.pyx:237`) so it can use `x[-2]`, `x[-7]`.
 - **Two different `floating` fused types.** `_modis_utils.pxd` defines its own (float32/float64) and the
   MODIS `.pyx` files `cimport` it; `multilinear_cython.pyx` uses `from cython cimport floating`, the
   builtin, which *also* includes `long double`.
@@ -119,6 +119,9 @@ graph without computing.
   and a `Free Threading :: 1 - Unstable` classifier.
 - `_simple_modis_interpolator.pyx` redundantly re-applies the file-level directives as per-function
   decorators; `_modis_interpolator.pyx` does not.
+- **Compile-time constants use `cdef extern from *` with a C `#define`**, not `DEF` (deprecated in
+  Cython 3): `EARTH_RADIUS` in `_modis_utils.pyx` and `R`/`H` in `_modis_interpolator.pyx`. This keeps
+  them true compile-time constants inside the `nogil` hot loops rather than module-level global reads.
 
 ## Build, test, lint
 
@@ -167,24 +170,15 @@ make -C doc doctest
 
 Verified as of this writing; fix them only when the task calls for it.
 
-- `_modis_utils.pyx:103` — `if first_arr.ndim != 2 or first_arr.ndim != 2:` tests the same condition
-  twice; the second was presumably meant to validate another array.
-- `_modis_utils.pyx:173` — `good_col_chunks = len(col_chunks) == 1 and col_chunks[0] != num_cols` is
-  always `False` (a single column chunk must equal `num_cols`), so the rechunk branch always runs.
-  The `!=` looks like it should be `==`.
-- `_modis_utils.pyx:178` — the error message hardcodes "(10 rows per scan)" regardless of resolution.
-- `_modis_interpolator.pyx:4` imports `scanline_mapblocks` from `.simple_modis_interpolator` rather than
-  from `._modis_utils` where it is defined, coupling the two MODIS front-ends for no reason.
 - `multilinear_cython.pyx` uses `prange`, but `setup.py` compiles with only `-O3` and no
   `-fopenmp`/`/openmp`, so those loops are serial. `multilinear_interpolation_5d` is unreachable — the
   dispatcher raises for `d > 4`.
-- **Three Earth radii**: `6370997.0` (`__init__.py`, `geointerpolator.py`, `_modis_utils.pyx`),
-  `6370.997` km (`_modis_interpolator.pyx`), `6371008.7714` (`viiinterpolator.py`).
+- **Three Earth radii, accepted as-is**: `6370997.0` (`__init__.py`, `geointerpolator.py`,
+  `_modis_utils.pyx`) and `6370.997` km (`_modis_interpolator.pyx`) are the same value in different
+  units; `6371008.7714` (`viiinterpolator.py`) is the IUGG mean radius, a genuinely different number,
+  so unifying it would change `viiinterpolator` results. Deliberate, not an oversight.
 - `AbstractMultipleInterpolator.interpolate` (inherited by both `Multiple*Interpolator` classes)
   returns a **generator**, not a tuple.
-- `simple_modis_interpolator.interpolate_geolocation_cartesian`'s docstring documents a `res_factor`
-  argument that no longer exists.
-- `DEF` compile-time constants (`DEF R`, `DEF H`, `DEF EARTH_RADIUS`) are deprecated in Cython 3.
 - `interpolator.py`'s `Interpolator` docstring describes `kx_`/`ky_` as orders "in x and y", but
   `_interp` passes `kx=self.kx_` to the *row* (first) axis of `RectBivariateSpline`.
 
@@ -199,7 +193,7 @@ start it unprompted.
   constants; reconcile module naming (`modisinterpolator.py`/`viiinterpolator.py` vs
   `simple_modis_interpolator.py`/`basic_interpolator.py`); document or rename the undocumented `h`
   prefix (`hrow_indices`/`hcol_indices` = high-resolution) and the `kx_`/`x__` trailing/double
-  underscore habits; fix the `course_col_idx` typo (should be `coarse_`); remove dead code.
+  underscore habits; remove dead code.
 - **Interpolator performance.** The MODIS Cython kernels and the `scanline_mapblocks` chunking are the
   hot spots. Any change must hold the existing geodetic-distance tolerances and must not introduce dask
   computes (`CustomScheduler(0)` will fail the tests if it does).
