@@ -14,7 +14,6 @@ This version works with vii test data V2 to be released Jan 2022 which has the d
 in alt, act (row,col) format instead of act,alt (col,row)
 """
 
-import dask
 import dask.array as da
 import numpy as np
 import xarray as xr
@@ -60,7 +59,8 @@ def tie_points_geo_interpolation(longitude, latitude,
 
     The interpolation is done on the longitude and latitude values, or on cartesian coordinates if the
     tie points reach latitudes above ``lat_threshold_use_cartesian`` or span more than 180 degrees of
-    longitude. The choice is made once for all the tie points, which for dask arrays requires computing them.
+    longitude. The choice is made from all the tie points, so it is the same for every dask chunk.
+    For dask arrays it is made when the result is computed, so nothing is computed by this function.
 
     Args:
         longitude: xarray DataArray containing the longitude values defined on the tie points (degrees).
@@ -80,10 +80,14 @@ def tie_points_geo_interpolation(longitude, latitude,
         raise ValueError("The dimensions of longitude and latitude don't match")
     _check_whole_scans(longitude.shape[0], scan_alt_tie_points)
 
-    to_cart = _use_cartesian(longitude, latitude, lat_threshold_use_cartesian)
+    # Lazy for dask arrays: computed once with the result and given to every chunk
+    max_abs_lat = abs(latitude).max().data
+    lon_range = (longitude.max() - longitude.min()).data
     interp_lonlat = _map_scan_blocks(_geo_interpolate_scans, [longitude.data, latitude.data],
-                                     scan_alt_tie_points, tie_points_factor, n_outputs=2,
-                                     to_cart=to_cart, z_threshold_use_xy=z_threshold_use_xy)
+                                     scan_alt_tie_points, tie_points_factor,
+                                     reductions=(max_abs_lat, lon_range), n_outputs=2,
+                                     lat_threshold_use_cartesian=lat_threshold_use_cartesian,
+                                     z_threshold_use_xy=z_threshold_use_xy)
     return _pixels_to_data_array(interp_lonlat[0], longitude), _pixels_to_data_array(interp_lonlat[1], latitude)
 
 
@@ -94,26 +98,33 @@ def _check_whole_scans(n_tie_alt, scan_alt_tie_points):
                          f"{scan_alt_tie_points}")
 
 
-def _use_cartesian(longitude, latitude, lat_threshold_use_cartesian):
+def _use_cartesian(max_abs_lat, lon_range, lat_threshold_use_cartesian):
     """Check if the geographical interpolation must be done on cartesian coordinates.
 
     That is the case at high latitudes, or when the longitudes cross the antimeridian.
-    Both ranges are computed together to compute dask arrays only once.
+
+    Args:
+        max_abs_lat: largest absolute latitude of all the tie points (degrees), NaN if there are none.
+        lon_range: difference between the largest and smallest longitudes of all the tie points (degrees).
+        lat_threshold_use_cartesian: latitude threshold to use cartesian coordinates.
 
     """
-    max_abs_lat, lon_range = dask.compute(abs(latitude).max(), longitude.max() - longitude.min())
     return bool(max_abs_lat > lat_threshold_use_cartesian or lon_range > 180.)
 
 
-def _map_scan_blocks(func, tie_arrays, scan_alt_tie_points, tie_points_factor, n_outputs=None, **kwargs):
+def _map_scan_blocks(func, tie_arrays, scan_alt_tie_points, tie_points_factor, reductions=(), n_outputs=None,
+                     **kwargs):
     """Call ``func`` on whole scans of tie points, chunk by chunk for dask arrays.
 
     Args:
-        func: function taking the numpy tie point arrays, ``scan_alt_tie_points`` and ``tie_points_factor``
-            and returning the pixel array, or ``n_outputs`` pixel arrays stacked along a new first dimension.
+        func: function taking the numpy tie point arrays, the ``reductions``, ``scan_alt_tie_points`` and
+            ``tie_points_factor``, and returning the pixel array, or ``n_outputs`` pixel arrays stacked along a
+            new first dimension.
         tie_arrays: numpy or dask arrays of the tie points, all with the same shape.
         scan_alt_tie_points: number of tie points along the satellite track for each scan.
         tie_points_factor: sub-sampling factor of tie points wrt pixel points.
+        reductions: numpy or dask 0-d arrays computed from all the tie points. Dask ones are computed once and
+            the same values are given to every chunk.
         n_outputs: number of stacked pixel arrays returned by ``func``, or None if it returns only one.
         kwargs: other keyword arguments passed to ``func``.
 
@@ -122,7 +133,7 @@ def _map_scan_blocks(func, tie_arrays, scan_alt_tie_points, tie_points_factor, n
 
     """
     if not any(isinstance(arr, da.Array) for arr in tie_arrays):
-        return func(*tie_arrays, scan_alt_tie_points, tie_points_factor, **kwargs)
+        return func(*tie_arrays, *reductions, scan_alt_tie_points, tie_points_factor, **kwargs)
 
     tie_arrays = _rechunk_to_whole_scans([da.asarray(arr) for arr in tie_arrays], scan_alt_tie_points)
     row_chunks, col_chunks = tie_arrays[0].chunks
@@ -135,7 +146,7 @@ def _map_scan_blocks(func, tie_arrays, scan_alt_tie_points, tie_points_factor, n
         map_kwargs = {"chunks": pixel_chunks}
     else:
         map_kwargs = {"chunks": ((n_outputs,),) + pixel_chunks, "new_axis": 0}
-    return da.map_blocks(func, *tie_arrays, scan_alt_tie_points, tie_points_factor, **kwargs,
+    return da.map_blocks(func, *tie_arrays, *reductions, scan_alt_tie_points, tie_points_factor, **kwargs,
                          dtype=dtype, meta=np.array((), dtype=dtype), **map_kwargs)
 
 
@@ -215,15 +226,18 @@ def _interpolate_intervals(start, end, weights, out):
     interpolated += start
 
 
-def _geo_interpolate_scans(longitude, latitude, scan_alt_tie_points, tie_points_factor, to_cart, z_threshold_use_xy):
+def _geo_interpolate_scans(longitude, latitude, max_abs_lat, lon_range, scan_alt_tie_points, tie_points_factor,
+                           lat_threshold_use_cartesian, z_threshold_use_xy):
     """Interpolate whole scans of longitude and latitude tie points to pixel points.
 
     Args:
         longitude: numpy array of longitude tie points (degrees).
         latitude: numpy array of latitude tie points (degrees).
+        max_abs_lat: largest absolute latitude of all the tie points, not only these ones (degrees).
+        lon_range: longitude range of all the tie points, not only these ones (degrees).
         scan_alt_tie_points: number of tie points along the satellite track for each scan.
         tie_points_factor: sub-sampling factor of tie points wrt pixel points.
-        to_cart: interpolate on cartesian coordinates instead of longitudes and latitudes.
+        lat_threshold_use_cartesian: latitude threshold to use cartesian coordinates.
         z_threshold_use_xy: z threshold to compute latitude from x and y in cartesian coordinates.
 
     Returns:
@@ -234,7 +248,7 @@ def _geo_interpolate_scans(longitude, latitude, scan_alt_tie_points, tie_points_
     shape = (2, n_tie_alt // scan_alt_tie_points * (scan_alt_tie_points - 1) * tie_points_factor,
              (n_tie_act - 1) * tie_points_factor)
     lonlat = np.empty(shape, dtype=_pixel_dtype(longitude, latitude))
-    if to_cart:
+    if _use_cartesian(max_abs_lat, lon_range, lat_threshold_use_cartesian):
         x_coords, y_coords, z_coords = (_interpolate_scans(coords, scan_alt_tie_points, tie_points_factor)
                                         for coords in _lonlat2xyz(longitude, latitude))
         _xyz2lonlat(x_coords, y_coords, z_coords, z_threshold_use_xy, out=lonlat)

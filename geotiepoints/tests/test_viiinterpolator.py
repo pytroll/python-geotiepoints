@@ -176,8 +176,7 @@ def test_tie_points_interpolation_invalid_alt_tie_points(use_dask):
 )
 def test_tie_points_geo_interpolation(longitude, latitude, exp_lon, exp_lat, use_dask):
     """Test the coordinates interpolation routine in geodetic and cartesian coordinates."""
-    # Choosing between geodetic and cartesian interpolation computes the latitude and longitude ranges
-    with dask.config.set(scheduler=CustomScheduler(max_computes=1)):
+    with dask.config.set(scheduler=CustomScheduler(max_computes=0)):
         lon, lat = tie_points_geo_interpolation(
             _tie_points_data_array(longitude, use_dask),
             _tie_points_data_array(latitude, use_dask),
@@ -309,7 +308,12 @@ def test_tie_points_interpolation_independent_of_chunks(chunks):
 @pytest.mark.parametrize("chunks", TEST_CHUNKS)
 @pytest.mark.parametrize("lat_range", [(0, 23), (45, 68)], ids=["lonlat", "cartesian"])
 def test_tie_points_geo_interpolation_independent_of_chunks(lat_range, chunks):
-    """Test that dask results are the same as numpy ones, whatever the chunks of the tie points."""
+    """Test that dask results are the same as numpy ones, whatever the chunks of the tie points.
+
+    The choice of cartesian coordinates must be the same for every chunk too: in the cartesian case,
+    only the chunks of the last scans reach latitudes above 60 degrees on their own.
+
+    """
     n_tie_alt = TEST_N_SCANS_CHUNKED * TEST_SCAN_ALT_TIE_POINTS
     longitude = _linspace_tie_points(-12, 11, n_tie_alt)
     latitude = _linspace_tie_points(*lat_range, n_tie_alt)
@@ -317,7 +321,7 @@ def test_tie_points_geo_interpolation_independent_of_chunks(lat_range, chunks):
         _tie_points_data_array(longitude, False), _tie_points_data_array(latitude, False),
         TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)
     dims = ('num_tie_points_alt', 'num_tie_points_act')
-    with dask.config.set(scheduler=CustomScheduler(max_computes=1)):
+    with dask.config.set(scheduler=CustomScheduler(max_computes=0)):
         lon, lat = tie_points_geo_interpolation(
             xr.DataArray(da.from_array(longitude, chunks=chunks), dims=dims),
             xr.DataArray(da.from_array(latitude, chunks=chunks), dims=dims),

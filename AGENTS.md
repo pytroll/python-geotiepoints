@@ -99,7 +99,9 @@ be exact. That is why the test fixture is an ocean scene and why tests assert *g
    on its own with numpy (along then across track, tie-aligned pixels copied rather than weighted), so
    results are identical for any chunking; tests enforce that, plus C-contiguous blocks and one
    pixel-row chunk per tie-point-row chunk (Satpy's METimage reader relies on both).
-   `tie_points_geo_interpolation` computes the input once, to choose geodetic vs cartesian globally.
+   `tie_points_geo_interpolation` never computes: the reductions that choose geodetic vs cartesian
+   (max |lat|, longitude range) are passed to `map_blocks` as 0-d dask arrays, so the choice is made
+   once per compute, over all the tie points, and is the same for every chunk. Never decide per chunk.
 
 Everything else (the `__init__.py` legacy helpers, Gen-1 `Interpolator`/`GeoInterpolator`,
 `multilinear`) is numpy-only; `__init__.py` parallelizes with `multiprocessing.Pool` instead.
