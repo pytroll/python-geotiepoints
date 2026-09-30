@@ -70,9 +70,12 @@ def tie_points_interpolation(data_on_tie_points, scan_alt_tie_points, tie_points
 
         # Interpolate using the xarray interp function twice: first across, then along the scan
         # (much faster than interpolating directly in the two dimensions)
+        # The order also matters for the memory layout: interpolating along the last dimension
+        # produces Fortran-ordered arrays, so doing it first gives C-contiguous final arrays
+        # as required by consumers like pyresample's EWA resampling.
         data = data.assign_coords({dim_alt: tie_grid_alt, dim_act: tie_grid_act})
-        data_pixel = data.interp({dim_alt: pixel_grid_alt}, assume_sorted=True) \
-                         .interp({dim_act: pixel_grid_act}, assume_sorted=True).drop_vars([dim_alt, dim_act])
+        data_pixel = data.interp({dim_act: pixel_grid_act}, assume_sorted=True) \
+                         .interp({dim_alt: pixel_grid_alt}, assume_sorted=True).drop_vars([dim_alt, dim_act])
 
         data_on_pixel_points.append(data_pixel)
 

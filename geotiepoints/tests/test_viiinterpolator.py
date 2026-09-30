@@ -175,6 +175,8 @@ class TestViiInterpolator(unittest.TestCase):
         # Along track
         delta_axis_1 = [0., 2., 4., 6., 12., 14., 16., 18]
         self.assertTrue(np.allclose(result_valid[:, 0], delta_axis_1))
+        # Consumers like pyresample's EWA resampling require C-contiguous arrays
+        self.assertTrue(result_valid.values.flags.c_contiguous)
 
         # Test the interpolation routine with invalid input
         pytest.raises(ValueError, tie_points_interpolation,
@@ -193,6 +195,8 @@ class TestViiInterpolator(unittest.TestCase):
         )
         self.assertTrue(np.allclose(lon, TEST_LON_1))
         self.assertTrue(np.allclose(lat, TEST_LAT_1))
+        self.assertTrue(lon.values.flags.c_contiguous)
+        self.assertTrue(lat.values.flags.c_contiguous)
 
         lon, lat = tie_points_geo_interpolation(
             self.longitude_over360,
@@ -211,6 +215,8 @@ class TestViiInterpolator(unittest.TestCase):
         )
         self.assertTrue(np.allclose(lon, TEST_LON_3))
         self.assertTrue(np.allclose(lat, TEST_LAT_3))
+        self.assertTrue(lon.values.flags.c_contiguous)
+        self.assertTrue(lat.values.flags.c_contiguous)
 
         # Test the interpolation routine with invalid input (different dimensions of the two arrays)
         with self.assertRaises(ValueError):
