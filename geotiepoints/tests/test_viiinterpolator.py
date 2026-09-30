@@ -6,10 +6,10 @@ with V1.
 
 """
 
-import unittest
 import numpy as np
-import xarray as xr
 import pytest
+import xarray as xr
+
 from geotiepoints.viiinterpolator import tie_points_interpolation, tie_points_geo_interpolation
 
 
@@ -42,7 +42,7 @@ TEST_LAT_1 = np.array(
      [18., 18.5, 19., 19.5, 20., 20.5]]
 )
 
-# Results of latitude/longitude interpolation on cartesian coordinates (latitude above 60 degrees)
+# Results of latitude/longitude interpolation on cartesian coordinates (longitude with a 360 degrees step)
 TEST_LON_2 = np.array(
     [[-12., -11.50003808, -11., -10.50011426, -10., -9.50019052],
      [-10.00243991, -9.5032411, -9.00366173, -8.50454031, -8.00488578, -7.5058423],
@@ -65,7 +65,7 @@ TEST_LAT_2 = np.array(
      [17.98865968, 18.48759253, 18.98798235, 19.48686863, 19.98729684, 20.48613573]]
 )
 
-# Results of latitude/longitude interpolation on cartesian coordinates (longitude with a 360 degrees step)
+# Results of latitude/longitude interpolation on cartesian coordinates (latitude above 60 degrees)
 TEST_LON_3 = np.array(
     [[-12., -11.50444038, -11., -10.50459822, -10., -9.50476197],
      [-10.07492627, -9.58101155, -9.07759836, -8.5839056, - 8.0803761, -7.58691614],
@@ -89,140 +89,72 @@ TEST_LAT_3 = np.array(
 )
 
 
-class TestViiInterpolator(unittest.TestCase):
-    """Test the vii_utils module."""
+def _tie_points_data_array(data):
+    """Wrap tie point values in a DataArray with the VII tie point dimensions."""
+    return xr.DataArray(data, dims=('num_tie_points_alt', 'num_tie_points_act'))
 
-    def setUp(self):
-        """Set up the test."""
-        # Create the arrays for the interpolation test
-        # The first has a valid number of n_tie_alt points (multiple of SCAN_ALT_TIE_POINTS)
-        self.valid_data_for_interpolation = xr.DataArray(
-            np.arange(
-                TEST_VALID_ALT_TIE_POINTS * TEST_ACT_TIE_POINTS,
-                dtype=np.float64,
-            ).reshape(TEST_VALID_ALT_TIE_POINTS, TEST_ACT_TIE_POINTS),
-            dims=('num_tie_points_alt', 'num_tie_points_act'),
-        )
-        # The second has an invalid number of n_tie_alt points (not multiple of SCAN_ALT_TIE_POINTS)
-        self.invalid_data_for_interpolation = xr.DataArray(
-            np.arange(
-                TEST_INVALID_ALT_TIE_POINTS * TEST_ACT_TIE_POINTS,
-                dtype=np.float64,
-            ).reshape(TEST_INVALID_ALT_TIE_POINTS, TEST_ACT_TIE_POINTS),
-            dims=('num_tie_points_alt', 'num_tie_points_act'),
-        )
-        # Then two arrays containing valid longitude and latitude data
-        self.longitude = xr.DataArray(
-            np.linspace(
-                -12,
-                11,
-                num=TEST_VALID_ALT_TIE_POINTS * TEST_ACT_TIE_POINTS,
-                dtype=np.float64,
-            ).reshape(TEST_VALID_ALT_TIE_POINTS, TEST_ACT_TIE_POINTS),
-            dims=('num_tie_points_alt', 'num_tie_points_act'),
-        )
-        self.latitude = xr.DataArray(
-            np.linspace(
-                0,
-                23,
-                num=TEST_VALID_ALT_TIE_POINTS * TEST_ACT_TIE_POINTS,
-                dtype=np.float64,
-            ).reshape(TEST_VALID_ALT_TIE_POINTS, TEST_ACT_TIE_POINTS),
-            dims=('num_tie_points_alt', 'num_tie_points_act'),
-        )
-        # Then one containing latitude data above 60 degrees
-        self.latitude_over60 = xr.DataArray(
-            np.linspace(
-                45,
-                68,
-                num=TEST_VALID_ALT_TIE_POINTS * TEST_ACT_TIE_POINTS,
-                dtype=np.float64,
-            ).reshape(TEST_VALID_ALT_TIE_POINTS, TEST_ACT_TIE_POINTS),
-            dims=('num_tie_points_alt', 'num_tie_points_act'),
-        )
-        # Then one containing longitude data with a 360 degrees step
-        self.longitude_over360 = xr.DataArray(
-            np.linspace(
-                -12,
-                11,
-                num=TEST_VALID_ALT_TIE_POINTS * TEST_ACT_TIE_POINTS,
-                dtype=np.float64,
-            ).reshape(TEST_VALID_ALT_TIE_POINTS, TEST_ACT_TIE_POINTS) % 360.,
-            dims=('num_tie_points_alt', 'num_tie_points_act'),
-        )
 
-    def tearDown(self):
-        """Tear down the test."""
-        # Nothing to do
-        pass
+def _arange_tie_points(n_tie_alt):
+    """Create tie points counting up from 0 with ``n_tie_alt`` points along the track."""
+    data = np.arange(n_tie_alt * TEST_ACT_TIE_POINTS, dtype=np.float64).reshape(n_tie_alt, TEST_ACT_TIE_POINTS)
+    return _tie_points_data_array(data)
 
-    def test_tie_points_interpolation(self):
-        """# Test the interpolation routine with valid and invalid input."""
-        # Test the interpolation routine with valid input
-        result_valid = tie_points_interpolation(
-            [self.valid_data_for_interpolation],
-            TEST_SCAN_ALT_TIE_POINTS,
-            TEST_TIE_POINTS_FACTOR
-        )[0]
 
-        act_points_interp = (TEST_ACT_TIE_POINTS - 1) * TEST_TIE_POINTS_FACTOR
-        num_scans = TEST_VALID_ALT_TIE_POINTS // TEST_SCAN_ALT_TIE_POINTS
-        scan_alt_points_interp = (TEST_SCAN_ALT_TIE_POINTS - 1) * TEST_TIE_POINTS_FACTOR
+def _linspace_tie_points(start, stop):
+    """Create evenly spaced tie point values from ``start`` to ``stop`` for a valid number of scans."""
+    data = np.linspace(start, stop, num=TEST_VALID_ALT_TIE_POINTS * TEST_ACT_TIE_POINTS, dtype=np.float64)
+    return data.reshape(TEST_VALID_ALT_TIE_POINTS, TEST_ACT_TIE_POINTS)
 
-        # Across the track
-        delta_axis_0 = [0., 0.5, 1., 1.5, 2., 2.5]
-        self.assertTrue(np.allclose(result_valid[0, :], delta_axis_0))
-        # Along track
-        delta_axis_1 = [0., 2., 4., 6., 12., 14., 16., 18]
-        self.assertTrue(np.allclose(result_valid[:, 0], delta_axis_1))
-        # Consumers like pyresample's EWA resampling require C-contiguous arrays
-        self.assertTrue(result_valid.values.flags.c_contiguous)
 
-        # Test the interpolation routine with invalid input
-        pytest.raises(ValueError, tie_points_interpolation,
-                      [self.invalid_data_for_interpolation],
-                      TEST_SCAN_ALT_TIE_POINTS,
-                      TEST_TIE_POINTS_FACTOR)
+def test_tie_points_interpolation():
+    """Test the interpolation routine with valid input."""
+    data = _arange_tie_points(TEST_VALID_ALT_TIE_POINTS)
+    result = tie_points_interpolation([data], TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)[0]
 
-    def test_tie_points_geo_interpolation(self):
-        """# Test the coordinates interpolation routine with valid and invalid input."""
-        # Test the interpolation routine with valid input
-        lon, lat = tie_points_geo_interpolation(
-            self.longitude,
-            self.latitude,
-            TEST_SCAN_ALT_TIE_POINTS,
-            TEST_TIE_POINTS_FACTOR
-        )
-        self.assertTrue(np.allclose(lon, TEST_LON_1))
-        self.assertTrue(np.allclose(lat, TEST_LAT_1))
-        self.assertTrue(lon.values.flags.c_contiguous)
-        self.assertTrue(lat.values.flags.c_contiguous)
+    # Across the track
+    np.testing.assert_allclose(result[0, :], [0., 0.5, 1., 1.5, 2., 2.5])
+    # Along the track
+    np.testing.assert_allclose(result[:, 0], [0., 2., 4., 6., 12., 14., 16., 18.])
+    # Consumers like pyresample's EWA resampling require C-contiguous arrays
+    assert result.values.flags.c_contiguous
 
-        lon, lat = tie_points_geo_interpolation(
-            self.longitude_over360,
-            self.latitude,
-            TEST_SCAN_ALT_TIE_POINTS,
-            TEST_TIE_POINTS_FACTOR
-        )
-        self.assertTrue(np.allclose(lon, TEST_LON_2))
-        self.assertTrue(np.allclose(lat, TEST_LAT_2))
 
-        lon, lat = tie_points_geo_interpolation(
-            self.longitude,
-            self.latitude_over60,
-            TEST_SCAN_ALT_TIE_POINTS,
-            TEST_TIE_POINTS_FACTOR
-        )
-        self.assertTrue(np.allclose(lon, TEST_LON_3))
-        self.assertTrue(np.allclose(lat, TEST_LAT_3))
-        self.assertTrue(lon.values.flags.c_contiguous)
-        self.assertTrue(lat.values.flags.c_contiguous)
+def test_tie_points_interpolation_invalid_alt_tie_points():
+    """Test that the number of tie points along the track must be a multiple of the tie points per scan."""
+    data = _arange_tie_points(TEST_INVALID_ALT_TIE_POINTS)
+    with pytest.raises(ValueError, match="must be a multiple"):
+        tie_points_interpolation([data], TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)
 
-        # Test the interpolation routine with invalid input (different dimensions of the two arrays)
-        with self.assertRaises(ValueError):
-            tie_points_geo_interpolation(
-                self.longitude,
-                self.invalid_data_for_interpolation,
-                TEST_SCAN_ALT_TIE_POINTS,
-                TEST_TIE_POINTS_FACTOR
-            )
+
+@pytest.mark.parametrize(
+    ("longitude", "latitude", "exp_lon", "exp_lat"),
+    [
+        pytest.param(_linspace_tie_points(-12, 11), _linspace_tie_points(0, 23), TEST_LON_1, TEST_LAT_1,
+                     id="lonlat"),
+        pytest.param(_linspace_tie_points(-12, 11) % 360., _linspace_tie_points(0, 23), TEST_LON_2, TEST_LAT_2,
+                     id="cartesian_lon_360_step"),
+        pytest.param(_linspace_tie_points(-12, 11), _linspace_tie_points(45, 68), TEST_LON_3, TEST_LAT_3,
+                     id="cartesian_lat_over_60"),
+    ],
+)
+def test_tie_points_geo_interpolation(longitude, latitude, exp_lon, exp_lat):
+    """Test the coordinates interpolation routine in geodetic and cartesian coordinates."""
+    lon, lat = tie_points_geo_interpolation(
+        _tie_points_data_array(longitude),
+        _tie_points_data_array(latitude),
+        TEST_SCAN_ALT_TIE_POINTS,
+        TEST_TIE_POINTS_FACTOR
+    )
+    np.testing.assert_allclose(lon, exp_lon)
+    np.testing.assert_allclose(lat, exp_lat)
+    # Consumers like pyresample's EWA resampling require C-contiguous arrays
+    assert lon.values.flags.c_contiguous
+    assert lat.values.flags.c_contiguous
+
+
+def test_tie_points_geo_interpolation_mismatched_shapes():
+    """Test that longitude and latitude must have the same shape."""
+    longitude = _tie_points_data_array(_linspace_tie_points(-12, 11))
+    latitude = _arange_tie_points(TEST_INVALID_ALT_TIE_POINTS)
+    with pytest.raises(ValueError, match="don't match"):
+        tie_points_geo_interpolation(longitude, latitude, TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)
