@@ -6,11 +6,15 @@ with V1.
 
 """
 
+import dask
+import dask.array as da
 import numpy as np
 import pytest
 import xarray as xr
 
 from geotiepoints.viiinterpolator import tie_points_interpolation, tie_points_geo_interpolation
+
+from .utils import CustomScheduler
 
 
 TEST_N_SCANS = 2
@@ -19,6 +23,8 @@ TEST_SCAN_ALT_TIE_POINTS = 3
 TEST_VALID_ALT_TIE_POINTS = TEST_SCAN_ALT_TIE_POINTS * TEST_N_SCANS
 TEST_INVALID_ALT_TIE_POINTS = TEST_SCAN_ALT_TIE_POINTS * TEST_N_SCANS + 1
 TEST_ACT_TIE_POINTS = 4
+TEST_SCAN_ALT_PIXELS = (TEST_SCAN_ALT_TIE_POINTS - 1) * TEST_TIE_POINTS_FACTOR
+TEST_ACT_PIXELS = (TEST_ACT_TIE_POINTS - 1) * TEST_TIE_POINTS_FACTOR
 
 # Results of latitude/longitude interpolation with simple interpolation on coordinates
 TEST_LON_1 = np.array(
@@ -89,15 +95,27 @@ TEST_LAT_3 = np.array(
 )
 
 
-def _tie_points_data_array(data):
-    """Wrap tie point values in a DataArray with the VII tie point dimensions."""
+@pytest.fixture(params=[False, True], ids=["numpy", "dask"])
+def use_dask(request):
+    """Run a test with numpy-backed and with dask-backed tie points."""
+    return request.param
+
+
+def _tie_points_data_array(data, use_dask):
+    """Wrap tie point values in a DataArray with the VII tie point dimensions.
+
+    Dask arrays are chunked along the track in whole scans like Satpy's METimage readers do.
+
+    """
+    if use_dask:
+        data = da.from_array(data, chunks=(TEST_SCAN_ALT_TIE_POINTS, -1))
     return xr.DataArray(data, dims=('num_tie_points_alt', 'num_tie_points_act'))
 
 
-def _arange_tie_points(n_tie_alt):
+def _arange_tie_points(n_tie_alt, use_dask):
     """Create tie points counting up from 0 with ``n_tie_alt`` points along the track."""
     data = np.arange(n_tie_alt * TEST_ACT_TIE_POINTS, dtype=np.float64).reshape(n_tie_alt, TEST_ACT_TIE_POINTS)
-    return _tie_points_data_array(data)
+    return _tie_points_data_array(data, use_dask)
 
 
 def _linspace_tie_points(start, stop):
@@ -106,22 +124,41 @@ def _linspace_tie_points(start, stop):
     return data.reshape(TEST_VALID_ALT_TIE_POINTS, TEST_ACT_TIE_POINTS)
 
 
-def test_tie_points_interpolation():
-    """Test the interpolation routine with valid input."""
-    data = _arange_tie_points(TEST_VALID_ALT_TIE_POINTS)
-    result = tie_points_interpolation([data], TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)[0]
+def _assert_pixel_array(data_arr, use_dask):
+    """Check the array type, chunks, and memory layout of interpolated data.
 
+    Satpy's METimage readers expect one chunk of pixel rows per chunk of tie point rows, each
+    spanning the whole width of the swath. Consumers like pyresample's EWA resampling require
+    C-contiguous arrays. Dask blocks are checked individually as computing the whole array would
+    concatenate them into a new C-contiguous array and hide the problem.
+
+    """
+    if use_dask:
+        assert isinstance(data_arr.data, da.Array)
+        assert data_arr.chunks == ((TEST_SCAN_ALT_PIXELS,) * TEST_N_SCANS, (TEST_ACT_PIXELS,))
+        blocks = dask.compute(*data_arr.data.to_delayed().ravel())
+    else:
+        assert isinstance(data_arr.data, np.ndarray)
+        blocks = [data_arr.data]
+    assert all(block.flags.c_contiguous for block in blocks)
+
+
+def test_tie_points_interpolation(use_dask):
+    """Test the interpolation routine with valid input."""
+    data = _arange_tie_points(TEST_VALID_ALT_TIE_POINTS, use_dask)
+    with dask.config.set(scheduler=CustomScheduler(max_computes=0)):
+        result = tie_points_interpolation([data], TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)[0]
+
+    _assert_pixel_array(result, use_dask)
     # Across the track
     np.testing.assert_allclose(result[0, :], [0., 0.5, 1., 1.5, 2., 2.5])
     # Along the track
     np.testing.assert_allclose(result[:, 0], [0., 2., 4., 6., 12., 14., 16., 18.])
-    # Consumers like pyresample's EWA resampling require C-contiguous arrays
-    assert result.values.flags.c_contiguous
 
 
-def test_tie_points_interpolation_invalid_alt_tie_points():
+def test_tie_points_interpolation_invalid_alt_tie_points(use_dask):
     """Test that the number of tie points along the track must be a multiple of the tie points per scan."""
-    data = _arange_tie_points(TEST_INVALID_ALT_TIE_POINTS)
+    data = _arange_tie_points(TEST_INVALID_ALT_TIE_POINTS, use_dask)
     with pytest.raises(ValueError, match="must be a multiple"):
         tie_points_interpolation([data], TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)
 
@@ -137,24 +174,26 @@ def test_tie_points_interpolation_invalid_alt_tie_points():
                      id="cartesian_lat_over_60"),
     ],
 )
-def test_tie_points_geo_interpolation(longitude, latitude, exp_lon, exp_lat):
+def test_tie_points_geo_interpolation(longitude, latitude, exp_lon, exp_lat, use_dask):
     """Test the coordinates interpolation routine in geodetic and cartesian coordinates."""
-    lon, lat = tie_points_geo_interpolation(
-        _tie_points_data_array(longitude),
-        _tie_points_data_array(latitude),
-        TEST_SCAN_ALT_TIE_POINTS,
-        TEST_TIE_POINTS_FACTOR
-    )
+    # Choosing between geodetic and cartesian interpolation computes the latitude and longitude ranges
+    with dask.config.set(scheduler=CustomScheduler(max_computes=2)):
+        lon, lat = tie_points_geo_interpolation(
+            _tie_points_data_array(longitude, use_dask),
+            _tie_points_data_array(latitude, use_dask),
+            TEST_SCAN_ALT_TIE_POINTS,
+            TEST_TIE_POINTS_FACTOR
+        )
+
+    _assert_pixel_array(lon, use_dask)
+    _assert_pixel_array(lat, use_dask)
     np.testing.assert_allclose(lon, exp_lon)
     np.testing.assert_allclose(lat, exp_lat)
-    # Consumers like pyresample's EWA resampling require C-contiguous arrays
-    assert lon.values.flags.c_contiguous
-    assert lat.values.flags.c_contiguous
 
 
-def test_tie_points_geo_interpolation_mismatched_shapes():
+def test_tie_points_geo_interpolation_mismatched_shapes(use_dask):
     """Test that longitude and latitude must have the same shape."""
-    longitude = _tie_points_data_array(_linspace_tie_points(-12, 11))
-    latitude = _arange_tie_points(TEST_INVALID_ALT_TIE_POINTS)
+    longitude = _tie_points_data_array(_linspace_tie_points(-12, 11), use_dask)
+    latitude = _arange_tie_points(TEST_INVALID_ALT_TIE_POINTS, use_dask)
     with pytest.raises(ValueError, match="don't match"):
         tie_points_geo_interpolation(longitude, latitude, TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)
