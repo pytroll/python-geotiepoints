@@ -68,16 +68,19 @@ def tie_points_interpolation(data_on_tie_points, scan_alt_tie_points, tie_points
         if data.shape != (n_tie_alt, n_tie_act) or data.dims != (dim_alt, dim_act):
             raise ValueError("The dimensions of the arrays are not consistent")
 
-        # Interpolate using the xarray interp function twice: first across, then along the scan
+        # Interpolate using the xarray interp function twice: first along, then across the scan
         # (much faster than interpolating directly in the two dimensions)
+        # Interpolating across the scan last keeps dask chunks of whole pixel rows, one per chunk of
+        # tie point rows, but it produces Fortran-ordered arrays. Make them C-contiguous as required
+        # by consumers like pyresample's EWA resampling.
         data = data.assign_coords({dim_alt: tie_grid_alt, dim_act: tie_grid_act})
         data_pixel = data.interp({dim_alt: pixel_grid_alt}, assume_sorted=True) \
                          .interp({dim_act: pixel_grid_act}, assume_sorted=True).drop_vars([dim_alt, dim_act])
+        data_pixel = _as_c_contiguous(data_pixel)
 
         data_on_pixel_points.append(data_pixel)
 
     return data_on_pixel_points
-
 
 
 def tie_points_geo_interpolation(longitude, latitude,
@@ -176,3 +179,21 @@ def _xyz2lonlat(x_coords, y_coords, z_coords, z_threshold_use_xy=0.8):
         np.sign(z_coords) * (90. - np.rad2deg(np.arcsin(r / MEAN_EARTH_RADIUS)))
     )
     return lons, lats
+
+
+def _as_c_contiguous(data_arr):
+    """Get a copy of the DataArray with a C-contiguous numpy array or C-contiguous dask blocks.
+
+    Args:
+        data_arr: xarray DataArray backed by a numpy or dask array.
+
+    Returns:
+        xarray DataArray with the same dimensions, coordinates and attributes.
+
+    """
+    data = data_arr.data
+    if isinstance(data, da.Array):
+        data = data.map_blocks(np.ascontiguousarray, dtype=data.dtype, meta=np.array((), dtype=data.dtype))
+    else:
+        data = np.ascontiguousarray(data)
+    return data_arr.copy(data=data)
