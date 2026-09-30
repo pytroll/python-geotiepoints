@@ -118,10 +118,10 @@ def _arange_tie_points(n_tie_alt, use_dask):
     return _tie_points_data_array(data, use_dask)
 
 
-def _linspace_tie_points(start, stop):
-    """Create evenly spaced tie point values from ``start`` to ``stop`` for a valid number of scans."""
-    data = np.linspace(start, stop, num=TEST_VALID_ALT_TIE_POINTS * TEST_ACT_TIE_POINTS, dtype=np.float64)
-    return data.reshape(TEST_VALID_ALT_TIE_POINTS, TEST_ACT_TIE_POINTS)
+def _linspace_tie_points(start, stop, n_tie_alt=TEST_VALID_ALT_TIE_POINTS):
+    """Create evenly spaced tie point values from ``start`` to ``stop`` with ``n_tie_alt`` points along the track."""
+    data = np.linspace(start, stop, num=n_tie_alt * TEST_ACT_TIE_POINTS, dtype=np.float64)
+    return data.reshape(n_tie_alt, TEST_ACT_TIE_POINTS)
 
 
 def _assert_pixel_array(data_arr, use_dask):
@@ -177,7 +177,7 @@ def test_tie_points_interpolation_invalid_alt_tie_points(use_dask):
 def test_tie_points_geo_interpolation(longitude, latitude, exp_lon, exp_lat, use_dask):
     """Test the coordinates interpolation routine in geodetic and cartesian coordinates."""
     # Choosing between geodetic and cartesian interpolation computes the latitude and longitude ranges
-    with dask.config.set(scheduler=CustomScheduler(max_computes=2)):
+    with dask.config.set(scheduler=CustomScheduler(max_computes=1)):
         lon, lat = tie_points_geo_interpolation(
             _tie_points_data_array(longitude, use_dask),
             _tie_points_data_array(latitude, use_dask),
@@ -197,3 +197,131 @@ def test_tie_points_geo_interpolation_mismatched_shapes(use_dask):
     latitude = _arange_tie_points(TEST_INVALID_ALT_TIE_POINTS, use_dask)
     with pytest.raises(ValueError, match="don't match"):
         tie_points_geo_interpolation(longitude, latitude, TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)
+
+
+@pytest.mark.parametrize(
+    ("nan_tie_rows", "nan_tie_cols", "exp_nan_rows", "exp_nan_cols"),
+    [
+        pytest.param([0, 1, 2], [], [0, 1, 2, 3], [], id="missing_first_scan"),
+        pytest.param([2], [], [3], [], id="edge_tie_row_of_first_scan"),
+        pytest.param([1], [], [1, 2, 3], [], id="middle_tie_row_of_first_scan"),
+        pytest.param([3], [], [4, 5], [], id="first_tie_row_of_second_scan"),
+        pytest.param([], [1], [], [1, 2, 3], id="tie_column"),
+    ],
+)
+def test_tie_points_interpolation_invalid_tie_points(nan_tie_rows, nan_tie_cols, exp_nan_rows, exp_nan_cols,
+                                                     use_dask):
+    """Test that invalid (NaN) tie points only invalidate the pixels interpolated from them.
+
+    Pixels of other scans and pixels coinciding with a valid tie point stay valid.
+
+    """
+    data = np.arange(TEST_VALID_ALT_TIE_POINTS * TEST_ACT_TIE_POINTS, dtype=np.float64)
+    data = data.reshape(TEST_VALID_ALT_TIE_POINTS, TEST_ACT_TIE_POINTS)
+    data[nan_tie_rows, :] = np.nan
+    data[:, nan_tie_cols] = np.nan
+    result = tie_points_interpolation([_tie_points_data_array(data, use_dask)],
+                                      TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)[0]
+
+    exp_nan = np.zeros(result.shape, dtype=bool)
+    exp_nan[exp_nan_rows, :] = True
+    exp_nan[:, exp_nan_cols] = True
+    np.testing.assert_array_equal(np.isnan(result.values), exp_nan)
+
+
+def test_tie_points_interpolation_keeps_tie_point_values(use_dask):
+    """Test that pixels coinciding with a tie point get exactly its value."""
+    data = np.random.default_rng(42).uniform(-180, 180, (TEST_VALID_ALT_TIE_POINTS, TEST_ACT_TIE_POINTS))
+    result = tie_points_interpolation([_tie_points_data_array(data, use_dask)],
+                                      TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)[0]
+
+    # Every tie point but the edge ones, at the end of each scan and of the swath width, coincides with a pixel
+    tie_rows = [scan * TEST_SCAN_ALT_TIE_POINTS + row
+                for scan in range(TEST_N_SCANS) for row in range(TEST_SCAN_ALT_TIE_POINTS - 1)]
+    pixel_rows = [scan * TEST_SCAN_ALT_PIXELS + row * TEST_TIE_POINTS_FACTOR
+                  for scan in range(TEST_N_SCANS) for row in range(TEST_SCAN_ALT_TIE_POINTS - 1)]
+    np.testing.assert_array_equal(result.values[pixel_rows, ::TEST_TIE_POINTS_FACTOR], data[tie_rows, :-1])
+
+
+@pytest.mark.parametrize(
+    ("dtype", "exp_dtype"),
+    [(np.float64, np.float64), (np.float32, np.float32), (np.int16, np.float64)],
+)
+def test_tie_points_interpolation_dtype_and_metadata(dtype, exp_dtype, use_dask):
+    """Test that floating point tie points keep their type, integers become float64, and metadata is kept."""
+    data = _arange_tie_points(TEST_VALID_ALT_TIE_POINTS, use_dask).astype(dtype)
+    data = data.rename("tie_data").assign_attrs(units="1").assign_coords(scalar=1.0)
+    result = tie_points_interpolation([data], TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)[0]
+
+    assert result.dtype == exp_dtype
+    assert result.values.dtype == exp_dtype
+    assert result.name == "tie_data"
+    assert result.attrs == {"units": "1"}
+    assert list(result.coords) == ["scalar"]
+    assert result.dims == data.dims
+
+
+@pytest.mark.parametrize("lat_range", [(0, 23), (45, 68)], ids=["lonlat", "cartesian"])
+def test_tie_points_geo_interpolation_float32(lat_range, use_dask):
+    """Test that 32-bit floating point longitudes and latitudes stay 32-bit."""
+    longitude = _tie_points_data_array(_linspace_tie_points(-12, 11).astype(np.float32), use_dask)
+    latitude = _tie_points_data_array(_linspace_tie_points(*lat_range).astype(np.float32), use_dask)
+    lon, lat = tie_points_geo_interpolation(longitude, latitude, TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)
+
+    for data_arr in (lon, lat):
+        assert data_arr.dtype == np.float32
+        assert data_arr.values.dtype == np.float32
+
+
+TEST_CHUNKS = [
+    pytest.param((TEST_SCAN_ALT_TIE_POINTS, -1), id="one_scan"),
+    pytest.param((2 * TEST_SCAN_ALT_TIE_POINTS, -1), id="two_scans"),
+    pytest.param((-1, -1), id="single_chunk"),
+    pytest.param((3 * TEST_SCAN_ALT_TIE_POINTS, -1), id="uneven_scans"),
+    pytest.param((TEST_SCAN_ALT_TIE_POINTS - 1, -1), id="partial_scans"),
+    pytest.param((2 * TEST_SCAN_ALT_TIE_POINTS, TEST_ACT_TIE_POINTS // 2), id="partial_width"),
+]
+TEST_N_SCANS_CHUNKED = 4
+
+
+def _assert_same_as_numpy(result, expected):
+    """Check that dask results are made of whole scan chunks across the swath width and equal the numpy ones."""
+    assert isinstance(result.data, da.Array)
+    assert all(rows % TEST_SCAN_ALT_PIXELS == 0 for rows in result.chunks[0])
+    assert result.chunks[1] == (result.shape[1],)
+    np.testing.assert_array_equal(result.values, expected.values)
+
+
+@pytest.mark.parametrize("chunks", TEST_CHUNKS)
+def test_tie_points_interpolation_independent_of_chunks(chunks):
+    """Test that dask results are the same as numpy ones, whatever the chunks of the tie points."""
+    data = np.random.default_rng(42).uniform(
+        -180, 180, (TEST_N_SCANS_CHUNKED * TEST_SCAN_ALT_TIE_POINTS, TEST_ACT_TIE_POINTS))
+    expected = tie_points_interpolation([_tie_points_data_array(data, False)],
+                                        TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)[0]
+    dask_data = xr.DataArray(da.from_array(data, chunks=chunks), dims=('num_tie_points_alt', 'num_tie_points_act'))
+    with dask.config.set(scheduler=CustomScheduler(max_computes=0)):
+        result = tie_points_interpolation([dask_data], TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)[0]
+
+    _assert_same_as_numpy(result, expected)
+
+
+@pytest.mark.parametrize("chunks", TEST_CHUNKS)
+@pytest.mark.parametrize("lat_range", [(0, 23), (45, 68)], ids=["lonlat", "cartesian"])
+def test_tie_points_geo_interpolation_independent_of_chunks(lat_range, chunks):
+    """Test that dask results are the same as numpy ones, whatever the chunks of the tie points."""
+    n_tie_alt = TEST_N_SCANS_CHUNKED * TEST_SCAN_ALT_TIE_POINTS
+    longitude = _linspace_tie_points(-12, 11, n_tie_alt)
+    latitude = _linspace_tie_points(*lat_range, n_tie_alt)
+    exp_lon, exp_lat = tie_points_geo_interpolation(
+        _tie_points_data_array(longitude, False), _tie_points_data_array(latitude, False),
+        TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)
+    dims = ('num_tie_points_alt', 'num_tie_points_act')
+    with dask.config.set(scheduler=CustomScheduler(max_computes=1)):
+        lon, lat = tie_points_geo_interpolation(
+            xr.DataArray(da.from_array(longitude, chunks=chunks), dims=dims),
+            xr.DataArray(da.from_array(latitude, chunks=chunks), dims=dims),
+            TEST_SCAN_ALT_TIE_POINTS, TEST_TIE_POINTS_FACTOR)
+
+    _assert_same_as_numpy(lon, exp_lon)
+    _assert_same_as_numpy(lat, exp_lat)
